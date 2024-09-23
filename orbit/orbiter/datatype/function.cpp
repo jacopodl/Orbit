@@ -1,0 +1,87 @@
+// This source file is part of the Orbit project.
+//
+// Licensed under the Apache License v2.0
+
+#include <orbit/orbiter/memory/memory.h>
+
+#include <orbit/orbiter/datatype/function.h>
+
+using namespace orbiter::datatype;
+
+FuncShared *FunSharedNew(orbiter::Context *ctx, const char *name, const char *doc,
+                         U16 arity, FunctionPtr func, FunctionKind kind) {
+    auto *s_name = StringNew(ctx, name);
+    if (s_name == nullptr)
+        return nullptr;
+
+    String *s_doc = nullptr;
+
+    if (doc != nullptr) {
+        s_doc = StringNew(ctx, doc);
+        if (s_doc == nullptr) {
+            Release(s_name);
+
+            return nullptr;
+        }
+    }
+
+    auto *shared = (FuncShared *) orbiter::memory::Alloc(sizeof(FuncShared));
+    if (shared != nullptr) {
+        shared->refs = 1;
+
+        shared->name = s_name;
+        shared->doc = s_doc;
+
+        shared->func = func;
+
+        shared->arity = arity;
+        shared->kind = kind;
+    }
+
+    return shared;
+}
+
+void FunSharedDel(FuncShared *shared) {
+    if (shared->refs.fetch_sub(1) > 1)
+        return;
+
+    Release(shared->name);
+    Release(shared->doc);
+
+    if (shared->IsInterpreted())
+        Release(shared->code);
+
+    orbiter::memory::Free(shared);
+}
+
+bool orbiter::datatype::FunctionTypeSetup(Context *ctx, TypeInfo *self) {
+    return true;
+}
+
+Function *orbiter::datatype::FunctionNew(Context *ctx, const FunctionDef *def) {
+    auto kind = FunctionKind::NATIVE;
+
+    if (def->method)
+        kind |= FunctionKind::METHOD;
+
+    auto *f_shared = FunSharedNew(ctx, def->name, def->doc, def->params, def->func, kind);
+    if (f_shared == nullptr)
+        return nullptr;
+
+    auto *fn = MakeObject<Function>(ctx, InstanceType::FUNCTION);
+
+    if (fn != nullptr) {
+        fn->shared = f_shared;
+
+        return fn;
+    }
+
+    FunSharedDel(f_shared);
+
+    return nullptr;
+}
+
+TypeInfo *orbiter::datatype::FunctionTypeInit(Context *ctx) {
+    auto *func = MakeType(ctx, InstanceType::FUNCTION, sizeof(Function) - sizeof(OObject), 0, 0);
+    return func;
+}

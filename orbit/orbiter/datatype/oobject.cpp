@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/oobject.h>
 
 using namespace orbiter::datatype;
@@ -47,6 +48,22 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject 
                 *property = tmp;
                 break;
             }
+        }
+    }
+
+    return true;
+}
+
+bool orbiter::datatype::TIPropertyAdd(Context *ctx, TypeInfo *type, const FunctionDef *bulk) {
+    for (auto *cursor = bulk; cursor->name != nullptr; cursor++) {
+        auto *fn = FunctionNew(ctx, cursor);
+        if (fn == nullptr)
+            return false;
+
+        if (!TIPropertyAdd(type, cursor->name, (OObject *) fn, {})) {
+            Release(fn);
+
+            return false;
         }
     }
 

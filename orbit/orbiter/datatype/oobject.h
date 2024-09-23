@@ -24,6 +24,17 @@ namespace orbiter::datatype {
     bool TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, PropertyDetail detail);
 
     /**
+     * @brief Add multiple properties(functions/methods) to a TypeInfo from a bulk definition
+     *
+     * @param ctx Pointer to the Context
+     * @param type Pointer to the TypeInfo
+     * @param bulk Pointer to the FunctionDef array containing bulk property definitions
+     *
+     * @return true if properties were added successfully, false otherwise
+     */
+    bool TIPropertyAdd(Context *ctx, TypeInfo *type, const FunctionDef *bulk);
+
+    /**
      * @brief Add an inline property to a TypeInfo using an offset
      *
      * @param type Pointer to the TypeInfo
