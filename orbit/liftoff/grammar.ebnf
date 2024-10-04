@@ -1,0 +1,243 @@
+(*
+    This source file is part of the Orbit project.
+    Licensed under the Apache License v2.0
+
+    syntax: ISO-14977 EBNF
+    version: 1.0
+*)
+
+(* Basic elements *)
+digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+non_zero_digit = "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
+hex_digit = digit | "a" | "b" | "c" | "d" | "e" | "f" | "A" | "B" | "C" | "D" | "E" | "F";
+octal_digit = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7";
+bin_digit = "0" | "1";
+letter = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" |
+         "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" |
+         "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" |
+         "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z";
+
+(* Identifiers *)
+identifier = (letter | "_"), {letter | digit | "_"};
+
+(* Comments *)
+single_line_comment = "#", {? any character except newline ?};
+multi_line_comment = "/*", {? any character, including newlines, except "*/" ?}, "*/";
+comment = single_line_comment | multi_line_comment;
+
+(* Inline Documentation *)
+doc_comment = "/**", {? any character, including newlines, except "*/" ?}, "*/";
+
+(* Numeric literals *)
+int = ["-"], ({digit} | "0");
+unsigned_int = int, "u";
+hex_int = "0x", hex_digit, {hex_digit};
+unsigned_hex_int = hex_int, "u";
+octal_int = "0o", octal_digit, {octal_digit};
+unsigned_octal_int = octal_int, "u";
+bin_int = "0b", bin_digit, {bin_digit};
+unsigned_bin_int = bin_int, "u";
+float = ["-"], (digit, {digit}, ".", {digit} | ".", digit, {digit});
+
+(* Character and string literals *)
+char = "'", (? any character except single quote or newline ? | "\", ? any character ?), "'";
+string = normal_string | raw_string | bytes_string;
+normal_string = '"', {? any character except double quote or newline ? | "\", ? any character ?}, '"';
+raw_string = "r", raw_string_delim, '"', {? any character including newlines ?}, '"', raw_string_delim;
+bytes_string = "b", raw_string_delim, '"', {? any byte value ?}, '"', raw_string_delim;
+raw_string_delim = {"#"};
+
+(* String Literal (for use in import paths and native declarations) *)
+string_literal = '"', {? any character except double quote or newline ?}, '"';
+
+(* Other basic types *)
+atom = "@", identifier;
+boolean = "true" | "false";
+nil = "nil";
+
+(* Composite types *)
+list = "[", [expression_list], "]";
+tuple = "(", [expression_list], ")";
+set = "{", [expression_list], "}";
+key_value_pair = expression, ":", expression;
+dictionary = "{", [key_value_pair, {",", key_value_pair}], "}";
+
+(* Expressions *)
+expression = panic_expr | channel_send_expr | channel_receive_expr | await_expr | assignment_expr | ternary_expr | binary_expr | unary_expr | postfix_expr | primary_expr | inline_function | trap_expr | spawn_expr;
+panic_expr = "panic", expression;
+assignment_expr = assignable, assignment_op, expression;
+ternary_expr = expression, "?", [expression, ":"], expression;
+binary_expr = expression, binary_op, expression;
+unary_expr = unary_op, expression | channel_receive_expr;
+postfix_expr = assignable, "++" | assignable, "--";
+primary_expr = operand | "(", expression, ")" | primary_expr, arguments;
+await_expr = "await", expression;
+spawn_expr = "spawn", expression;
+channel_send_expr = expression, "<-", expression;
+channel_receive_expr = "<-", expression;
+trap_expr = "trap", expression;
+
+(* Operators *)
+assignment_op = "=" | "+=" | "-=";
+binary_op = "||" | "&&" | rel_op | add_op | mul_op | in_op;
+rel_op = "===" | "!==" | "==" | "!=" | "<" | "<=" | ">" | ">=";
+add_op = "+" | "-" | "|" | "^";
+mul_op = "*" | "/" | "%" | "<<" | ">>" | "&";
+in_op = "in" | "not", "in";
+unary_op = "+" | "-" | "!" | "^" | "*" | "&" | "<-";
+
+(* Assignable (left-hand side of assignment) *)
+assignable = identifier | member_access;
+
+(* Member Access *)
+member_access = primary_expr, {member_access_op};
+member_access_op = selector | nullable_selector | index | slice;
+selector = ".", identifier;
+nullable_selector = "?.", identifier;
+index = "[", expression, "]";
+slice = "[", [expression], ":", [expression], [":", [expression]], "]";
+
+(* Function calls *)
+arguments = "(", [argument_list], ")";
+argument_list = positional_args, [",", named_args], [",", ellipsis_arg], [",", kwargs_arg] |
+                named_args, [",", ellipsis_arg], [",", kwargs_arg] |
+                ellipsis_arg, [",", kwargs_arg] |
+                kwargs_arg;
+positional_args = expression, {",", expression};
+named_args = named_arg, {",", named_arg};
+named_arg = identifier, "=", expression;
+ellipsis_arg = expression, "...";
+kwargs_arg = "*", identifier;
+
+(* Function Decorator *)
+decorator = "[#", identifier, ["(", [argument_list], ")"], "]";
+
+(* Inline functions *)
+inline_function = "func", "(", [parameter_list], ")", [return_type], [async_keyword], inline_function_body;
+inline_function_body = block_function | "=>", expression;
+return_type = ":", type;
+
+(* Statements *)
+common_statement = labeled_statement | loop_statement | for_in_statement | if_statement | switch_statement | sync_statement | try_statement | defer_statement | function_definition | short_var_declaration | var_declaration | expression | return_statement;
+module_level_statement = import_statement | module_conditional_block | [pub_keyword], (native_declaration | function_definition | short_var_declaration | var_declaration | const_declaration | trait_definition | class_definition) | common_statement;
+local_statement = common_statement | break_statement | continue_statement | yield_statement;
+function_level_statement = common_statement | yield_statement;
+
+(* Module Conditional Block *)
+module_conditional_block = "if", expression, module_block, {module_elif_clause}, [module_else_clause];
+module_elif_clause = "elif", expression, module_block;
+module_else_clause = "else", module_block;
+
+(* Module Block *)
+module_block = "{", {module_level_statement}, "}";
+
+(* Import Statements *)
+import_statement = simple_import | from_import;
+simple_import = "import", string_literal, ["as", identifier];
+from_import = "from", string_literal, "import", (import_list | "*");
+import_list = import_item, {",", import_item};
+import_item = identifier, ["as", identifier];
+
+(* Native Declarations *)
+native_declaration = native_function_declaration | native_variable_declaration;
+
+(* Native Function Declaration *)
+native_function_declaration = [doc_comment], "native", "func", identifier, "(", [native_parameter_list], ")", ":", native_type, [native_alias], [native_from];
+native_parameter_list = native_parameter, {",", native_parameter};
+native_parameter = identifier, ":", native_type;
+native_alias = "as", string_literal;
+native_from = "from", string_literal;
+
+(* Native Variable Declaration *)
+native_variable_declaration = "native", identifier, ":", native_type, [native_alias], [native_from], ["writable"];
+
+native_type = "bool" | "byte" | "i8" | "i16" | "i32" | "i64" | "iSize" | "u8" | "u16" | "u32" | "u64" | "uSize" | "f32" | "f64";
+
+(* Function definitions *)
+function_definition = [doc_comment], {decorator}, "func", identifier, "(", [parameter_list], ")", [return_type], [async_keyword], block_function;
+class_function_definition = [doc_comment], {decorator}, "func", identifier, "(", [parameter_list], ")", [return_type], [async_keyword], [const_keyword], block_function;
+trait_function_definition = [doc_comment], {decorator}, "func", identifier, "(", [parameter_list], ")", [return_type], [async_keyword], [const_keyword], [block_function];
+
+parameter_list = parameter, {",", parameter}, [",", variadic_param], [",", kwargs_param];
+parameter = simple_param | default_param;
+simple_param = identifier, [":", type];
+default_param = identifier, "=", expression;
+variadic_param = "...", identifier;
+kwargs_param = "*", identifier;
+
+(* Variable and constant declarations *)
+const_declaration = "let", identifier, "=", expression;
+
+var_declaration = "var", (single_var_decl | multi_var_decl);
+single_var_decl = identifier, [":", type], ["=", expression];
+multi_var_decl = identifier_list | (identifier_list, "=", expression_list);
+short_var_declaration = identifier_list, ":=", expression_list;
+
+(* Control structures *)
+labeled_statement = label, ":", (loop_statement | for_in_statement);
+label = identifier;
+
+loop_statement = "loop", [loop_expression], block;
+loop_expression = expression | (identifier_list, [assignment_op, expression] | short_var_declaration), ";", expression, ";", expression;
+for_in_statement = "for", ["var"], identifier_list, "in", expression, block;
+
+if_statement = "if", expression, block, {elif_clause}, [else_clause];
+elif_clause = "elif", expression, block;
+else_clause = "else", block;
+
+switch_statement = "switch", [expression], "{", {switch_case}, [default_case], "}";
+switch_case = "case", case_label_list, ":", {case_statement};
+case_label_list = expression, {";", expression};
+default_case = "default", ":", {case_statement};
+case_statement = local_statement | "fallthrough";
+
+break_statement = "break", [label];
+continue_statement = "continue", [label];
+return_statement = "return", [expression_list];
+
+(* Sync Statement *)
+sync_statement = "sync", expression, block;
+
+(* Yield statement *)
+yield_statement = "yield", expression;
+
+try_statement = "try", block, {catch_clause}, [finally_clause];
+catch_clause = "catch", [atom], block;
+finally_clause = "finally", block;
+
+(* Defer Statement *)
+defer_statement = "defer", expression;
+
+(* Traits and Classes *)
+trait_definition = [doc_comment], "trait", identifier, [trait_extension], trait_body;
+trait_extension = "impl", class_trait_extension, {"+", class_trait_extension};
+trait_body = "{", {trait_member}, "}";
+trait_member = [pub_keyword], (const_declaration | trait_function_definition);
+
+class_definition = [doc_comment], "class", identifier, [class_inheritance], [trait_extension], class_body;
+class_inheritance = ":", class_trait_extension;
+class_body = "{", {class_member}, "}";
+class_member = [pub_keyword], ([weak_keyword], var_declaration | const_declaration | class_function_definition);
+
+class_trait_extension = identifier | identifier, {selector};
+
+(* Common elements *)
+block = "{", {local_statement}, "}";
+block_function = "{", {function_level_statement}, "}";
+expression_list = expression, {",", expression};
+identifier_list = identifier, {",", identifier};
+pub_keyword = "pub";
+async_keyword = "async";
+const_keyword = "const";
+weak_keyword = "weak";
+
+(* Type WIP *)
+type = identifier;
+
+(* Operand *)
+operand = literal | identifier;
+
+(* Literal *)
+literal = int | unsigned_int | hex_int | unsigned_hex_int | octal_int | unsigned_octal_int |
+          bin_int | unsigned_bin_int | float | char | string |
+          atom | boolean | nil | list | tuple | set | dictionary;
