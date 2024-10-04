@@ -7,7 +7,7 @@
 
 #include <orbit/datatype.h>
 
-#include <orbit/orbiter/datatype/ostring.h>
+#include <orbit/orbiter/datatype/orstring.h>
 
 namespace orbiter::datatype {
     constexpr int kERR_MSG_MAX_LENGTH = 80;
@@ -44,7 +44,7 @@ namespace orbiter::datatype {
 
         bool Write(const unsigned char *buffer, MSize length, MSize overalloc);
 
-        bool Write(const String *string, MSize overalloc) {
+        bool Write(const ORString *string, MSize overalloc) {
             return this->Write(string->buffer, string->length, overalloc);
         }
 

@@ -3,7 +3,7 @@
 // Licensed under the Apache License v2.0
 
 #include <orbit/orbiter/datatype/function.h>
-#include <orbit/orbiter/datatype/ostring.h>
+#include <orbit/orbiter/datatype/orstring.h>
 #include <orbit/orbiter/datatype/type.h>
 
 #include <orbit/orbiter/context.h>
@@ -31,14 +31,14 @@ Context *orbiter::ContextInit() {
     INIT_TYPE(InstanceType::TYPE, TypeInit);
 
     INIT_TYPE(InstanceType::FUNCTION, FunctionTypeInit);
-    INIT_TYPE(InstanceType::STRING, StringTypeInit);
+    INIT_TYPE(InstanceType::STRING, ORStringTypeInit);
 
     // *****************************************************************************************************************
 
     SETUP_TYPE(InstanceType::TYPE, TypeSetup);
 
     SETUP_TYPE(InstanceType::FUNCTION, FunctionTypeSetup);
-    SETUP_TYPE(InstanceType::STRING, StringTypeSetup);
+    SETUP_TYPE(InstanceType::STRING, ORStringTypeSetup);
 
     return ctx;
 

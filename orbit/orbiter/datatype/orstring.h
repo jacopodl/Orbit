@@ -5,9 +5,14 @@
 #ifndef ORBIT_ORBITER_DATATYPE_OSTRING_H_
 #define ORBIT_ORBITER_DATATYPE_OSTRING_H_
 
+#include <cstring>
+
 #include <orbit/orbiter/context.h>
 
 #include <orbit/orbiter/datatype/oobject.h>
+
+#define ORSTRING_TO_CSTR(string)     ((string)->buffer)
+#define ORSTRING_LENGTH(string)      ((string)->length)
 
 namespace orbiter::datatype {
     enum class StringKind {
@@ -17,7 +22,7 @@ namespace orbiter::datatype {
         UTF8_4
     };
 
-    struct String {
+    struct ORString {
         OROBJ_HEAD;
 
         /* Raw buffer */
@@ -54,7 +59,35 @@ namespace orbiter::datatype {
      *
      * @return true if setup was successful, false otherwise
      */
-    bool StringTypeSetup(Context *ctx, TypeInfo *self);
+    bool ORStringTypeSetup(const Context *ctx, TypeInfo *self);
+
+    /**
+     * @brief Compares two strings lexicographically.
+     *
+     * @param left Left Argon string.
+     * @param right Right Argon string.
+     * @return An int value:
+     * 0 if the string is equal to the other string.
+     * < 0 if the string is lexicographically less than the other string.
+     * > 0 if the string is lexicographically greater than the other string (more characters).
+     */
+    int ORStringCompare(const ORString *left, const ORString *right);
+
+    /**
+    * @brief Compares two strings lexicographically.
+    *
+    * @param left Left Argon string.
+    * @param right Right Argon string.
+    * @return An int value:
+    * 0 if the string is equal to the other string.
+    * < 0 if the string is lexicographically less than the other string.
+    * > 0 if the string is lexicographically greater than the other string (more characters).
+    */
+    int ORStringCompare(const ORString *left, const char *right, MSize length);
+
+    inline int ORStringCompare(const ORString *left, const char *right) {
+        return ORStringCompare(left, right, strlen(right));
+    }
 
     /**
      * @brief Creates an exact copy of a String object in the String pool and return it
@@ -65,7 +98,7 @@ namespace orbiter::datatype {
      *
      * @return A pointer to an Orbit string object, otherwise nullptr
      */
-    String *StringIntern(Context *ctx, const unsigned char *string, MSize length);
+    ORString *ORStringIntern(const Context *ctx, const unsigned char *string, MSize length);
 
     /**
      * @brief Creates an exact copy of a String object in the String pool and return it
@@ -75,8 +108,8 @@ namespace orbiter::datatype {
      *
      * @return A pointer to an Orbit string object, otherwise nullptr
      */
-    inline String *StringIntern(Context *ctx, const char *string) {
-        return StringIntern(ctx, (const unsigned char *) string, strlen(string));
+    inline ORString *ORStringIntern(const Context *ctx, const char *string) {
+        return ORStringIntern(ctx, (const unsigned char *) string, strlen(string));
     }
 
     /**
@@ -89,14 +122,14 @@ namespace orbiter::datatype {
      * Obviously the size of the allocated buffer must be sufficient to also contain the terminator character
      *
      * @param ctx Pointer to the Context
-     * @param buffer Raw buffer containing the string (ownership of the buffer will be transferred to the created object)
+     * @param string Raw buffer containing the string (ownership of the buffer will be transferred to the created object)
      * @param length Length of the buffer
      * @param cp_length Number of unicode code point in the buffer
      * @param kind StringKind
      *
      * @return A pointer to an Orbit string object, otherwise nullptr
      */
-    String *StringNew(Context *ctx, unsigned char *string, MSize length, MSize cp_length, StringKind kind);
+    ORString *ORStringNew(const Context *ctx, unsigned char *string, MSize length, MSize cp_length, StringKind kind);
 
     /**
      * @brief Create new string.
@@ -107,7 +140,7 @@ namespace orbiter::datatype {
      *
      * @return A pointer to an Orbit string object, otherwise nullptr.
      */
-    String *StringNew(Context *ctx, const unsigned char *string, MSize length);
+    ORString *ORStringNew(const Context *ctx, const unsigned char *string, MSize length);
 
     /**
      * @brief Create new string
@@ -118,19 +151,20 @@ namespace orbiter::datatype {
      *
      * @return A pointer to an Orbit string object, otherwise nullptr
      */
-    inline String *StringNew(Context *ctx, const char *string, MSize length) {
-        return StringNew(ctx, (const unsigned char *) string, length);
+    inline ORString *ORStringNew(const Context *ctx, const char *string, MSize length) {
+        return ORStringNew(ctx, (const unsigned char *) string, length);
     }
 
     /**
      * @brief Create new string
      *
+     * @param ctx Pointer to the Context
      * @param string The C-string to convert to Orbit string
      *
      * @return A pointer to an Orbit string object, otherwise nullptr
      */
-    inline String *StringNew(Context *ctx, const char *string) {
-        return StringNew(ctx, (unsigned char *) string, strlen(string));
+    inline ORString *ORStringNew(const Context *ctx, const char *string) {
+        return ORStringNew(ctx, (unsigned char *) string, strlen(string));
     }
 
     /**
@@ -149,7 +183,7 @@ namespace orbiter::datatype {
      *
      * @return A pointer to an Orbit string object, otherwise nullptr.
      */
-    String *StringNewHoldBuffer(Context *ctx, unsigned char *buffer, MSize length);
+    ORString *ORStringNewHoldBuffer(const Context *ctx, unsigned char *buffer, MSize length);
 
     /**
      * @brief Initialize and create the specified type
@@ -161,7 +195,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created TypeInfo for the type, or nullptr if creation failed
      */
-    TypeInfo *StringTypeInit(orbiter::Context *ctx);
+    TypeInfo *ORStringTypeInit(const Context *ctx);
 }
 
 #endif // !ORBIT_ORBITER_DATATYPE_OSTRING_H_

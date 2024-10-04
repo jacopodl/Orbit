@@ -10,10 +10,10 @@
 #include <orbit/orbiter/datatype/obase.h>
 
 namespace orbiter::datatype {
-
     /**
      * @brief Add a property to a TypeInfo
      *
+     * @param ctx Pointer to the Context
      * @param type Pointer to the TypeInfo
      * @param name Name of the property
      * @param value Pointer to the OObject representing the property's value
@@ -21,7 +21,7 @@ namespace orbiter::datatype {
      *
      * @return true if property was added successfully, false otherwise
      */
-    bool TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, PropertyDetail detail);
+    bool TIPropertyAdd(const Context *ctx, TypeInfo *type, const char *name, OObject *value, PropertyDetail detail);
 
     /**
      * @brief Add multiple properties(functions/methods) to a TypeInfo from a bulk definition
@@ -32,11 +32,12 @@ namespace orbiter::datatype {
      *
      * @return true if properties were added successfully, false otherwise
      */
-    bool TIPropertyAdd(Context *ctx, TypeInfo *type, const FunctionDef *bulk);
+    bool TIPropertyAdd(const Context *ctx, TypeInfo *type, const FunctionDef *bulk);
 
     /**
      * @brief Add an inline property to a TypeInfo using an offset
      *
+     * @param ctx Pointer to the Context
      * @param type Pointer to the TypeInfo
      * @param name Name of the property
      * @param offset Offset of the property within the object
@@ -44,8 +45,9 @@ namespace orbiter::datatype {
      *
      * @return true if property was added successfully, false otherwise
      */
-    inline bool TIPropertyAddOffset(TypeInfo *type, const char *name, U8 offset, PropertyDetail detail) {
-        return TIPropertyAdd(type, name, (OObject *) ((MSize) offset), detail | PropertyDetail::INLINE);
+    inline bool TIPropertyAddOffset(const Context *ctx, TypeInfo *type, const char *name,
+                                    U8 offset, PropertyDetail detail) {
+        return TIPropertyAdd(ctx, type, name, (OObject *) ((MSize) offset), detail | PropertyDetail::INLINE);
     }
 
     /**
@@ -63,7 +65,8 @@ namespace orbiter::datatype {
      *
      * @param object Pointer to the OObject to release
      */
-    inline void Release(OObject *object) {}
+    inline void Release(OObject *object) {
+    }
 
     /**
      * @brief Release an object of any type (template specialization)
@@ -129,7 +132,7 @@ namespace orbiter::datatype {
      * @return Pointer to the newly created object, or nullptr if allocation failed
      */
     template<typename T>
-    T *MakeObject(Context *ctx, InstanceType type) {
+    T *MakeObject(const Context *ctx, InstanceType type) {
         return MakeObject<T>(ctx->primitive[(int) type]);
     }
 
@@ -171,13 +174,13 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created TypeInfo
      */
-    inline TypeInfo *MakeType(Context *ctx, InstanceType type, U8 headroom, U8 props, U8 slots) {
+    inline TypeInfo *MakeType(const Context *ctx, InstanceType type, U8 headroom, U8 props, U8 slots) {
         return MakeType(ctx->primitive[(int) InstanceType::TYPE], type, headroom, props, slots);
     }
 
-// *****************************************************************************************************************
-// HANDLE
-// *****************************************************************************************************************
+    // *****************************************************************************************************************
+    // HANDLE
+    // *****************************************************************************************************************
 
     template<typename T>
     class Handle {
@@ -185,9 +188,11 @@ namespace orbiter::datatype {
         T *object;
 
     public:
-        explicit Handle() noexcept: object(nullptr) {}
+        explicit Handle() noexcept: object(nullptr) {
+        }
 
-        explicit Handle(T *obj) noexcept: object(obj) {}
+        explicit Handle(T *obj) noexcept: object(obj) {
+        }
 
         Handle(Handle &&other) noexcept: object(other.object) {
             other.object = nullptr;
@@ -247,7 +252,6 @@ namespace orbiter::datatype {
             }
         }
     };
-
 }
 
 #endif // !ORBIT_ORBITER_DATATYPE_OOBJECT_H_

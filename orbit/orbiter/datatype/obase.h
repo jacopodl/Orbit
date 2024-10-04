@@ -37,11 +37,7 @@ namespace orbiter::datatype {
     };
 
     struct PropertyDescriptor {
-        /* Name of the property */
-        const char *name;
-
-        /* Length of the property name */
-        U8 length;
+        struct ORString *name; // from: orstring.h
 
         /* Pointer to the OObject representing the property's value */
         struct OObject *value;

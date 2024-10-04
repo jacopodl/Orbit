@@ -8,16 +8,16 @@
 
 using namespace orbiter::datatype;
 
-FuncShared *FunSharedNew(orbiter::Context *ctx, const char *name, const char *doc,
+FuncShared *FunSharedNew(const orbiter::Context *ctx, const char *name, const char *doc,
                          U16 arity, FunctionPtr func, FunctionKind kind) {
-    auto *s_name = StringNew(ctx, name);
+    auto *s_name = ORStringNew(ctx, name);
     if (s_name == nullptr)
         return nullptr;
 
-    String *s_doc = nullptr;
+    ORString *s_doc = nullptr;
 
     if (doc != nullptr) {
-        s_doc = StringNew(ctx, doc);
+        s_doc = ORStringNew(ctx, doc);
         if (s_doc == nullptr) {
             Release(s_name);
 
@@ -54,11 +54,11 @@ void FunSharedDel(FuncShared *shared) {
     orbiter::memory::Free(shared);
 }
 
-bool orbiter::datatype::FunctionTypeSetup(Context *ctx, TypeInfo *self) {
+bool orbiter::datatype::FunctionTypeSetup(const Context *ctx, TypeInfo *self) {
     return true;
 }
 
-Function *orbiter::datatype::FunctionNew(Context *ctx, const FunctionDef *def) {
+Function *orbiter::datatype::FunctionNew(const Context *ctx, const FunctionDef *def) {
     auto kind = FunctionKind::NATIVE;
 
     if (def->method)
@@ -81,7 +81,7 @@ Function *orbiter::datatype::FunctionNew(Context *ctx, const FunctionDef *def) {
     return nullptr;
 }
 
-TypeInfo *orbiter::datatype::FunctionTypeInit(Context *ctx) {
+TypeInfo *orbiter::datatype::FunctionTypeInit(const Context *ctx) {
     auto *func = MakeType(ctx, InstanceType::FUNCTION, sizeof(Function) - sizeof(OObject), 0, 0);
     return func;
 }

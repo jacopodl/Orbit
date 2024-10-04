@@ -9,19 +9,23 @@
 
 using namespace orbiter::datatype;
 
-bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, PropertyDetail detail) {
+bool orbiter::datatype::TIPropertyAdd(const Context *ctx, TypeInfo *type, const char *name,
+                                      OObject *value, PropertyDetail detail) {
     PropertyDescriptor tmp{};
     int i = 0;
+
+    auto orname = ORStringIntern(ctx, name);
+    if (orname == nullptr)
+        return false;
 
     for (; i < type->properties.count; i++) {
         auto *property = type->properties.p_array + i;
 
-        if (property->name == nullptr || strncmp(name, property->name, property->length) <= 0) {
+        if (property->name == nullptr || ORStringCompare(orname, property->name) <= 0) {
             if (property->name != nullptr)
                 tmp = *property;
 
-            property->name = name;
-            property->length = strlen(name);
+            property->name = orname;
 
             // TODO: offset + slot of super type
 
@@ -36,7 +40,7 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject 
     if (tmp.name != nullptr) {
         for (i += 1; i < type->properties.count; i++) {
             auto *property = type->properties.p_array + i;
-            auto cmp = strncmp(name, property->name, property->length);
+            auto cmp = ORStringCompare(orname, property->name);
 
             if (cmp < 0) {
                 auto swap = *property;
@@ -54,13 +58,13 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject 
     return true;
 }
 
-bool orbiter::datatype::TIPropertyAdd(Context *ctx, TypeInfo *type, const FunctionDef *bulk) {
+bool orbiter::datatype::TIPropertyAdd(const Context *ctx, TypeInfo *type, const FunctionDef *bulk) {
     for (auto *cursor = bulk; cursor->name != nullptr; cursor++) {
         auto *fn = FunctionNew(ctx, cursor);
         if (fn == nullptr)
             return false;
 
-        if (!TIPropertyAdd(type, cursor->name, (OObject *) fn, {})) {
+        if (!TIPropertyAdd(ctx, type, cursor->name, (OObject *) fn, {})) {
             Release(fn);
 
             return false;
@@ -95,11 +99,10 @@ PropertyDescriptor *orbiter::datatype::TIFindLocalProperty(const TypeInfo *type,
 
     int low = 0;
     int high = type->properties.count;
-
     while (low < high) {
-        int mid = low + (high - low) / 2;
-        int cmp = strncmp(property[mid].name, name, property[mid].length);
+        const auto mid = low + (high - low) / 2;
 
+        const auto cmp = ORStringCompare(property[mid].name, name);
         if (cmp == 0)
             return property + mid;
 

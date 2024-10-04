@@ -6,15 +6,15 @@
 
 #include <orbit/orbiter/datatype/stringbuilder.h>
 
-#include <orbit/orbiter/datatype/ostring.h>
+#include <orbit/orbiter/datatype/orstring.h>
 
 using namespace orbiter::datatype;
 
 #define STR_BUF(str) ((str)->buffer)
 #define STR_LEN(str) ((str)->length)
 
-String *MkStringContainer(orbiter::Context *ctx, MSize len, bool mkbuf) {
-    auto str = MakeObject<String>(ctx, InstanceType::STRING);
+ORString *MkStringContainer(const orbiter::Context *ctx, MSize len, bool mkbuf) {
+    auto str = MakeObject<ORString>(ctx, InstanceType::STRING);
 
     if (str != nullptr) {
         str->buffer = nullptr;
@@ -41,7 +41,7 @@ String *MkStringContainer(orbiter::Context *ctx, MSize len, bool mkbuf) {
     return str;
 }
 
-bool StringInitKind(String *string) {
+bool StringInitKind(ORString *string) {
     StringKind kind = StringKind::ASCII;
     MSize index = 0;
     MSize cp_length = 0;
@@ -49,7 +49,7 @@ bool StringInitKind(String *string) {
     string->cp_length = 0;
 
     while (index < string->length) {
-        if (!CheckUnicodeCharSequence(&kind, &cp_length, nullptr,0, string->buffer[index], index)) {
+        if (!CheckUnicodeCharSequence(&kind, &cp_length, nullptr, 0, string->buffer[index], index)) {
             // TODO: error!
             return false;
         }
@@ -64,16 +64,30 @@ bool StringInitKind(String *string) {
     return true;
 }
 
-bool orbiter::datatype::StringTypeSetup(Context *ctx, TypeInfo *self) {
+bool orbiter::datatype::ORStringTypeSetup(const Context *ctx, TypeInfo *self) {
     return true;
 }
 
-String *orbiter::datatype::StringIntern(Context *ctx, const unsigned char *string, MSize length) {
-    // TODO: IMPL THIS!
-    return StringNew(ctx, string, length);
+int orbiter::datatype::ORStringCompare(const ORString *left, const ORString *right) {
+    if (left != right && right != nullptr) {
+        return strncmp((const char *) STR_BUF(left), (const char *) STR_BUF(right),
+                       std::min(STR_LEN(left), STR_LEN(right)));
+    }
+
+    return 0;
 }
 
-String *orbiter::datatype::StringNew(Context *ctx, unsigned char *buffer, MSize length, MSize cp_length, StringKind kind) {
+int orbiter::datatype::ORStringCompare(const ORString *left, const char *right, MSize length) {
+    return strncmp((const char *) STR_BUF(left), right, std::min(STR_LEN(left), length));
+}
+
+ORString *orbiter::datatype::ORStringIntern(const Context *ctx, const unsigned char *string, MSize length) {
+    // TODO: IMPL THIS!
+    return ORStringNew(ctx, string, length);
+}
+
+ORString *orbiter::datatype::ORStringNew(const Context *ctx, unsigned char *buffer, MSize length, MSize cp_length,
+                                       StringKind kind) {
     assert(buffer[length] == '\0');
 
     auto *str = MkStringContainer(ctx, length, false);
@@ -86,7 +100,7 @@ String *orbiter::datatype::StringNew(Context *ctx, unsigned char *buffer, MSize 
     return str;
 }
 
-String *orbiter::datatype::StringNew(Context *ctx, const unsigned char *string, MSize length) {
+ORString *orbiter::datatype::ORStringNew(const Context *ctx, const unsigned char *string, MSize length) {
     StringBuilder builder{};
     StringKind kind;
     MSize len;
@@ -102,14 +116,14 @@ String *orbiter::datatype::StringNew(Context *ctx, const unsigned char *string, 
 
     // TODO: do not release buffer of size zero!
 
-    auto *str = StringNew(ctx, buffer, len, cp_len, kind);
+    auto *str = ORStringNew(ctx, buffer, len, cp_len, kind);
     if (str != nullptr)
         builder.Release();
 
     return str;
 }
 
-String *orbiter::datatype::StringNewHoldBuffer(Context *ctx, unsigned char *string, MSize length) {
+ORString *orbiter::datatype::ORStringNewHoldBuffer(const Context *ctx, unsigned char *string, MSize length) {
     assert(string[length] == '\0');
 
     auto *str = MkStringContainer(ctx, length, false);
@@ -129,7 +143,7 @@ String *orbiter::datatype::StringNewHoldBuffer(Context *ctx, unsigned char *stri
     return str;
 }
 
-TypeInfo *orbiter::datatype::StringTypeInit(orbiter::Context *ctx) {
-    auto *string = MakeType(InstanceType::STRING, sizeof(String) - sizeof(OObject), 0, 0);
+TypeInfo *orbiter::datatype::ORStringTypeInit(const Context *ctx) {
+    auto *string = MakeType(InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 0, 0);
     return string;
 }

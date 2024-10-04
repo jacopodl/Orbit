@@ -10,7 +10,7 @@
 #include <orbit/orbiter/context.h>
 
 #include <orbit/orbiter/datatype/oobject.h>
-#include <orbit/orbiter/datatype/ostring.h>
+#include <orbit/orbiter/datatype/orstring.h>
 
 namespace orbiter::datatype {
     enum class FunctionKind : U8 {
@@ -32,10 +32,10 @@ namespace orbiter::datatype {
         std::atomic_uint refs;
 
         /// Name of the function
-        String *name;
+        ORString *name;
 
         /// Documentation string for the function
-        String *doc;
+        ORString *doc;
 
         union {
             /// Pointer to Orbit code.
@@ -86,7 +86,7 @@ namespace orbiter::datatype {
      *
      * @return true if setup was successful, false otherwise
      */
-    bool FunctionTypeSetup(Context *ctx, TypeInfo *self);
+    bool FunctionTypeSetup(const Context *ctx, TypeInfo *self);
 
     /**
      * @brief Create a new Function object
@@ -96,7 +96,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created Function
      */
-    Function *FunctionNew(Context *ctx, const FunctionDef *def);
+    Function *FunctionNew(const Context *ctx, const FunctionDef *def);
 
     /**
      * @brief Initialize the Function type
@@ -105,7 +105,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the TypeInfo for the Function type
      */
-    TypeInfo *FunctionTypeInit(Context *ctx);
+    TypeInfo *FunctionTypeInit(const Context *ctx);
 }
 
 #define RUNTIME_FUNCTION(name, exported_name, doc, params)                                          \
