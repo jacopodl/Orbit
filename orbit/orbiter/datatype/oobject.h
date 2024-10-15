@@ -188,76 +188,92 @@ namespace orbiter::datatype {
 
     template<typename T>
     class Handle {
-    private:
-        T *object;
+        T *object_;
 
     public:
-        explicit Handle() noexcept: object(nullptr) {
+        Handle() noexcept : object_(nullptr) {
         }
 
-        explicit Handle(T *obj) noexcept: object(obj) {
+        explicit Handle(T *object) noexcept : object_(object) {
         }
 
-        Handle(Handle &&other) noexcept: object(other.object) {
-            other.object = nullptr;
+        Handle(Handle &&other) noexcept : object_(other.object_) {
+            other.object_ = nullptr;
         }
 
         Handle(const Handle &) = delete;
 
-        Handle &operator=(const Handle &) = delete;
-
         ~Handle() noexcept {
-            if (object != nullptr)
-                Release(object);
+            this->reset();
         }
-
-        explicit operator bool() const noexcept { return object != nullptr; }
 
         Handle &operator=(Handle &&other) noexcept {
             if (this != &other) {
-                if (object)
-                    Release(object);
+                this->reset();
 
-                object = other.object;
-
-                other.object = nullptr;
+                this->object_ = other.object_;
+                other.object_ = nullptr;
             }
 
             return *this;
         }
 
-        T &operator*() const { return *object; }
+        template<typename U>
+        Handle &operator=(Handle<U> &&other) noexcept {
+            if (this->object_ != nullptr)
+                this->reset();
 
-        T *operator->() const noexcept { return object; }
+            this->object_ = (T *) other.release();
 
-        T *get() const noexcept { return object; }
+            return *this;
+        }
 
-        T *get_inc() const noexcept { return O_INCREF(object); }
+        Handle &operator=(const Handle &other) {
+            if (this != &other) {
+                if (this->object_ != nullptr)
+                    this->reset();
+
+                this->object_ = O_VFY_INCREF(other.object_);
+            }
+
+            return *this;
+        }
+
+        T &operator*() const { return *this->object_; }
+
+        T *operator->() const noexcept { return this->object_; }
+
+        explicit operator bool() const noexcept { return this->object_ != nullptr; }
+
+        T *get() const noexcept { return this->object_; }
+
+        T *get_inc() const noexcept { return O_INCREF(this->object_); }
 
         T *release() noexcept {
-            auto *temp = object;
+            T *temp = this->object_;
 
-            this->object = nullptr;
+            this->object_ = nullptr;
 
             return temp;
         }
 
         void reset() noexcept {
-            if (object)
-                Release(object);
-
-            object = nullptr;
+            if (this->object_ != nullptr) {
+                Release(this->object_);
+                this->object_ = nullptr;
+            }
         }
 
         void reset(T *new_object) noexcept {
-            if (object != new_object) {
-                if (object)
-                    Release(object);
+            if (this->object_ != new_object) {
+                this->reset();
 
-                object = new_object;
+                this->object_ = new_object;
             }
         }
     };
+
+    using OHandle = Handle<OObject>;
 }
 
 #endif // !ORBIT_ORBITER_DATATYPE_OOBJECT_H_

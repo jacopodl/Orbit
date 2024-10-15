@@ -44,6 +44,8 @@ namespace orbiter::datatype {
         MSize hash;
     };
 
+    using HORString = Handle<ORString>;
+
     /**
      * @brief Set up additional features and properties for the specified type
      *
@@ -102,7 +104,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to the interned string
      */
-    Handle<ORString> ORStringIntern(const Context *ctx, const unsigned char *string, MSize length);
+    HORString ORStringIntern(const Context *ctx, const unsigned char *string, MSize length);
 
     /**
      * @brief Creates an exact copy of a String object in the String pool and return it
@@ -112,7 +114,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to the interned string
      */
-    inline Handle<ORString> ORStringIntern(const Context *ctx, const char *string) {
+    inline HORString ORStringIntern(const Context *ctx, const char *string) {
         return ORStringIntern(ctx, (const unsigned char *) string, strlen(string));
     }
 
@@ -133,7 +135,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    Handle<ORString> ORStringNew(const Context *ctx, unsigned char *string, MSize length, MSize cp_length,
+    HORString ORStringNew(const Context *ctx, unsigned char *string, MSize length, MSize cp_length,
                                  StringKind kind);
 
     /**
@@ -145,7 +147,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    Handle<ORString> ORStringNew(const Context *ctx, const unsigned char *string, MSize length);
+    HORString ORStringNew(const Context *ctx, const unsigned char *string, MSize length);
 
     /**
      * @brief Create new string
@@ -156,7 +158,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    inline Handle<ORString> ORStringNew(const Context *ctx, const char *string, MSize length) {
+    inline HORString ORStringNew(const Context *ctx, const char *string, MSize length) {
         return ORStringNew(ctx, (const unsigned char *) string, length);
     }
 
@@ -168,7 +170,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    inline Handle<ORString> ORStringNew(const Context *ctx, const char *string) {
+    inline HORString ORStringNew(const Context *ctx, const char *string) {
         return ORStringNew(ctx, (unsigned char *) string, strlen(string));
     }
 
@@ -188,7 +190,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    Handle<ORString> ORStringNewHoldBuffer(const Context *ctx, unsigned char *buffer, MSize length);
+    HORString ORStringNewHoldBuffer(const Context *ctx, unsigned char *buffer, MSize length);
 
     MSize ORStringHash(ORString *string);
 
