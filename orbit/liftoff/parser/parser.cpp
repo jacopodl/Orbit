@@ -249,6 +249,8 @@ ASTHandle<ASTNode *> Parser::ParseIndexing(ASTHandle<ASTNode *> &left) {
     if (!this->Match(TokenType::RIGHT_SQUARE))
         throw ParserException(4);
 
+    this->Eat(false);
+
     subscript->loc.start = subscript->expression->loc.start;
 
     return subscript;
@@ -266,11 +268,24 @@ ASTHandle<ASTNode *> Parser::ParseExpression(int precedence) {
 
     left = (this->*nud)();
 
+    bool is_safe = false;
     while (precedence < PeekPrecedence(TKCUR_TYPE)) {
         if ((led = LookupLED(TKCUR_TYPE)) == nullptr)
             break;
 
+        if (TKCUR_TYPE == TokenType::QUESTION_DOT)
+            is_safe = true;
+
         left = (this->*led)(left);
+    }
+
+    if (is_safe) {
+        auto safe = MakeUnary(TKCUR_LOC, NodeType::NIL_SAFE);
+
+        safe->loc = left->loc;
+        safe->value = left.release();
+
+        return safe;
     }
 
     return left;
@@ -374,6 +389,25 @@ ASTHandle<ASTNode *> Parser::ParseLiteral() {
     return literal;
 }
 
+ASTHandle<ASTNode *> Parser::ParseMemberAccess(ASTHandle<ASTNode *> &left) {
+    auto selector = MakeBinary(TKCUR_LOC, NodeType::SELECTOR);
+
+    selector->token_type = TKCUR_TYPE;
+    selector->loc.start = left->loc.start;
+
+    selector->left = left.release();
+
+    this->Eat(true);
+
+    selector->right = this->ParseIdentifier().release();
+    if (selector->right == nullptr)
+        throw ParserException(0);
+
+    selector->loc.end = selector->right->loc.end;
+
+    return selector;
+}
+
 ASTHandle<ASTNode *> Parser::ParsePostInc(ASTHandle<ASTNode *> &left) {
     // TODO: post_inc
     if (left->node_type != NodeType::IDENTIFIER)
@@ -436,7 +470,6 @@ ASTHandle<ASTNode *> Parser::ParseTernary(ASTHandle<ASTNode *> &left) {
     return branch;
 }
 
-
 Parser::LedMeth Parser::LookupLED(TokenType token) noexcept {
     if (token > TokenType::INFIX_BEGIN && token < TokenType::INFIX_END)
         return &Parser::ParseInfix;
@@ -450,6 +483,9 @@ Parser::LedMeth Parser::LookupLED(TokenType token) noexcept {
             return &Parser::ParseAssignment;
         case TokenType::COMMA:
             return &Parser::ParseExpressionList;
+        case TokenType::DOT:
+        case TokenType::QUESTION_DOT:
+            return &Parser::ParseMemberAccess;
         case TokenType::ELVIS:
             return &Parser::ParseElvis;
         case TokenType::LEFT_SQUARE:

@@ -88,6 +88,8 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseLiteral();
 
+        [[nodiscard]] ASTHandle<ASTNode *> ParseMemberAccess(ASTHandle<ASTNode *> &left);
+
         [[nodiscard]] ASTHandle<ASTNode *> ParsePrefix();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParsePostInc(ASTHandle<ASTNode *> &left);

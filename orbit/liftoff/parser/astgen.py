@@ -43,7 +43,7 @@ NODES = {
             "left": "ASTNode*",
             "right": "ASTNode*"
         },
-        "node_type": ["BINARY", "ELVIS"]
+        "node_type": ["BINARY", "ELVIS", "SELECTOR"]
     },
     "Branch": {
         "fields": {
@@ -91,7 +91,7 @@ NODES = {
             "token_type": "scanner::TokenType",
             "value": "ASTNode*"
         },
-        "node_type": ["UNARY", "UPDATE"]
+        "node_type": ["UNARY", "UPDATE", "NIL_SAFE"]
     }
 }
 
