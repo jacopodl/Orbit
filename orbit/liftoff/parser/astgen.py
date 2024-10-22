@@ -43,7 +43,7 @@ NODES = {
             "left": "ASTNode*",
             "right": "ASTNode*"
         },
-        "node_type": ["BINARY", "ELVIS", "SELECTOR"]
+        "node_type": ["BINARY", "ELVIS", "NULL_COALESCING", "SELECTOR"]
     },
     "Branch": {
         "fields": {

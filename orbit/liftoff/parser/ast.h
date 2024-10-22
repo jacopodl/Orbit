@@ -22,6 +22,7 @@ enum class NodeType {
     ASSIGNMENT,
     BINARY,
     ELVIS,
+    NULL_COALESCING,
     SELECTOR,
     BRANCH,
     IDENTIFIER,
@@ -180,7 +181,7 @@ inline void ASTNodeCleanup(ASTNode* ast_node) {
         if (node->value)
             ASTNodeCleanup(node->value);
                 break;
-            }         case NodeType::BINARY:         case NodeType::ELVIS:         case NodeType::SELECTOR:         {
+            }         case NodeType::BINARY:         case NodeType::ELVIS:         case NodeType::NULL_COALESCING:         case NodeType::SELECTOR:         {
                 auto* node = (Binary*)ast_node;
         if (node->left)
             ASTNodeCleanup(node->left);
@@ -249,6 +250,7 @@ struct ASTVisitor {
         case NodeType::ASSIGNMENT: return static_cast<Derived*>(this)->visitAssignment((Assignment *) node);
         case NodeType::BINARY:
         case NodeType::ELVIS:
+        case NodeType::NULL_COALESCING:
         case NodeType::SELECTOR:
             return static_cast<Derived*>(this)->visitBinary((Binary *) node);
         case NodeType::BRANCH: return static_cast<Derived*>(this)->visitBranch((Branch *) node);
@@ -301,7 +303,7 @@ inline ASTHandle<Assignment*> MakeAssignment(const scanner::Loc &loc) {
 
 
 inline ASTHandle<Binary*> MakeBinary(const scanner::Loc &loc, NodeType node_type) {
-    assert(node_type == NodeType::BINARY || node_type == NodeType::ELVIS || node_type == NodeType::SELECTOR);
+    assert(node_type == NodeType::BINARY || node_type == NodeType::ELVIS || node_type == NodeType::NULL_COALESCING || node_type == NodeType::SELECTOR);
     auto *node = (Binary *) orbiter::memory::Calloc(sizeof(Binary));
     if(node != nullptr) {
         node->node_type = node_type;

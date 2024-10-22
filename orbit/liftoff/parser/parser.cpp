@@ -408,6 +408,22 @@ ASTHandle<ASTNode *> Parser::ParseMemberAccess(ASTHandle<ASTNode *> &left) {
     return selector;
 }
 
+ASTHandle<ASTNode *> Parser::ParseNullCoalescing(ASTHandle<ASTNode *> &left) {
+    this->Eat(true);
+
+    auto expr = this->ParseExpression(TokenType::NULL_COALESCING);
+
+    auto binary = MakeBinary(TKCUR_LOC, NodeType::NULL_COALESCING);
+
+    binary->loc.start = left->loc.start;
+    binary->loc.end = expr->loc.end;
+
+    binary->left = left.release();
+    binary->right = expr.release();
+
+    return binary;
+}
+
 ASTHandle<ASTNode *> Parser::ParsePostInc(ASTHandle<ASTNode *> &left) {
     // TODO: post_inc
     if (left->node_type != NodeType::IDENTIFIER)
@@ -493,8 +509,13 @@ Parser::LedMeth Parser::LookupLED(TokenType token) noexcept {
         case TokenType::MINUS_MINUS:
         case TokenType::PLUS_PLUS:
             return &Parser::ParsePostInc;
+        case TokenType::NULL_COALESCING:
+            return &Parser::ParseNullCoalescing;
         case TokenType::QUESTION:
             return &Parser::ParseTernary;
+        case TokenType::WALRUS:
+            // TODO: walrus
+            assert(false);
         default:
             return nullptr;
     }
