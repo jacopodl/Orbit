@@ -163,6 +163,59 @@ ASTHandle<ASTNode *> Parser::ParseAssignment(ASTHandle<ASTNode *> &left) {
     return assign;
 }
 
+ASTHandle<ASTNode *> Parser::ParseDictSet() {
+    std::vector<ASTHandle<ASTNode *> > elements;
+
+    const auto loc = TKCUR_LOC;
+    auto node_type = NodeType::ASSIGNMENT;
+
+    this->Eat(true);
+
+    if (this->Match(TokenType::RIGHT_BRACES)) {
+        auto ret = MakeUnary(TKCUR_LOC, NodeType::DICT);
+
+        ret->loc.start = loc.start;
+        ret->loc.end = TKCUR_LOC.end;
+
+        this->Eat(false);
+
+        return ret;
+    }
+
+    do {
+        elements.push_back(this->ParseExpression(TokenType::COMMA));
+
+        if (this->MatchEat(TokenType::COLON, true)) {
+            if (node_type == NodeType::SET)
+                throw ParserException(7);
+
+            node_type = NodeType::DICT;
+
+            this->EatNL();
+
+            elements.push_back(this->ParseExpression(TokenType::COMMA));
+
+            continue;
+        }
+
+        if (node_type == NodeType::DICT)
+            throw ParserException(6);
+
+        node_type = NodeType::SET;
+    } while (this->MatchEat(TokenType::COMMA, true));
+
+    auto ret = MakeListExpression(TKCUR_LOC, node_type);
+
+    if (!this->MatchEat(TokenType::RIGHT_BRACES, false))
+        throw ParserException(node_type == NodeType::DICT ? 8 : 9);
+
+    ret->loc.start = loc.start;
+
+    ret->elements = std::move(elements);
+
+    return ret;
+}
+
 ASTHandle<ASTNode *> Parser::ParseElvis(ASTHandle<ASTNode *> &left) {
     this->Eat(true);
 
@@ -579,6 +632,8 @@ Parser::NudMeth Parser::LookupNUD(TokenType token) noexcept {
             return &Parser::ParseIdentifier;
 
         // Grouping and composite types
+        case TokenType::LEFT_BRACES:
+            return &Parser::ParseDictSet;
         case TokenType::LEFT_SQUARE:
             return &Parser::ParseList;
 

@@ -61,7 +61,7 @@ NODES = {
         "fields": {
             "elements": "std::vector<ASTHandle<ASTNode*>>"
         },
-        "node_type": ["LIST", "TUPLE"]
+        "node_type": ["DICT", "LIST", "SET", "TUPLE"]
     },
     "Literal": {
         "fields": {

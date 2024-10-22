@@ -17,7 +17,11 @@ namespace liftoff::parser {
         "unexpected update operator",
         "subscript definition (index | slice) cannot be empty",
         "expected ']' after (index | slice) definition",
-        "expected ']' after list definition"
+        "expected ']' after list definition",
+        "you started defining a dict, not a set",
+        "you started defining a set, not a dict",
+        "expected '}' after dict definition",
+        "expected '}' after set definition",
     };
 
     class Context;
@@ -70,6 +74,8 @@ namespace liftoff::parser {
         }
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseAssignment(ASTHandle<ASTNode *> &left);
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseDictSet();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseElvis(ASTHandle<ASTNode *> &left);
 

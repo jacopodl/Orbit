@@ -28,7 +28,9 @@ enum class NodeType {
     SELECTOR,
     BRANCH,
     IDENTIFIER,
+    DICT,
     LIST,
+    SET,
     TUPLE,
     LITERAL,
     MODULE,
@@ -203,7 +205,7 @@ inline void ASTNodeCleanup(ASTNode* ast_node) {
                 auto* node = (Identifier*)ast_node;
         Release(node->value);
                 break;
-            }         case NodeType::LIST:         case NodeType::TUPLE:         {
+            }         case NodeType::DICT:         case NodeType::LIST:         case NodeType::SET:         case NodeType::TUPLE:         {
                 auto* node = (ListExpression*)ast_node;
         node->elements.~vector();
                 break;
@@ -259,7 +261,9 @@ struct ASTVisitor {
             return static_cast<Derived*>(this)->visitBinary((Binary *) node);
         case NodeType::BRANCH: return static_cast<Derived*>(this)->visitBranch((Branch *) node);
         case NodeType::IDENTIFIER: return static_cast<Derived*>(this)->visitIdentifier((Identifier *) node);
+        case NodeType::DICT:
         case NodeType::LIST:
+        case NodeType::SET:
         case NodeType::TUPLE:
             return static_cast<Derived*>(this)->visitListExpression((ListExpression *) node);
         case NodeType::LITERAL: return static_cast<Derived*>(this)->visitLiteral((Literal *) node);
@@ -344,7 +348,7 @@ inline ASTHandle<Identifier*> MakeIdentifier(const scanner::Loc &loc) {
 
 
 inline ASTHandle<ListExpression*> MakeListExpression(const scanner::Loc &loc, NodeType node_type) {
-    assert(node_type == NodeType::LIST || node_type == NodeType::TUPLE);
+    assert(node_type == NodeType::DICT || node_type == NodeType::LIST || node_type == NodeType::SET || node_type == NodeType::TUPLE);
     auto *node = (ListExpression *) orbiter::memory::Calloc(sizeof(ListExpression));
     if(node != nullptr) {
         node->node_type = node_type;
