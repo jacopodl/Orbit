@@ -11,7 +11,7 @@
 using namespace orbiter::datatype;
 using namespace liftoff;
 
-Scope *ScopeNew(MSize line_start, MSize line_end) {
+Scope *ScopeNew(MSize line_start) {
     auto *scope = (Scope *) orbiter::memory::Alloc(sizeof(Scope));
 
     if (scope != nullptr) {
@@ -29,7 +29,7 @@ Scope *ScopeNew(MSize line_start, MSize line_end) {
         scope->static_offset = 0;
 
         scope->line_start = line_start;
-        scope->line_end = line_end;
+        scope->line_end = 0;
     }
 
     return scope;
@@ -144,15 +144,14 @@ Symbol *SymbolTable::Declare(const char *name, SymbolType type, MSize offset) co
     return this->Declare(o_name.get(), type, offset);
 }
 
-Symbol *SymbolTable::DeclareSymbolScope(ORString *name, SymbolType type, MSize offset, MSize line_start,
-                                        MSize line_end) noexcept {
+Symbol *SymbolTable::DeclareSymbolScope(ORString *name, SymbolType type, MSize offset, MSize line_start) noexcept {
     STHEntry *entry;
 
     auto *sym = this->Declare(name, type, offset);
     if (sym == nullptr)
         return nullptr;
 
-    auto *scope = ScopeNew(line_start, line_end);
+    auto *scope = ScopeNew(line_start);
     if (scope == nullptr) {
         if (this->scope->symbols.Remove(sym->name, &entry)) {
             Release(entry->key);
@@ -190,15 +189,14 @@ Symbol *SymbolTable::DeclareSymbolScope(ORString *name, SymbolType type, MSize o
     return sym;
 }
 
-Symbol *SymbolTable::DeclareSymbolScope(const char *name, SymbolType type, MSize offset, MSize line_start,
-                                        MSize line_end) noexcept {
+Symbol *SymbolTable::DeclareSymbolScope(const char *name, SymbolType type, MSize offset, MSize line_start) noexcept {
     auto o_name = ORStringNew(this->ctx, name);
     if (!o_name) {
         this->last_error = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
-    return this->DeclareSymbolScope(o_name.get(), type, offset, line_start, line_end);
+    return this->DeclareSymbolScope(o_name.get(), type, offset, line_start);
 }
 
 Symbol *SymbolTable::Lookup(ORString *name, MSize offset) const noexcept {
@@ -312,7 +310,7 @@ void SymbolTable::LeaveScope() noexcept {
 SymbolTable *liftoff::SymbolTableNew(const orbiter::Context *ctx) noexcept {
     auto *table = (SymbolTable *) orbiter::memory::Alloc(sizeof(SymbolTable));
     if (table != nullptr) {
-        auto *scope = ScopeNew(0, 0);
+        auto *scope = ScopeNew(0);
         if (scope == nullptr) {
             orbiter::memory::Free(table);
             return nullptr;

@@ -145,11 +145,9 @@ namespace liftoff {
          * @param type The type of the symbol.
          * @param offset The offset of the symbol in source code.
          * @param line_start The start line of the symbol scope.
-         * @param line_end The end line of the symbol scope.
          * @return A pointer to the newly declared symbol.
          */
-        Symbol *DeclareSymbolScope(orbiter::datatype::ORString *name, SymbolType type, MSize offset, MSize line_start,
-                                   MSize line_end) noexcept;
+        Symbol *DeclareSymbolScope(orbiter::datatype::ORString *name, SymbolType type, MSize offset, MSize line_start) noexcept;
 
         /**
          * @brief Declares a new symbol scope with the specified details.
@@ -158,11 +156,9 @@ namespace liftoff {
          * @param type The type of the symbol.
          * @param offset The offset of the symbol in source code.
          * @param line_start The start line of the symbol scope.
-         * @param line_end The end line of the symbol scope.
          * @return A pointer to the newly declared symbol.
          */
-        Symbol *DeclareSymbolScope(const char *name, SymbolType type, MSize offset, MSize line_start,
-                                   MSize line_end) noexcept;
+        Symbol *DeclareSymbolScope(const char *name, SymbolType type, MSize offset, MSize line_start) noexcept;
 
         /**
          * @brief Looks up a symbol with the specified name and offset.

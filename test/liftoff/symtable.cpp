@@ -41,7 +41,7 @@ TEST_F(SymbolTableTest, Declare) {
 TEST_F(SymbolTableTest, DeclareSymbolScope) {
     ASSERT_TRUE(this->table->Declare("var1", SymbolType::VARIABLE, 0));
     ASSERT_TRUE(this->table->Declare("var2", SymbolType::VARIABLE, 5));
-    ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5, 10) != nullptr);
+    ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5) != nullptr);
 
     Symbol *sym = this->table->Lookup("var1", 2);
     ASSERT_TRUE(orbiter::datatype::ORStringCompare(sym->name, "var1") == 0);
@@ -56,7 +56,7 @@ TEST_F(SymbolTableTest, DeclareSymbolScope) {
 TEST_F(SymbolTableTest, LookupClosure) {
     ASSERT_TRUE(this->table->Declare("var1", SymbolType::VARIABLE, 0));
     ASSERT_TRUE(this->table->Declare("var2", SymbolType::VARIABLE, 5));
-    ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5, 10) != nullptr);
+    ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5) != nullptr);
 
     Symbol *sym = this->table->Lookup("var1", 2);
     ASSERT_TRUE(orbiter::datatype::ORStringCompare(sym->name, "var1") == 0);
@@ -72,7 +72,7 @@ TEST_F(SymbolTableTest, LookupClosure) {
 
     ASSERT_TRUE(this->table->Declare("var3", SymbolType::VARIABLE, 6));
 
-    ASSERT_TRUE(this->table->DeclareSymbolScope("inner1", SymbolType::FUNC, 15, 7, 9) != nullptr);
+    ASSERT_TRUE(this->table->DeclareSymbolScope("inner1", SymbolType::FUNC, 15, 7) != nullptr);
 
     sym = this->table->Lookup("var2", 18);
     ASSERT_TRUE(orbiter::datatype::ORStringCompare(sym->name, "var2") == 0);
@@ -102,7 +102,7 @@ TEST_F(SymbolTableTest, EnterScope) {
     ASSERT_FALSE(this->table->EnterScope("var1"));
     ASSERT_EQ(this->table->last_error, liftoff::SymbolTableError::SCOPE_NOT_FOUND);
 
-    ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5, 10) != nullptr);
+    ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5) != nullptr);
 
     this->table->LeaveScope();
 
