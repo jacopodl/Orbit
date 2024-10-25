@@ -234,7 +234,11 @@ namespace liftoff::scanner {
         Token(Token &other) = delete;
 
         ~Token() {
+            this->type = TokenType::TK_NULL;
+
             orbiter::memory::Free(this->buffer);
+
+            this->buffer = nullptr;
         }
 
         Token &operator=(const Token &other) = delete;
