@@ -34,7 +34,8 @@ namespace liftoff::parser {
         "expected '}' to end a code block",
         "only identifiers are allowed before the '=' sign",
         "function parameters must be passed in the order: [positional][, named param][, spread][, kwargs]",
-        "expected ')' after arguments in function call"
+        "expected ')' after arguments in function call",
+        "expected identifier(s) before warlus':=' operator"
     };
 
     class Context;
@@ -135,6 +136,8 @@ namespace liftoff::parser {
         [[nodiscard]] ASTHandle<ASTNode *> ParseStatement();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseTernary(ASTHandle<ASTNode *> &left);
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseWalrus(ASTHandle<ASTNode *> &left);
 
         [[nodiscard]] ASTHandle<Function *> ParseFunction(bool inl);
 

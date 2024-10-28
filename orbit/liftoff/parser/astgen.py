@@ -35,7 +35,8 @@ NODES = {
             "token_type": "scanner::TokenType",
             "name": "ASTNode*",
             "value": "ASTNode*"
-        }
+        },
+        "node_type": ["ASSIGNMENT", "ASSIGNMENTS", "VAR_DECLARATION", "VAR_DECLARATIONS"]
     },
     "Binary": {
         "fields": {

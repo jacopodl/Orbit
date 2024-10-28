@@ -10,6 +10,8 @@
 
 #include <orbit/liftoff/parser/parser.h>
 
+#include "orbit/orbiter/datatype/tuple.h"
+
 using namespace orbiter::datatype;
 using namespace liftoff::scanner;
 using namespace liftoff::parser;
@@ -123,6 +125,8 @@ int PeekPrecedence(TokenType token) {
 }
 
 ASTHandle<ASTNode *> Parser::ParseAssignment(ASTHandle<ASTNode *> &left) {
+    auto node_type = NodeType::ASSIGNMENT;
+
     const auto tk_type = TKCUR_TYPE;
 
     this->Eat(true);
@@ -147,11 +151,13 @@ ASTHandle<ASTNode *> Parser::ParseAssignment(ASTHandle<ASTNode *> &left) {
                 && itm->node_type != NodeType::SELECTOR)
                 throw ParserException(1);
         }
+
+        node_type = NodeType::ASSIGNMENTS;
     }
 
     auto expr = this->ParseExpression(tk_type);
 
-    auto assign = MakeAssignment(TKCUR_LOC);
+    auto assign = MakeAssignment(TKCUR_LOC, node_type);
 
     assign->name = left.release();
     assign->value = expr.release();
@@ -799,6 +805,46 @@ ASTHandle<ASTNode *> Parser::ParseTernary(ASTHandle<ASTNode *> &left) {
     return branch;
 }
 
+ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
+    auto node_type = NodeType::VAR_DECLARATION;
+
+    this->Eat(true);
+
+    if (left->node_type == NodeType::TUPLE) {
+        const auto &tuple = (ASTHandle<ListExpression *> &) left;
+
+        for (const auto &cursor: tuple->elements) {
+            const auto &id = (ASTHandle<Identifier *> &) cursor;
+
+            if (cursor->node_type != NodeType::IDENTIFIER)
+                throw ParserException(23);
+
+            if (!this->sym_t_->Declare(id->value, SymbolType::VARIABLE, id->loc.start.offset))
+                throw SymbolTableException();
+        }
+
+        node_type = NodeType::VAR_DECLARATIONS;
+    } else if (left->node_type != NodeType::IDENTIFIER)
+        throw ParserException(23);
+
+    auto decl = MakeAssignment(TKCUR_LOC, node_type);
+
+    decl->loc.start = left->loc.start;
+    decl->name = left.release();
+
+    decl->value = this->ParseExpression(TokenType::WALRUS).release();
+    decl->loc.end = decl->value->loc.end;
+
+    if (node_type == NodeType::VAR_DECLARATION) {
+        if (!this->sym_t_->Declare(((Identifier *) decl->name)->value,
+                                   SymbolType::VARIABLE,
+                                   decl->name->loc.start.offset))
+            throw SymbolTableException();
+    }
+
+    return decl;
+}
+
 ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
     Context ctx(this, ContextType::FUNC);
 
@@ -855,7 +901,7 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
 
 ASTHandle<Parameter *> Parser::ParseParameter(const Position &start, NodeType type) {
     if (!this->Match(TokenType::IDENTIFIER))
-        throw ParserException(0); // TODO: error
+        throw ParserException(16);
 
     auto id_name = ORStringNew(this->ctx_, this->tkcur_.buffer, this->tkcur_.length);
     if (!id_name)
@@ -1014,8 +1060,7 @@ Parser::LedMeth Parser::LookupLED(TokenType token) noexcept {
         case TokenType::QUESTION:
             return &Parser::ParseTernary;
         case TokenType::WALRUS:
-            // TODO: walrus
-            assert(false);
+            return &Parser::ParseWalrus;
         default:
             return nullptr;
     }

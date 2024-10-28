@@ -87,8 +87,14 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) cons
     STHEntry *entry;
 
     if (this->scope->symbols.Lookup(name, &entry)) {
-        this->last_error = SymbolTableError::SYMBOL_ALREADY_EXISTS;
-        return nullptr;
+        if (entry->value->decl_offset != offset) {
+            this->last_error = SymbolTableError::SYMBOL_ALREADY_EXISTS;
+            return nullptr;
+        }
+
+        entry->value->type = type;
+
+        return entry->value;
     }
 
     if ((entry = this->scope->symbols.AllocHEntry()) == nullptr) {
