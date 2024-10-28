@@ -127,12 +127,11 @@ ASTHandle<ASTNode *> Parser::ParseAssignment(ASTHandle<ASTNode *> &left) {
 
     this->Eat(true);
 
-    // TODO
     if (left->node_type != NodeType::IDENTIFIER
-        // && left->node_type != NodeType::INDEX
-        // && left->node_type != NodeType::SLICE
-        && left->node_type != NodeType::TUPLE)
-        //&& left->node_type != NodeType::SELECTOR)
+        && left->node_type != NodeType::INDEX
+        && left->node_type != NodeType::SLICE
+        && left->node_type != NodeType::TUPLE
+        && left->node_type != NodeType::SELECTOR)
         throw ParserException(1);
 
     // Check for tuple content
@@ -142,10 +141,10 @@ ASTHandle<ASTNode *> Parser::ParseAssignment(ASTHandle<ASTNode *> &left) {
         for (auto &cursor: tuple->elements) {
             const auto *itm = cursor.get();
 
-            if (itm->node_type != NodeType::IDENTIFIER)
-                //&& itm->node_type != NodeType::INDEX
-                //&& left->node_type != NodeType::SLICE
-                //&& itm->node_type != NodeType::SELECTOR)
+            if (itm->node_type != NodeType::IDENTIFIER
+                && itm->node_type != NodeType::INDEX
+                && left->node_type != NodeType::SLICE
+                && itm->node_type != NodeType::SELECTOR)
                 throw ParserException(1);
         }
     }

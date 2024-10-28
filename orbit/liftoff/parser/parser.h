@@ -13,7 +13,7 @@
 namespace liftoff::parser {
     constexpr const char *kStandardError[] = {
         "invalid syntax",
-        "only identifiers are allowed before the '=' sign",
+        "only identifier(s)/index/slice/access expression are allowed before the '=' sign",
         "unexpected update operator",
         "subscript definition (index | slice) cannot be empty",
         "expected ']' after (index | slice) definition",
