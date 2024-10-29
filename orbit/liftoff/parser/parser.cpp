@@ -126,8 +126,7 @@ ASTHandle<ASTNode *> Parser::ParseVarDecl(const Position &start, bool pub, bool 
         expr = this->ParseExpression(TokenType::WALRUS);
 
         decl->loc.end = expr->loc.end;
-    }
-    else if (constant)
+    } else if (constant)
         throw ParserException(24);
 
     if (identifiers.size() == 1)
@@ -841,6 +840,18 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
             return this->ParseVarDecl(start, pub, true, false);
         case TokenType::KW_VAR:
             return this->ParseVarDecl(start, pub, false, weak);
+        case TokenType::KW_FUNC: {
+            auto func = this->ParseFunction(false);
+
+            func->loc.start = start;
+            func->pub = pub;
+
+            if (pub && !func->anon)
+                this->exports.emplace_back(func->name);
+
+            return func;
+        }
+
         default:
             return this->ParseExpression();
     }
