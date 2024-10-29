@@ -44,7 +44,7 @@ NODES = {
             "left": "ASTNode*",
             "right": "ASTNode*"
         },
-        "node_type": ["BINARY", "ELVIS", "IN", "NOT_IN", "NULL_COALESCING", "SELECTOR"]
+        "node_type": ["BINARY", "CHAN_SEND", "ELVIS", "IN", "NOT_IN", "NULL_COALESCING", "SELECTOR"]
     },
     "Branch": {
         "fields": {
@@ -119,7 +119,8 @@ NODES = {
             "token_type": "scanner::TokenType",
             "value": "ASTNode*"
         },
-        "node_type": ["AWAIT", "ELLIPSIS", "KW_ARG", "NIL_SAFE", "PANIC", "SPAWN", "TRAP", "UNARY", "UPDATE"]
+        "node_type": ["AWAIT", "CHAN_RECV", "ELLIPSIS", "KW_ARG", "NIL_SAFE", "PANIC", "SPAWN", "TRAP", "UNARY",
+                      "UPDATE"]
     }
 }
 

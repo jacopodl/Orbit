@@ -10,8 +10,6 @@
 
 #include <orbit/liftoff/parser/parser.h>
 
-#include "orbit/orbiter/datatype/tuple.h"
-
 using namespace orbiter::datatype;
 using namespace liftoff::scanner;
 using namespace liftoff::parser;
@@ -361,7 +359,7 @@ ASTHandle<ASTNode *> Parser::ParseInfix(ASTHandle<ASTNode *> &left) {
 
     auto right = this->ParseExpression(tk_type);
 
-    auto infix = MakeBinary(TKCUR_LOC, NodeType::BINARY);
+    auto infix = MakeBinary(TKCUR_LOC, tk_type == TokenType::ARROW_LEFT ? NodeType::CHAN_SEND : NodeType::BINARY);
 
     infix->token_type = tk_type;
 
@@ -419,8 +417,6 @@ ASTHandle<ASTNode *> Parser::ParseList() {
 }
 
 ASTHandle<ASTNode *> Parser::ParseExpression(int precedence) {
-    ASTHandle<ASTNode *> left;
-
     LedMeth led;
     NudMeth nud;
 
@@ -428,7 +424,7 @@ ASTHandle<ASTNode *> Parser::ParseExpression(int precedence) {
         assert(false);
     }
 
-    left = (this->*nud)();
+    auto left = (this->*nud)();
 
     bool is_safe = false;
     while (precedence < PeekPrecedence(TKCUR_TYPE)) {
@@ -466,7 +462,7 @@ ASTHandle<ASTNode *> Parser::ParseExpressionList(ASTHandle<ASTNode *> &left) {
 
     list->elements.emplace_back(left.release());
 
-    Position end{};
+    Position end;
     do {
         this->EatNL();
 
@@ -521,7 +517,7 @@ ASTHandle<ASTNode *> Parser::ParseFuncCall(ASTHandle<ASTNode *> &left) {
     this->Eat(true);
 
     if (!this->Match(TokenType::RIGHT_ROUND)) {
-        Position end{};
+        Position end;
         int mode = 0;
 
         do {
@@ -1030,6 +1026,8 @@ Parser::LedMeth Parser::LookupLED(TokenType token) noexcept {
         return &Parser::ParseInfix;
 
     switch (token) {
+        case TokenType::ARROW_LEFT:
+            return &Parser::ParseInfix;
         case TokenType::EQUAL:
         case TokenType::ASSIGN_ADD:
         case TokenType::ASSIGN_SUB:
@@ -1071,6 +1069,16 @@ Parser::NudMeth Parser::LookupNUD(TokenType token) noexcept {
         return &Parser::ParseLiteral;
 
     switch (token) {
+        // Unary prefix operators
+        case TokenType::ARROW_LEFT:
+        case TokenType::ASTERISK:
+        case TokenType::AMPERSAND:
+        case TokenType::EXCLAMATION:
+        case TokenType::MINUS:
+        case TokenType::PLUS:
+        case TokenType::TILDE:
+            return &Parser::ParsePrefix;
+
         // Identifiers and self
         case TokenType::IDENTIFIER:
         case TokenType::SELF:
@@ -1083,15 +1091,6 @@ Parser::NudMeth Parser::LookupNUD(TokenType token) noexcept {
             return &Parser::ParseExprOrTuple;
         case TokenType::LEFT_SQUARE:
             return &Parser::ParseList;
-
-        // Unary prefix operators
-        case TokenType::PLUS:
-        case TokenType::MINUS:
-        case TokenType::EXCLAMATION:
-        case TokenType::TILDE:
-        case TokenType::ASTERISK:
-        case TokenType::AMPERSAND:
-            return &Parser::ParsePrefix;
 
         // Keywords that can start expressions
         case TokenType::KW_AWAIT:
@@ -1111,7 +1110,7 @@ Parser::NudMeth Parser::LookupNUD(TokenType token) noexcept {
 ASTHandle<ASTNode *> Parser::ParsePrefix() {
     const auto tk_type = TKCUR_TYPE;
 
-    auto prefix = MakeUnary(TKCUR_LOC, NodeType::UNARY);
+    auto prefix = MakeUnary(TKCUR_LOC, tk_type == TokenType::ARROW_LEFT ? NodeType::CHAN_RECV : NodeType::UNARY);
 
     this->Eat(true);
 
