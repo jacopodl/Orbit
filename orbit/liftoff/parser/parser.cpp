@@ -1136,6 +1136,15 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
         return lbl;
     }
 
+    if (stmt->node_type == NodeType::VAR_DECLARATION || stmt->node_type == NodeType::VAR_DECLARATIONS) {
+        const auto &decl = (ASTHandle<Assignment *> &) stmt;
+
+        if (pub) {
+            if (decl->node_type == NodeType::VAR_DECLARATION)
+                this->exports.emplace_back(O_INCREF(((Identifier *) decl->name)->value));
+        }
+    }
+
     return stmt;
 }
 
