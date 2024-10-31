@@ -676,8 +676,12 @@ bool Scanner::NextToken(Token *out_token) noexcept {
         out_token->length = 0;
     }
 
-    if (this->peeked.type != TokenType::TK_NULL)
+    if (this->peeked.type != TokenType::TK_NULL) {
         *out_token = std::move(this->peeked);
+        this->peeked.type = TokenType::TK_NULL;
+
+        return true;
+    }
 
     while ((value = this->Peek()) > 0) {
 #define RETURN_TK(tk_type)          \
