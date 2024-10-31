@@ -38,7 +38,9 @@ namespace liftoff::parser {
         "expected identifier(s) before warlus':=' operator",
         "expected '=' after identifier(s) in let declaration",
         "'weak' can only be used in the context of a class",
-        "defer expected call expression"
+        "defer expected call expression",
+        "spawn expected call expression",
+        "expected ';' after test"
     };
 
     class Context;
@@ -99,6 +101,8 @@ namespace liftoff::parser {
         [[nodiscard]] ASTHandle<ASTNode *> ParseDeferStatement();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseIfStatement();
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseLoopStatement();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseSyncStatement();
 

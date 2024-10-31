@@ -124,6 +124,39 @@ ASTHandle<ASTNode *> Parser::ParseIfStatement() {
     return branch;
 }
 
+ASTHandle<ASTNode *> Parser::ParseLoopStatement() {
+    auto loop = MakeLoop(TKCUR_LOC, NodeType::LOOP);
+
+    this->Eat(true);
+
+    this->sym_t_->EnterNestedScope();
+
+    if (!this->Match(TokenType::LEFT_BRACES)) {
+        loop->init = this->ParseExpression().release();
+
+        if (this->MatchEat(TokenType::SEMICOLON, true)) {
+            loop->node_type = NodeType::FOR;
+
+            if (!this->MatchEat(TokenType::SEMICOLON, true)) {
+                loop->test = this->ParseExpression().release();
+
+                if (!this->MatchEat(TokenType::SEMICOLON, true))
+                    throw ParserException(28);
+            }
+
+            if (!this->Match(TokenType::LEFT_BRACES))
+                loop->inc = this->ParseExpression().release();
+        }
+    }
+
+    loop->body = this->ParseBlock(false).release();
+    loop->loc.end = loop->body->loc.end;
+
+    this->sym_t_->LeaveNestedScope();
+
+    return loop;
+}
+
 ASTHandle<ASTNode *> Parser::ParseSyncStatement() {
     auto sync = MakeBinary(TKCUR_LOC, NodeType::SYNC_BLOCK);
 
@@ -235,7 +268,7 @@ ASTHandle<ASTNode *> Parser::ParseAPST() {
         return right;
 
     if (node_type == NodeType::SPAWN && right->node_type != NodeType::CALL)
-        throw ParserException(33);
+        throw ParserException(27);
 
     auto &unary = (ASTHandle<Unary *> &) right;
     if (unary->node_type == NodeType::NIL_SAFE && unary->value->node_type == node_type) {
@@ -936,6 +969,8 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
             return this->ParseIfStatement();
         case TokenType::KW_LET:
             return this->ParseVarDecl(start, pub, true, false);
+        case TokenType::KW_LOOP:
+            return this->ParseLoopStatement();
         case TokenType::KW_RETURN: {
             auto ret = MakeUnary(TKCUR_LOC, NodeType::RETURN);
 

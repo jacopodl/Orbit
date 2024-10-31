@@ -96,6 +96,15 @@ NODES = {
             "literal": "orbiter::datatype::OObject*"
         }
     },
+    "Loop": {
+        "fields": {
+            "init": "ASTNode*",
+            "test": "ASTNode*",
+            "inc": "ASTNode*",
+            "body": "ASTNode*"
+        },
+        "node_type": ["FOR", "FOR_IN", "LOOP"]
+    },
     "Module": {
         "fields": {
             "filename": "orbiter::datatype::ORString*",
