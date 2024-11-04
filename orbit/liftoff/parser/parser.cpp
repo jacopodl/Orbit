@@ -199,6 +199,98 @@ ASTHandle<ASTNode *> Parser::ParseLoopStatement() {
     return loop;
 }
 
+ASTHandle<ASTNode *> Parser::ParseSwitchCase(bool as_if) {
+    auto sw_case = MakeSwitchCase(TKCUR_LOC);
+    bool no_def = true;
+    bool fallthrough = false;
+
+    if (this->Match(TokenType::KW_DEFAULT))
+        no_def = false;
+
+    this->Eat(true);
+
+    if (no_def) {
+        int idx = 0;
+        do {
+            if (as_if && idx > 0)
+                throw ParserException(40);
+
+            sw_case->tests.push_back(this->ParseExpression(TokenType::EQUAL));
+
+            idx += 1;
+        } while (this->MatchEat(TokenType::SEMICOLON, true));
+    }
+
+    if (!this->MatchEat(TokenType::COLON, true))
+        throw ParserException(37);
+
+    auto block = MakeBlock(TKCUR_LOC);
+
+    this->sym_t_->EnterNestedScope();
+
+    while (!this->Match(TokenType::KW_CASE, TokenType::KW_DEFAULT, TokenType::RIGHT_BRACES)) {
+        if (!this->MatchEat(TokenType::KW_FALLTHROUGH, false)) {
+            if (fallthrough)
+                throw ParserException(38);
+
+            block->statements.push_back(this->ParseStatement());
+        } else
+            fallthrough = true;
+
+        if (!this->Match(TokenType::END_OF_LINE, TokenType::SEMICOLON))
+            throw ParserException(0);
+
+        this->Eat(true);
+    }
+
+    this->sym_t_->LeaveNestedScope();
+
+    sw_case->body = block.release();
+
+    sw_case->loc.end = sw_case->body->loc.end;
+
+    sw_case->fallthrough = fallthrough;
+
+    return sw_case;
+}
+
+ASTHandle<ASTNode *> Parser::ParseSwitchStatement() {
+    auto sw = MakeSwitchBlock(TKCUR_LOC);
+    bool def_case = false;
+
+    this->Eat(true);
+
+    if (!this->Match(TokenType::LEFT_BRACES))
+        sw->test = this->ParseExpression(TokenType::EQUAL).release();
+
+    if (!this->MatchEat(TokenType::LEFT_BRACES, true))
+        throw ParserException(36);
+
+    while (this->Match(TokenType::KW_CASE, TokenType::KW_DEFAULT)) {
+        auto sw_case = this->ParseSwitchCase(sw->test == nullptr);
+
+        if (((SwitchBlock *) sw_case.get())->test == nullptr) {
+            if (def_case)
+                throw ParserException(39);
+
+            def_case = true;
+        }
+
+        sw->cases.push_back(std::move(sw_case));
+    }
+
+    this->EatNL();
+
+    if (!this->Match(TokenType::RIGHT_BRACES))
+        throw ParserException(41);
+
+    sw->loc.end = TKCUR_LOC.end;
+
+    this->Eat(false);
+
+    return sw;
+}
+
 ASTHandle<ASTNode *> Parser::ParseSyncStatement() {
     auto sync = MakeBinary(TKCUR_LOC, NodeType::SYNC_BLOCK);
 
@@ -1040,8 +1132,7 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
     do {
         switch (TKCUR_TYPE) {
             case TokenType::KW_DEFER:
-                stmt = this->ParseDeferStatement();
-                break;
+                return this->ParseDeferStatement();
             case TokenType::KW_FOR:
                 stmt = this->ParseForInStatement();
                 break;
@@ -1058,23 +1149,14 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 break;
             }
             case TokenType::KW_IF:
-                stmt = this->ParseIfStatement();
-                break;
+                return this->ParseIfStatement();
             case TokenType::KW_LET:
-                stmt = this->ParseVarDecl(start, pub, true, false, false);
-                break;
+                return this->ParseVarDecl(start, pub, true, false, false);
             case TokenType::KW_LOOP:
                 stmt = this->ParseLoopStatement();
                 break;
-            case TokenType::KW_TRY:
-                stmt = this->ParseTryCatchFinally();
-                break;
-            case TokenType::KW_SYNC:
-                stmt = this->ParseSyncStatement();
-                break;
-            case TokenType::KW_VAR:
-                stmt = this->ParseVarDecl(start, pub, false, weak, false);
-                break;
+            case TokenType::KW_SWITCH:
+                return this->ParseSwitchStatement();
             case TokenType::KW_YIELD:
                 if (!this->context_->Check(ContextType::FUNC))
                     throw ParserException(31);
@@ -1091,9 +1173,14 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 } else if (ret->node_type == NodeType::YIELD)
                     throw ParserException(30);
 
-                stmt = std::move(ret);
-                break;
+                return ret;
             }
+            case TokenType::KW_SYNC:
+                return this->ParseSyncStatement();
+            case TokenType::KW_TRY:
+                return this->ParseTryCatchFinally();
+            case TokenType::KW_VAR:
+                return this->ParseVarDecl(start, pub, false, weak, false);
             default:
                 stmt = this->ParseExpression();
         }

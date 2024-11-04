@@ -47,7 +47,13 @@ namespace liftoff::parser {
         "Invalid try block: must have at least one catch or finally clause",
         "Invalid catch clause: expected @atom after catch",
         "Invalid label placement: labels cannot be stacked. Each label must be followed by a valid loop statement",
-        "Invalid label usage: labels can only precede 'for', 'for-in', or 'loop' statements. Other statements cannot be labeled"
+        "Invalid label usage: labels can only precede 'for', 'for-in', or 'loop' statements. Other statements cannot be labeled",
+        "Invalid switch syntax: expected '{' after switch condition to open switch block",
+        "Invalid case/default syntax: expected ':' after case expression or default keyword",
+        "Invalid 'fallthrough' placement: fallthrough statement must be the last statement in a case or default block",
+        "Multiple default cases: switch statement can have at most one default case",
+        "Invalid case syntax: multiple case expressions (case a;b;c:) are only allowed when switch has a value to match against.",
+        "Unclosed switch statement: expected '}' at the end of switch block"
     };
 
     class Context;
@@ -112,6 +118,10 @@ namespace liftoff::parser {
         [[nodiscard]] ASTHandle<ASTNode *> ParseIfStatement();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseLoopStatement();
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseSwitchCase(bool as_if);
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseSwitchStatement();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseSyncStatement();
 

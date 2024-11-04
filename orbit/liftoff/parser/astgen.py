@@ -145,6 +145,19 @@ NODES = {
         },
         "node_type": ["INDEX", "SLICE"]
     },
+    "SwitchCase": {
+        "fields": {
+            "tests": "std::vector<ASTHandle<ASTNode*>>",
+            "body": "ASTNode*",
+            "fallthrough": "bool"
+        }
+    },
+    "SwitchBlock": {
+        "fields": {
+            "test": "ASTNode*",
+            "cases": "std::vector<ASTHandle<ASTNode*>>"
+        }
+    },
     "TryBlock": {
         "fields": {
             "try_block": "ASTNode*",
