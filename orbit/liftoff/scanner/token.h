@@ -192,6 +192,7 @@ namespace liftoff::scanner {
         // Special operators
         ARROW_LEFT,
         ARROW_RIGHT,
+        DECORATOR,
         QUESTION,
         QUESTION_DOT,
         ELVIS,

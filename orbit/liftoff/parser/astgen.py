@@ -85,6 +85,12 @@ NODES = {
         },
         "node_type": ["CLASS", "TRAIT"]
     },
+    "Decorator": {
+        "fields": {
+            "decorators": "std::vector<ASTHandle<ASTNode*>>",
+            "func": "ASTNode*",
+        }
+    },
     "Function": {
         "fields": {
             "name": "orbiter::datatype::ORString*",

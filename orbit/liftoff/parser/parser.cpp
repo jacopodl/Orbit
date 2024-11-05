@@ -74,7 +74,8 @@ int PeekPrecedence(TokenType token) {
         case TokenType::SLASH_SLASH:
         case TokenType::PERCENT:
             return 150; // Multiplicative operators
-
+        case TokenType::LEFT_ROUND:
+            return 160;
         case TokenType::DOT:
         case TokenType::QUESTION_DOT:
             return 170; // Member access
@@ -136,6 +137,32 @@ ASTHandle<ASTNode *> Parser::ParseClassTrait() {
     this->sym_t_->LeaveScope();
 
     return ct;
+}
+
+ASTHandle<ASTNode *> Parser::ParseDecorator() {
+    auto doc = this->GetDocString();
+
+    auto deco = MakeDecorator(TKCUR_LOC);
+
+    this->Eat(true);
+
+    if (!this->Match(TokenType::RIGHT_SQUARE)) {
+        do {
+            deco->decorators.push_back(this->ParseExpression(TokenType::ASTERISK));
+        } while (this->MatchEat(TokenType::COMMA, true));
+    }
+
+    if (!this->MatchEat(TokenType::RIGHT_SQUARE, true))
+        throw ParserException(44);
+
+    deco->func = this->ParseStatement().release();
+
+    if (deco->func->node_type != NodeType::FUNCTION)
+        throw ParserException(45);
+
+    ((Function *) deco->func)->doc = doc.release();
+
+    return deco;
 }
 
 ASTHandle<ASTNode *> Parser::ParseExtImpl() {
@@ -1210,6 +1237,8 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
 
     do {
         switch (TKCUR_TYPE) {
+            case TokenType::DECORATOR:
+                return this->ParseDecorator();
             case TokenType::KW_CLASS:
             case TokenType::KW_TRAIT:
                 return this->ParseClassTrait();
@@ -1661,7 +1690,7 @@ void Parser::Eat(bool ignore_nl) {
 
             this->doc_ = std::move(this->tkcur_);
         } else if (this->doc_.type == TokenType::COMMENT_DOC
-                   && !this->Match(TokenType::KW_CLASS, TokenType::KW_TRAIT, TokenType::KW_FUNC,
+                   && !this->Match(TokenType::DECORATOR, TokenType::KW_CLASS, TokenType::KW_TRAIT, TokenType::KW_FUNC,
                                    TokenType::SEMICOLON, TokenType::END_OF_LINE))
             this->doc_.~Token();
     } while (this->TokenInRange(TokenType::COMMENT_BEGIN, TokenType::COMMENT_END));

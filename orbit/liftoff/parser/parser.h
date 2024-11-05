@@ -55,7 +55,9 @@ namespace liftoff::parser {
         "Invalid case syntax: multiple case expressions (case a;b;c:) are only allowed when switch has a value to match against.",
         "Unclosed switch statement: expected '}' at the end of switch block",
         "Invalid trait inheritance: traits cannot inherit from classes using ':'. Use 'impl TraitName' to extend other traits",
-        "Invalid inheritance/implementation syntax: class extension and trait implementation can only use identifiers and member access (e.g., name or name.subname)"
+        "Invalid inheritance/implementation syntax: class extension and trait implementation can only use identifiers and member access (e.g., name or name.subname)",
+        "Missing closing bracket: expected ']' to close decorator definition",
+        "Invalid decorator placement: decorators must be immediately followed by a function definition"
     };
 
     class Context;
@@ -114,6 +116,8 @@ namespace liftoff::parser {
         }
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseClassTrait();
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseDecorator();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseExtImpl();
 

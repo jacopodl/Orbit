@@ -822,6 +822,7 @@ bool Scanner::NextToken(Token *out_token) noexcept {
             case '@':
                 return this->TokenizeAtom(out_token);
             case '[':
+                CHECK_AGAIN('#', TokenType::DECORATOR);
                 RETURN_TK(TokenType::LEFT_SQUARE);
             case '\\':
                 if (this->Next() != '\n') {
