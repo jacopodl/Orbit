@@ -406,6 +406,8 @@ ASTHandle<ASTNode *> Parser::ParseNativeStatement() {
     if (!this->Match(TokenType::IDENTIFIER))
         throw ParserException(61);
 
+    start = TKCUR_LOC.start;
+
     variable->native_name = ORStringNew(this->ctx_, this->tkcur_.buffer, this->tkcur_.length).release();
 
     this->Eat(true);
@@ -430,7 +432,13 @@ ASTHandle<ASTNode *> Parser::ParseNativeStatement() {
 
         variable->alias = ORStringNew(this->ctx_, this->tkcur_.buffer, this->tkcur_.length).release();
 
+        if (!this->sym_t_->Declare(variable->alias, SymbolType::NATIVE_VAR, TKCUR_LOC.start.offset))
+            throw SymbolTableException();
+
         this->Eat(false);
+    } else {
+        if (!this->sym_t_->Declare(variable->native_name, SymbolType::NATIVE_VAR, start.offset))
+            throw SymbolTableException();
     }
 
     this->IgnoreNewLineIF(TokenType::KW_FROM);
@@ -514,9 +522,15 @@ ASTHandle<ASTNode *> Parser::ParseNativeFuncStatement(Position start) {
 
         func->alias = ORStringNew(this->ctx_, this->tkcur_.buffer, this->tkcur_.length).release();
 
+        if (!this->sym_t_->Declare(func->alias, SymbolType::NATIVE_FUNC, TKCUR_LOC.start.offset))
+            throw SymbolTableException();
+
         func->loc.end = TKCUR_LOC.end;
 
         this->Eat(false);
+    } else {
+        if (!this->sym_t_->Declare(func->native_name, SymbolType::NATIVE_FUNC, func->loc.start.offset))
+            throw SymbolTableException();
     }
 
     this->IgnoreNewLineIF(TokenType::KW_FROM);
