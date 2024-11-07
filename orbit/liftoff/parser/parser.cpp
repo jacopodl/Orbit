@@ -1740,7 +1740,7 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
         if (this->MatchEat(TokenType::KW_ASYNC, true))
             func->async = true;
         else if (this->MatchEat(TokenType::KW_CONST, true)) {
-            if (!this->context_->CheckExt(ContextType::CLASS) && !this->context_->CheckExt(ContextType::TRAIT))
+            if (!this->context_->CheckBack(ContextType::CLASS) && !this->context_->CheckBack(ContextType::TRAIT))
                 throw ParserException(17);
 
             func->constant = true;
@@ -1748,7 +1748,15 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
             throw ParserException(0);
     }
 
-    func->body = this->ParseBlock(false).release();
+    this->IgnoreNewLineIF(TokenType::LEFT_BRACES);
+
+    if (this->Match(TokenType::LEFT_BRACES))
+        func->body = this->ParseBlock(false).release();
+    else {
+        if (!this->context_->CheckBack(ContextType::CLASS)
+            && !this->context_->CheckBack(ContextType::TRAIT))
+            throw ParserException(68);
+    }
 
     this->sym_t_->scope->line_end = func->loc.end.line;
     this->sym_t_->LeaveScope();

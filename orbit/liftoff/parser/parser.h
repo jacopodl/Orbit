@@ -79,7 +79,8 @@ namespace liftoff::parser {
         "Invalid native variable alias: expected identifier after 'as' keyword (e.g., 'as counter')",
         "Invalid native variable import: expected string literal after 'from' keyword (e.g., 'from \"libc\"')",
         "Invalid break/continue: can only be used within a loop or switch statement",
-        "Undefined label: break/continue refers to a non-existent or invalid label"
+        "Undefined label: break/continue refers to a non-existent or invalid label",
+        "Invalid function declaration: function body is required. Only methods in traits and classes can be declared without a body (abstract methods). Regular functions must always have a body defined"
     };
 
     class Context;
@@ -293,6 +294,10 @@ namespace liftoff::parser {
 
         [[nodiscard]] bool Check(ContextType type) const noexcept {
             return this->type_ == type;
+        }
+
+        [[nodiscard]] bool CheckBack(ContextType type) const noexcept {
+            return this->back_ != nullptr && this->back_->type_ == type;
         }
 
         [[nodiscard]] bool CheckExt(ContextType type) const noexcept {
