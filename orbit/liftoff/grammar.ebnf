@@ -3,7 +3,7 @@
     Licensed under the Apache License v2.0
 
     syntax: ISO-14977 EBNF
-    version: 1.0
+    version: 2.0
 *)
 
 (* Basic elements *)
@@ -63,10 +63,12 @@ key_value_pair = expression, ":", expression;
 dictionary = "{", [key_value_pair, {",", key_value_pair}], "}";
 
 (* Expressions *)
-expression = panic_expr | channel_send_expr | channel_receive_expr | await_expr | assignment_expr | ternary_expr | binary_expr | unary_expr | postfix_expr | primary_expr | inline_function | trap_expr | spawn_expr;
+expression = panic_expr | channel_send_expr | channel_receive_expr | await_expr | assignment_expr | ternary_expr | elvis_expr | nil_coalescing | binary_expr | unary_expr | postfix_expr | primary_expr | inline_function | trap_expr | spawn_expr;
 panic_expr = "panic", expression;
 assignment_expr = assignable, assignment_op, expression;
 ternary_expr = expression, "?", [expression, ":"], expression;
+elvis_expr = expression, "?:", expression;
+nil_coalescing = expression, "??", expression;
 binary_expr = expression, binary_op, expression;
 unary_expr = unary_op, expression | channel_receive_expr;
 postfix_expr = assignable, "++" | assignable, "--";
@@ -113,13 +115,12 @@ kwargs_arg = "*", identifier;
 decorator = "[#", identifier, ["(", [argument_list], ")"], "]";
 
 (* Inline functions *)
-inline_function = "func", "(", [parameter_list], ")", [return_type], [async_keyword], inline_function_body;
-inline_function_body = block_function | "=>", expression;
+inline_function = "func", "(", [parameter_list], ")", [return_type], [async_keyword], block_function;
 return_type = ":", type;
 
 (* Statements *)
 common_statement = labeled_statement | loop_statement | for_in_statement | if_statement | switch_statement | sync_statement | try_statement | defer_statement | function_definition | short_var_declaration | var_declaration | expression | return_statement;
-module_level_statement = import_statement | module_conditional_block | [pub_keyword], (native_declaration | function_definition | short_var_declaration | var_declaration | const_declaration | trait_definition | class_definition) | common_statement;
+module_level_statement = import_statement | module_conditional_block | native_declaration | [pub_keyword], (function_definition | short_var_declaration | var_declaration | const_declaration | trait_definition | class_definition) | common_statement;
 local_statement = common_statement | break_statement | continue_statement | yield_statement;
 function_level_statement = common_statement | yield_statement;
 
@@ -132,11 +133,10 @@ module_else_clause = "else", module_block;
 module_block = "{", {module_level_statement}, "}";
 
 (* Import Statements *)
-import_statement = simple_import | from_import;
-simple_import = "import", string_literal, ["as", identifier];
-from_import = "from", string_literal, "import", (import_list | "*");
+import_statement = "import", (string_literal, ["as", identifier] | import_list, "from", string_literal);
 import_list = import_item, {",", import_item};
 import_item = identifier, ["as", identifier];
+
 
 (* Native Declarations *)
 native_declaration = native_function_declaration | native_variable_declaration;
@@ -202,7 +202,7 @@ sync_statement = "sync", expression, block;
 yield_statement = "yield", expression;
 
 try_statement = "try", block, {catch_clause}, [finally_clause];
-catch_clause = "catch", [atom], block;
+catch_clause = "catch", atom, [{"|", atom}], block;
 finally_clause = "finally", block;
 
 (* Defer Statement *)
