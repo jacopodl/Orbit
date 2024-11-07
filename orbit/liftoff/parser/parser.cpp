@@ -2,6 +2,7 @@
 //
 // Licensed under the Apache License v2.0
 
+#include "orbit/orbiter/datatype/atom.h"
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/stringbuilder.h>
@@ -1293,9 +1294,8 @@ ASTHandle<ASTNode *> Parser::ParseLiteral() {
 
     switch (this->tkcur_.type) {
         case TokenType::ATOM:
-            //assert(false);
-            this->Eat(false);
-            return {};
+            handle = AtomNew(this->ctx_,(const char *) this->tkcur_.buffer, this->tkcur_.length);
+            break;
         case TokenType::BYTE_STRING:
             // TODO: ByteString
             assert(false);
