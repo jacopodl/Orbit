@@ -82,6 +82,8 @@ HAtom orbiter::datatype::AtomNew(const Context *ctx, ORString *id) {
     entry->value = atom;
 
     if (gat->Insert(entry)) {
+        atom->id = O_INCREF(id);
+
         O_INCREF(id);
         O_INCREF(atom);
 
