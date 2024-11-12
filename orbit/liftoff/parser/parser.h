@@ -91,7 +91,7 @@ namespace liftoff::parser {
 
         friend Context;
 
-        const orbiter::Isolate *isolate_ = nullptr;
+        orbiter::Isolate *isolate_ = nullptr;
 
         const char *filename_ = nullptr;
 

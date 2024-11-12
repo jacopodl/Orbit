@@ -5,10 +5,12 @@
 #ifndef ORBIT_LIFTOFF_SCANNER_SBUFFER_H_
 #define ORBIT_LIFTOFF_SCANNER_SBUFFER_H_
 
-#include <cstdio>
+#include <orbit/orbiter/isolate.h>
 
 namespace liftoff::scanner {
     class StoreBuffer {
+        orbiter::IsolateAllocator allocator_;
+
         unsigned char *buffer_ = nullptr;
         unsigned char *cursor_ = nullptr;
         unsigned char *end_ = nullptr;
@@ -16,6 +18,9 @@ namespace liftoff::scanner {
         bool Enlarge(size_t increase);
 
     public:
+        explicit StoreBuffer(orbiter::Isolate *isolate): allocator_(isolate) {
+        }
+
         ~StoreBuffer();
 
         bool PutChar(unsigned char chr);

@@ -9,8 +9,21 @@
 
 using namespace liftoff::scanner;
 
-TEST(scanner_ibuffer, AppendInput) {
-    InputBuffer buffer{};
+class ScannerIBuffer : public ::testing::Test {
+protected:
+    void SetUp() override {
+        this->isolate = orbiter::Isolate::New();
+    }
+
+    void TearDown() override {
+        // TODO: this->isolate->Delete();
+    }
+
+    orbiter::Isolate *isolate = nullptr;
+};
+
+TEST_F(ScannerIBuffer, AppendInput) {
+    InputBuffer buffer(this->isolate, 4096, 0);
 
     const unsigned char testData[] = "Hello, World!";
     ASSERT_TRUE(buffer.AppendInput(testData, strlen((const char *) testData)));
@@ -19,11 +32,14 @@ TEST(scanner_ibuffer, AppendInput) {
 
     char *line = buffer.GetCurrentLine(nullptr);
     ASSERT_STREQ(line, "Hello, World!");
-    orbiter::memory::Free(line);
+
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(line);
 }
 
-TEST(scanner_ibuffer, AppendInputMultipleTimes) {
-    InputBuffer buffer;
+TEST_F(ScannerIBuffer, AppendInputMultipleTimes) {
+    InputBuffer buffer(this->isolate, 4096, 0);
+
     ASSERT_TRUE(buffer.AppendInput((const unsigned char *) "Hello, ", 7));
     ASSERT_TRUE(buffer.AppendInput((const unsigned char *) "World!", 6));
 
@@ -31,12 +47,15 @@ TEST(scanner_ibuffer, AppendInputMultipleTimes) {
 
     char *line = buffer.GetCurrentLine(nullptr);
     ASSERT_STREQ(line, "Hello, World!");
-    orbiter::memory::Free(line);
+
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(line);
 }
 
-TEST(scanner_ibuffer, GetCurrentLine) {
+TEST_F(ScannerIBuffer, GetCurrentLine) {
     const unsigned char testData[] = "Line 1\nLine 2\nLine 3";
-    InputBuffer buffer;
+    InputBuffer buffer(this->isolate, 4096, 0);
+    orbiter::IsolateAllocator allocator(this->isolate);
 
     buffer.AppendInput(testData, (int) strlen((const char *) testData));
 
@@ -47,7 +66,7 @@ TEST(scanner_ibuffer, GetCurrentLine) {
     char *line = buffer.GetCurrentLine(&length);
     ASSERT_STREQ(line, "Line 1");
     ASSERT_EQ(length, 6);
-    orbiter::memory::Free(line);
+    allocator.free(line);
 
     // Advance to next line
     buffer.Peek(true); // Skip the newline
@@ -59,13 +78,13 @@ TEST(scanner_ibuffer, GetCurrentLine) {
     line = buffer.GetCurrentLine(&length);
     ASSERT_STREQ(line, "Lin");
     ASSERT_EQ(length, 3);
-    orbiter::memory::Free(line);
+    allocator.free(line);
 }
 
-TEST(scanner_ibuffer, PeekAndAdvance) {
+TEST_F(ScannerIBuffer, PeekAndAdvance) {
     const unsigned char testData[] = "ABC";
 
-    InputBuffer buffer;
+    InputBuffer buffer(this->isolate, 4096, 0);
 
     buffer.AppendInput(testData, strlen((const char *) testData));
 
@@ -77,7 +96,7 @@ TEST(scanner_ibuffer, PeekAndAdvance) {
     ASSERT_EQ(buffer.Peek(true), 0); // End of buffer
 }
 
-TEST(scanner_ibuffer, ReadFile) {
+TEST_F(ScannerIBuffer, ReadFile) {
     // This test requires creating a temporary file
     const char *testFileName = "test_input.txt";
 
@@ -87,7 +106,7 @@ TEST(scanner_ibuffer, ReadFile) {
     fprintf(testFile, "File content");
     fclose(testFile);
 
-    InputBuffer buffer(7, 1024);
+    InputBuffer buffer(this->isolate, 7, 1024);
 
     testFile = fopen(testFileName, "r");
     ASSERT_NE(testFile, nullptr);
@@ -104,7 +123,9 @@ TEST(scanner_ibuffer, ReadFile) {
 
     char *line = buffer.GetCurrentLine(nullptr);
     ASSERT_STREQ(line, "File content");
-    orbiter::memory::Free(line);
+
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(line);
 
     fclose(testFile);
     remove(testFileName);

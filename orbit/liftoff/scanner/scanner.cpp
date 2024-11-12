@@ -95,9 +95,9 @@ int DefaultPrompt(const char *prompt, FILE *fd, InputBuffer *ibuf) {
     do {
         length += cur >> 1;
 
-        if ((tmp = (unsigned char *) orbiter::memory::Realloc(buf, length)) == nullptr) {
+        if ((tmp = (unsigned char *) realloc(buf, length)) == nullptr) {
             cur = -1;
-            orbiter::memory::Free(buf);
+            free(buf);
 
             return cur;
         }
@@ -110,7 +110,7 @@ int DefaultPrompt(const char *prompt, FILE *fd, InputBuffer *ibuf) {
             if (feof(fd) != 0)
                 cur = 0;
 
-            orbiter::memory::Free(buf);
+            free(buf);
             return cur;
         }
 
@@ -120,7 +120,7 @@ int DefaultPrompt(const char *prompt, FILE *fd, InputBuffer *ibuf) {
     if (!ibuf->AppendInput(buf, cur))
         cur = -1;
 
-    orbiter::memory::Free(buf);
+    free(buf);
     return cur;
 }
 
@@ -241,7 +241,6 @@ bool Scanner::ParseUnicode(bool extended) {
     unsigned char buf[4] = {};
     int width = 2;
     int byte;
-    int len;
 
     if (extended)
         width = 4;
@@ -256,7 +255,7 @@ bool Scanner::ParseUnicode(bool extended) {
         sequence[(width - 1) - i] = (unsigned char) byte;
     }
 
-    len = orbiter::datatype::StringIntToUTF8(*((unsigned int *) sequence), buf);
+    const int len = orbiter::datatype::StringIntToUTF8(*((unsigned int *) sequence), buf);
     if (len == 0) {
         this->status_ = ScannerStatus::INVALID_UCHR;
         return false;
@@ -362,8 +361,7 @@ bool Scanner::TokenizeChar(Token *out_token) {
 }
 
 bool Scanner::TokenizeComment(Token *out_token, bool inline_comment) {
-    TokenType type = TokenType::COMMENT;
-    int peek;
+    auto type = TokenType::COMMENT;
 
     if (inline_comment)
         type = TokenType::COMMENT_INLINE;
@@ -373,7 +371,7 @@ bool Scanner::TokenizeComment(Token *out_token, bool inline_comment) {
          isspace(skip) || (!inline_comment && skip == '\n');
          this->Next(), skip = this->Peek());
 
-    peek = this->Peek();
+    int peek = this->Peek();
     while (peek > 0 && (peek != '\n' || !inline_comment)) {
         peek = this->Next();
 
@@ -555,9 +553,9 @@ bool Scanner::TokenizeString(Token *out_token, bool check_prefix, bool byte_stri
     }
 
     while ((value = this->Next()) > 0) {
-        int count = 0;
-
         if (value == '"') {
+            int count = 0;
+
             for (; this->Peek() == '#'; this->Next(), count++);
 
             if (count == hashes) {
@@ -670,9 +668,12 @@ bool Scanner::NextToken(Token *out_token) noexcept {
     // Reset error status
     this->status_ = ScannerStatus::GOOD;
 
+    out_token->isolate = this->isolate_;
+
     // Cleanup token
     if (out_token->buffer != nullptr) {
-        orbiter::memory::Free(out_token->buffer);
+        orbiter::IsolateAllocator allocator(this->isolate_);
+        allocator.free(out_token->buffer);
 
         out_token->buffer = nullptr;
         out_token->length = 0;
@@ -862,10 +863,9 @@ bool Scanner::NextToken(Token *out_token) noexcept {
 
 int Scanner::HexToByte() {
     int byte = 0;
-    int curr;
 
     for (int i = 1; i >= 0; i--) {
-        curr = this->Next();
+        const int curr = this->Next();
 
         if (!IsHexDigit(curr))
             return -1;
@@ -948,11 +948,14 @@ const char *Scanner::GetStatusMessage() const {
     return messages[(int) this->status_];
 }
 
-Scanner::Scanner(FILE *fd, const char *ps1, const char *ps2, int buf_size) noexcept: prompt_(ps1),
-    next_prompt_(ps2),
-    fd_(fd) {
+Scanner::Scanner(orbiter::Isolate *isolate, FILE *fd, const char *ps1, const char *ps2,
+                 int buf_size) noexcept: isolate_(isolate),
+                                         prompt_(ps1),
+                                         next_prompt_(ps2),
+                                         fd_(fd),
+                                         sbuf_(isolate),
+                                         ibuf_(isolate, buf_size) {
     assert(buf_size > 0);
 
-    this->ibuf_ = InputBuffer(buf_size);
     this->promptfn_ = DefaultPrompt;
 }

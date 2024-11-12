@@ -8,6 +8,19 @@
 
 using namespace liftoff::scanner;
 
+class ScannerTest : public ::testing::Test {
+protected:
+    void SetUp() override {
+        this->isolate = orbiter::Isolate::New();
+    }
+
+    void TearDown() override {
+        // TODO: this->isolate->Delete();
+    }
+
+    orbiter::Isolate *isolate = nullptr;
+};
+
 bool TkEqual(const Token *tk, TokenType type, int so, int sc, int sl, int eo, int ec, int el) {
     return tk->type == type &&
            tk->loc.start.offset == so &&
@@ -18,8 +31,8 @@ bool TkEqual(const Token *tk, TokenType type, int so, int sc, int sl, int eo, in
            tk->loc.end.line == el;
 }
 
-TEST(scanner, BinaryNumber) {
-    Scanner scanner("0b1010 0B101 0b1010u");
+TEST_F(ScannerTest, BinaryNumber) {
+    Scanner scanner(this->isolate, "0b1010 0B101 0b1010u");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -32,8 +45,8 @@ TEST(scanner, BinaryNumber) {
     ASSERT_TRUE(TkEqual(&token, TokenType::U_NUMBER_BIN, 13, 14, 1, 19, 20, 1));
 }
 
-TEST(scanner, Comment) {
-    Scanner scanner(R"(# comment #null
+TEST_F(ScannerTest, Comment) {
+    Scanner scanner(this->isolate, R"(# comment #null
 # Comment new
 # line)");
     Token token{};
@@ -46,7 +59,7 @@ TEST(scanner, Comment) {
     ASSERT_TRUE(scanner.NextToken(&token));
     ASSERT_TRUE(TkEqual(&token, TokenType::COMMENT_INLINE, 16, 1, 2, 29, 14, 2));
 
-    scanner = Scanner(R"(/*
+    scanner = Scanner(this->isolate, R"(/*
     multi
     line
     *comment
@@ -57,7 +70,7 @@ TEST(scanner, Comment) {
     ASSERT_TRUE(scanner.NextToken(&token));
     ASSERT_TRUE(TkEqual(&token, TokenType::COMMENT, 0, 1, 1, 57, 6, 6));
 
-    scanner = Scanner(R"(/*
+    scanner = Scanner(this->isolate, R"(/*
 unterminated
 comment *
 )");
@@ -65,8 +78,8 @@ comment *
     ASSERT_FALSE(scanner.NextToken(&token));
 }
 
-TEST(scanner, Decimals) {
-    Scanner scanner("0. 2.3 1234.003 00000.3 .1");
+TEST_F(ScannerTest, Decimals) {
+    Scanner scanner(this->isolate, "0. 2.3 1234.003 00000.3 .1");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -88,16 +101,16 @@ TEST(scanner, Decimals) {
     ASSERT_TRUE(TkEqual(&token, TokenType::END_OF_FILE, 26, 27, 1, 26, 27, 1));
 }
 
-TEST(scanner, EmptyInput) {
-    Scanner scanner("");
+TEST_F(ScannerTest, EmptyInput) {
+    Scanner scanner(this->isolate, "");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
     ASSERT_TRUE(TkEqual(&token, TokenType::END_OF_FILE, 0, 1, 1, 0, 1, 1));
 }
 
-TEST(scanner, HexNumber) {
-    Scanner scanner("0xaba12 0X19Fa 0xFFu");
+TEST_F(ScannerTest, HexNumber) {
+    Scanner scanner(this->isolate, "0xaba12 0X19Fa 0xFFu");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -110,8 +123,8 @@ TEST(scanner, HexNumber) {
     ASSERT_TRUE(TkEqual(&token, TokenType::U_NUMBER_HEX, 15, 16, 1, 19, 20, 1));
 }
 
-TEST(scanner, LineContinuation) {
-    Scanner scanner(R"(24 \
+TEST_F(ScannerTest, LineContinuation) {
+    Scanner scanner(this->isolate, R"(24 \
 + 1)");
     Token token{};
 
@@ -125,16 +138,16 @@ TEST(scanner, LineContinuation) {
     ASSERT_TRUE(TkEqual(&token, TokenType::NUMBER, 7, 3, 2, 8, 4, 2));
 }
 
-TEST(scanner, LiteralString) {
-    Scanner scanner(R"("Hello!")");
+TEST_F(ScannerTest, LiteralString) {
+    Scanner scanner(this->isolate, R"("Hello!")");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
     ASSERT_TRUE(TkEqual(&token, TokenType::STRING, 0, 1, 1, 8, 9, 1));
 }
 
-TEST(scanner, LiteralByteString) {
-    Scanner scanner(R"(b"ByteString" b"Ignore\u2342Unico\U00002312de" b"�")");
+TEST_F(ScannerTest, LiteralByteString) {
+    Scanner scanner(this->isolate, R"(b"ByteString" b"Ignore\u2342Unico\U00002312de" b"�")");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -146,16 +159,16 @@ TEST(scanner, LiteralByteString) {
     ASSERT_FALSE(scanner.NextToken(&token));
 }
 
-TEST(scanner, NewLine) {
-    Scanner scanner("\n\n");
+TEST_F(ScannerTest, NewLine) {
+    Scanner scanner(this->isolate, "\n\n");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
     ASSERT_TRUE(TkEqual(&token, TokenType::END_OF_LINE, 0, 1, 1, 2, 1, 3));
 }
 
-TEST(scanner, NextToken) {
-    Scanner scanner("\n\n \r!% &() * +,-./:; < = > ?@[]^{|}~ |> >= <= <- ->");
+TEST_F(ScannerTest, NextToken) {
+    Scanner scanner(this->isolate, "\n\n \r!% &() * +,-./:; < = > ?@[]^{|}~ |> >= <= <- ->");
     Token token;
 
     // Test '\n'
@@ -286,8 +299,8 @@ TEST(scanner, NextToken) {
     EXPECT_EQ(token.type, TokenType::ARROW_RIGHT);
 }
 
-TEST(scanner, Numbers) {
-    Scanner scanner("0 000123 123 010697 1 12u 24U 0b10u 0x12U 0o7u");
+TEST_F(ScannerTest, Numbers) {
+    Scanner scanner(this->isolate, "0 000123 123 010697 1 12u 24U 0b10u 0x12U 0o7u");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -321,8 +334,8 @@ TEST(scanner, Numbers) {
     ASSERT_TRUE(token.type == TokenType::U_NUMBER_OCT);
 }
 
-TEST(scanner, OctalNumber) {
-    Scanner scanner("0o23423 0O02372 0o2u");
+TEST_F(ScannerTest, OctalNumber) {
+    Scanner scanner(this->isolate, "0o23423 0O02372 0o2u");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -335,8 +348,8 @@ TEST(scanner, OctalNumber) {
     ASSERT_TRUE(TkEqual(&token, TokenType::U_NUMBER_OCT, 16, 17, 1, 19, 20, 1));
 }
 
-TEST(scanner, SingleChar) {
-    Scanner scanner(R"('a' '\n' '\'' '\\' 'ri')");
+TEST_F(ScannerTest, SingleChar) {
+    Scanner scanner(this->isolate, R"('a' '\n' '\'' '\\' 'ri')");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));
@@ -354,8 +367,8 @@ TEST(scanner, SingleChar) {
     ASSERT_FALSE(scanner.NextToken(&token));
 }
 
-TEST(scanner, TokenizeAtom) {
-    Scanner scanner("@atom @atom_2@_");
+TEST_F(ScannerTest, TokenizeAtom) {
+    Scanner scanner(this->isolate, "@atom @atom_2@_");
     Token token;
 
     EXPECT_TRUE(scanner.NextToken(&token));
@@ -371,24 +384,24 @@ TEST(scanner, TokenizeAtom) {
     EXPECT_EQ(std::string((char *)token.buffer, token.length), "_");
 }
 
-TEST(scanner, UnterminatedString) {
-    Scanner scanner("b\"ByteString");
+TEST_F(ScannerTest, UnterminatedString) {
+    Scanner scanner(this->isolate, "b\"ByteString");
     Token token{};
 
     ASSERT_FALSE(scanner.NextToken(&token));
 
-    scanner = Scanner("\"string");
+    scanner = Scanner(this->isolate, "\"string");
     ASSERT_FALSE(scanner.NextToken(&token));
 
-    scanner = Scanner("b#\"string");
+    scanner = Scanner(this->isolate, "b#\"string");
     ASSERT_FALSE(scanner.NextToken(&token));
 
-    scanner = Scanner("b#\"string\n\nof bytes\"#");
+    scanner = Scanner(this->isolate, "b#\"string\n\nof bytes\"#");
     ASSERT_TRUE(scanner.NextToken(&token));
 }
 
-TEST(scanner, Word) {
-    Scanner scanner("vax v4r v_48_ __private_var__ b as assert");
+TEST_F(ScannerTest, Word) {
+    Scanner scanner(this->isolate, "vax v4r v_48_ __private_var__ b as assert");
     Token token{};
 
     ASSERT_TRUE(scanner.NextToken(&token));

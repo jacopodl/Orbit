@@ -4,7 +4,7 @@
 
 #include <cassert>
 
-#include <orbit/util/hashmap.h>
+#include <orbit/orbiter/datatype/hashmap.h>
 
 #include <orbit/orbiter/datatype/atom.h>
 
@@ -14,9 +14,6 @@ using GATEntry = HEntry<ORString *, Atom *>;
 using GATMap = HashMap<
     ORString *,
     Atom *,
-    orbiter::memory::Alloc,
-    orbiter::memory::Realloc,
-    orbiter::memory::Free,
     ORStringEqual,
     ORStringHash
 >;
@@ -29,18 +26,23 @@ bool AtomGATDtor(TypeInfo *self) {
         Release(entry->value);
     });
 
+    orbiter::IsolateAllocator allocator(self->isolate);
+    allocator.FreeObject(self);
+
     self->aux.data = nullptr;
 
     return true;
 }
 
 bool orbiter::datatype::AtomTypeSetup(Isolate *isolate, TypeInfo *self) {
-    auto *map = (GATMap *) memory::Alloc((sizeof(GATMap)));
+    IsolateAllocator allocator(isolate);
+
+    auto *map = allocator.AllocObject<GATMap>(isolate);
     if (map == nullptr)
         return false;
 
     if (!map->Initialize()) {
-        memory::Free(map);
+        allocator.FreeObject(map);
 
         return false;
     }
@@ -51,7 +53,7 @@ bool orbiter::datatype::AtomTypeSetup(Isolate *isolate, TypeInfo *self) {
     return true;
 }
 
-HAtom orbiter::datatype::AtomNew(const Isolate *isolate, const char *string, MSize length) {
+HAtom orbiter::datatype::AtomNew(Isolate *isolate, const char *string, MSize length) {
     const auto id = ORStringNew(isolate, string, length);
     if (!id)
         return {};
@@ -59,7 +61,7 @@ HAtom orbiter::datatype::AtomNew(const Isolate *isolate, const char *string, MSi
     return AtomNew(isolate, id.get());
 }
 
-HAtom orbiter::datatype::AtomNew(const Isolate *isolate, ORString *id) {
+HAtom orbiter::datatype::AtomNew(Isolate *isolate, ORString *id) {
     auto *gat = (GATMap *) isolate->primitive[(int) InstanceType::ATOM]->aux.data;
     GATEntry *entry;
 

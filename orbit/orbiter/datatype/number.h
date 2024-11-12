@@ -46,7 +46,7 @@ namespace orbiter::datatype {
      * @param value The integer value to initialize the Number object with.
      * @return A handle to the newly created Number object.
      */
-    HNumber IntNew(const Isolate *isolate, IntegerUnderlying value);
+    HNumber IntNew(Isolate *isolate, IntegerUnderlying value);
 
     /**
      * @brief Creates a new Number object by parsing a string representation.
@@ -56,7 +56,7 @@ namespace orbiter::datatype {
      * @param base The numeric base (e.g., 10 for decimal, 16 for hexadecimal).
      * @return A handle to the newly created Number object.
      */
-    HNumber IntNew(const Isolate *isolate, const char *string, int base);
+    HNumber IntNew(Isolate *isolate, const char *string, int base);
 
     /**
      * @brief Creates a new Number object with an unsigned integer value.
@@ -65,7 +65,7 @@ namespace orbiter::datatype {
      * @param value The unsigned integer value to initialize the Number object with.
      * @return A handle to the newly created Number object.
      */
-    HNumber UIntNew(const Isolate *isolate, UIntegerUnderlying value);
+    HNumber UIntNew(Isolate *isolate, UIntegerUnderlying value);
 
      /**
      * @brief Creates a new unsigned Number object by parsing a string representation.
@@ -75,7 +75,7 @@ namespace orbiter::datatype {
      * @param base The numeric base (e.g., 10 for decimal, 16 for hexadecimal).
      * @return A handle to the newly created Number object.
      */
-    HNumber UIntNew(const Isolate *isolate, const char *string, int base);
+    HNumber UIntNew(Isolate *isolate, const char *string, int base);
 
     /**
      * @brief Initialize and create the specified type

@@ -35,9 +35,9 @@ namespace orbiter::datatype {
      */
     bool DecimalTypeSetup(Isolate *isolate, TypeInfo *self);
 
-    HDecimal DecimalNew(const Isolate *isolate, DecimalUnderlying number);
+    HDecimal DecimalNew(Isolate *isolate, DecimalUnderlying number);
 
-    HDecimal DecimalNew(const Isolate *isolate, const char *string);
+    HDecimal DecimalNew(Isolate *isolate, const char *string);
 
     /**
      * @brief Initialize and create the specified type

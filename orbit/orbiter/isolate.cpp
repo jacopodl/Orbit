@@ -14,22 +14,30 @@
 using namespace orbiter;
 using namespace orbiter::datatype;
 
-Isolate *orbiter::IsolateInit() {
-#define INIT_TYPE(num, fn)                                      \
-    do {                                                        \
-        if((ctx->primitive[(int) num] = fn(ctx)) == nullptr)    \
-            goto ERROR;                                         \
+Isolate *Isolate::New() {
+#define INIT_TYPE(num, fn)                                              \
+    do {                                                                \
+        if((isolate->primitive[(int) num] = fn(isolate)) == nullptr)    \
+            goto ERROR;                                                 \
     } while(0)
 
 #define SETUP_TYPE(num, fn)                             \
     do {                                                \
-        if(!fn(ctx, ctx->primitive[(int) num]))         \
+        if(!fn(isolate, isolate->primitive[(int) num])) \
             goto ERROR;                                 \
     } while(0)
 
-    auto *ctx = (Isolate *) memory::Alloc(sizeof(Isolate));
-    if (ctx == nullptr)
+    auto *isolate = static_cast<Isolate *>(operator new(sizeof(Isolate)));
+    if (isolate == nullptr)
         return nullptr;
+
+    new(&isolate->allocator_) stratum::Memory();
+
+    if(!isolate->allocator_.Initialize()) {
+        delete isolate;
+
+        return nullptr;
+    }
 
     INIT_TYPE(InstanceType::TYPE, TypeInit);
 
@@ -49,10 +57,13 @@ Isolate *orbiter::IsolateInit() {
     SETUP_TYPE(InstanceType::NUMBER, NumberTypeSetup);
     SETUP_TYPE(InstanceType::STRING, ORStringTypeSetup);
 
-    return ctx;
+    return isolate;
 
 ERROR:
-    // TODO: Release all type
+    isolate->allocator_.Finalize();
+
+    delete isolate;
+
     return nullptr;
 #undef INIT_TYPE
 #undef SETUP_TYPE

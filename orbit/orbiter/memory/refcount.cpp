@@ -4,42 +4,54 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/isolate.h>
+
 #include <orbit/orbiter/datatype/obase.h>
 
-#include <orbit/orbiter/memory/memory.h>
 #include <orbit/orbiter/memory/refcount.h>
 
+using namespace orbiter::datatype;
 using namespace orbiter::memory;
 
 RCObject RefCount::GetObjectBase() {
-    auto obj = (orbiter::datatype::OObject *) this;
+    const auto obj = (RCObject) this;
     assert(((void *) obj == &(obj->head_.ref_count_)) && "RefCount must be FIRST field in OObject structure!");
-    return (RCObject) obj;
+    return obj;
 }
 
 SideTable *RefCount::AllocOrGetSideTable() {
     auto current = this->bits_.load(std::memory_order_seq_cst);
-    SideTable *side;
 
     if (!RC_HAVE_INLINE_COUNTER(current))
         return RC_GET_SIDETABLE(current);
 
-    if ((side = (SideTable *) Alloc(sizeof(SideTable))) == nullptr)
+    const auto obj = this->GetObjectBase();
+
+    assert(obj->head_.type_ != nullptr);
+
+    const auto isolate = obj->head_.type_->isolate;
+
+    IsolateAllocator allocator(isolate);
+    auto *side = allocator.alloc<SideTable>(sizeof(SideTable));
+    if (side == nullptr)
         return nullptr;
 
     side->strong.store(RC_INLINE_GET_COUNT(current));
     side->weak.store(1);
-    side->object = this->GetObjectBase();
+    side->isolate = isolate;
+    side->object = obj;
 
-    auto desired = ((uintptr_t) side);
+    auto desired = (uintptr_t) side;
 
     if (RC_CHECK_IS_GCOBJ(current))
         desired = RC_SETBIT_GC(desired);
 
     do {
         if (!RC_HAVE_INLINE_COUNTER(current)) {
-            Free(side);
+            allocator.free(side);
+
             side = RC_GET_SIDETABLE(current);
+
             break;
         }
 
@@ -53,22 +65,22 @@ SideTable *RefCount::AllocOrGetSideTable() {
 bool RefCount::DecStrong(uintptr_t *out) {
     auto current = *((uintptr_t *) &this->bits_);
     uintptr_t desired = {};
-    bool release;
 
     do {
         desired = current;
 
         if (!RC_HAVE_INLINE_COUNTER(desired)) {
-            auto side = RC_GET_SIDETABLE(desired);
+            const auto side = RC_GET_SIDETABLE(desired);
 
             if (out != nullptr)
                 *out = desired;
 
             if (side->strong.fetch_sub(1) == 1) {
-                // ArObject can be destroyed
+                // OObject can be destroyed
                 if (side->weak.fetch_sub(1) == 1) {
                     // No weak ref! SideTable can be destroyed
-                    Free(side);
+                    const IsolateAllocator allocator(side->isolate);
+                    allocator.free(side);
                 }
                 return true;
             }
@@ -80,7 +92,7 @@ bool RefCount::DecStrong(uintptr_t *out) {
                                                 std::memory_order_release,
                                                 std::memory_order_acquire));
 
-    release = RC_CHECK_INLINE_ZERO(desired);
+    auto release = RC_CHECK_INLINE_ZERO(desired);
 
     if (out != nullptr)
         *out = desired;
@@ -95,8 +107,10 @@ bool RefCount::DecWeak() const {
     auto side = RC_GET_SIDETABLE(current);
     auto weak = side->weak.fetch_sub(1);
 
-    if (weak == 1)
-        Free(side);
+    if (weak == 1) {
+        const IsolateAllocator allocator(side->isolate);
+        allocator.free(side);
+    }
 
     return weak <= 2;
 }
@@ -132,7 +146,7 @@ bool RefCount::IncStrong() {
             if (side == nullptr)
                 return false;
 
-            side->strong++;
+            side->strong += 1;
             return true;
         }
     } while (!this->bits_.compare_exchange_weak(current, desired,
@@ -166,7 +180,7 @@ RCObject RefCount::GetObject() {
 uintptr_t RefCount::IncWeak() {
     auto side = this->AllocOrGetSideTable();
     if (side != nullptr) {
-        side->weak++;
+        side->weak += 1;
         return (uintptr_t) side;
     }
 
@@ -174,7 +188,7 @@ uintptr_t RefCount::IncWeak() {
 }
 
 uintptr_t RefCount::GetStrongCount() const {
-    auto current = this->bits_.load(std::memory_order_seq_cst);
+    const auto current = this->bits_.load(std::memory_order_seq_cst);
 
     if (RC_HAVE_INLINE_COUNTER(current))
         return RC_INLINE_GET_COUNT(current);
@@ -183,7 +197,7 @@ uintptr_t RefCount::GetStrongCount() const {
 }
 
 uintptr_t RefCount::GetWeakCount() const {
-    auto current = this->bits_.load(std::memory_order_seq_cst);
+    const auto current = this->bits_.load(std::memory_order_seq_cst);
 
     if (!RC_HAVE_INLINE_COUNTER(current))
         return RC_GET_SIDETABLE(current)->weak;

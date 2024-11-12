@@ -46,7 +46,7 @@ const FunctionDef type_methods[] = {
 };
 
 TypeInfo *orbiter::datatype::TypeInit(Isolate *isolate) {
-    auto *type = MakeType(InstanceType::TYPE, 0, 4, 0);
+    auto *type = MakeType(isolate, InstanceType::TYPE, 0, 4, 0);
     return type;
 }
 

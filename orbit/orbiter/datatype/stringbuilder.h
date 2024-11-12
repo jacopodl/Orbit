@@ -13,6 +13,8 @@ namespace orbiter::datatype {
     constexpr int kERR_MSG_MAX_LENGTH = 80;
 
     class StringBuilder {
+        IsolateAllocator allocator_;
+
         char e_msg_[kERR_MSG_MAX_LENGTH]{};
 
         unsigned char *buffer_ = nullptr;
@@ -32,11 +34,14 @@ namespace orbiter::datatype {
         int ProcessUnicodeEscape(unsigned char *wb, const unsigned char *buffer, MSize length, bool extended);
 
     public:
+        explicit StringBuilder(Isolate *isolate) : allocator_(isolate) {
+        }
+
         ~StringBuilder();
 
         bool BufferResize(MSize sz);
 
-        bool InError() {
+        [[nodiscard]] bool InError() const {
             return this->e_msg_[0] != '\0';
         }
 
@@ -73,7 +78,6 @@ namespace orbiter::datatype {
     int StringIntToUTF8(unsigned int glyph, unsigned char *buf);
 
     int StringUTF8ToInt(const unsigned char *buf);
-
 }
 
 #endif // !ORBIT_ORBITER_DATATYPE_STRINGBUILDER_H_

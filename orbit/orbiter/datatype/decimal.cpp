@@ -10,7 +10,7 @@ bool orbiter::datatype::DecimalTypeSetup(Isolate *isolate, TypeInfo *self) {
     return true;
 }
 
-HDecimal orbiter::datatype::DecimalNew(const Isolate *isolate, DecimalUnderlying number) {
+HDecimal orbiter::datatype::DecimalNew(Isolate *isolate, DecimalUnderlying number) {
     auto *decimal = MakeObject<Decimal>(isolate, InstanceType::DECIMAL);
     if (decimal != nullptr)
         decimal->value = number;
@@ -18,7 +18,7 @@ HDecimal orbiter::datatype::DecimalNew(const Isolate *isolate, DecimalUnderlying
     return HDecimal(decimal);
 }
 
-HDecimal orbiter::datatype::DecimalNew(const Isolate *isolate, const char *string) {
+HDecimal orbiter::datatype::DecimalNew(Isolate *isolate, const char *string) {
     auto *decimal = MakeObject<Decimal>(isolate, InstanceType::DECIMAL);
     if (decimal != nullptr)
         decimal->value = std::strtold(string, nullptr);
@@ -27,6 +27,6 @@ HDecimal orbiter::datatype::DecimalNew(const Isolate *isolate, const char *strin
 }
 
 TypeInfo *orbiter::datatype::DecimalTypeInit(Isolate *isolate) {
-    auto *decimal = MakeType(InstanceType::DECIMAL, 0, 0, 0);
+    auto *decimal = MakeType(isolate, InstanceType::DECIMAL, 0, 0, 0);
     return decimal;
 }

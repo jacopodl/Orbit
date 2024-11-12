@@ -11,7 +11,7 @@ using namespace liftoff;
 class SymbolTableTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        this->isolate = orbiter::IsolateInit();
+        this->isolate = orbiter::Isolate::New();
         this->table = SymbolTableNew(isolate);
     }
 

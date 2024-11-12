@@ -61,7 +61,7 @@ namespace orbiter::datatype {
      *
      * @return true if setup was successful, false otherwise
      */
-    bool ORStringTypeSetup(const Isolate *isolate, TypeInfo *self);
+    bool ORStringTypeSetup(Isolate *isolate, TypeInfo *self);
 
     /**
      * @brief Compares two strings lexicographically.
@@ -104,7 +104,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to the interned string
      */
-    HORString ORStringIntern(const Isolate *isolate, const unsigned char *string, MSize length);
+    HORString ORStringIntern(Isolate *isolate, const unsigned char *string, MSize length);
 
     /**
      * @brief Creates an exact copy of a String object in the String pool and return it
@@ -114,7 +114,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to the interned string
      */
-    inline HORString ORStringIntern(const Isolate *isolate, const char *string) {
+    inline HORString ORStringIntern(Isolate *isolate, const char *string) {
         return ORStringIntern(isolate, (const unsigned char *) string, strlen(string));
     }
 
@@ -135,7 +135,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    HORString ORStringNew(const Isolate *isolate, unsigned char *string, MSize length, MSize cp_length,
+    HORString ORStringNew(Isolate *isolate, unsigned char *string, MSize length, MSize cp_length,
                                  StringKind kind);
 
     /**
@@ -147,7 +147,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    HORString ORStringNew(const Isolate *isolate, const unsigned char *string, MSize length);
+    HORString ORStringNew(Isolate *isolate, const unsigned char *string, MSize length);
 
     /**
      * @brief Create new string
@@ -158,7 +158,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    inline HORString ORStringNew(const Isolate *isolate, const char *string, MSize length) {
+    inline HORString ORStringNew(Isolate *isolate, const char *string, MSize length) {
         return ORStringNew(isolate, (const unsigned char *) string, length);
     }
 
@@ -170,7 +170,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    inline HORString ORStringNew(const Isolate *isolate, const char *string) {
+    inline HORString ORStringNew(Isolate *isolate, const char *string) {
         return ORStringNew(isolate, (unsigned char *) string, strlen(string));
     }
 
@@ -190,7 +190,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to ORString object
      */
-    HORString ORStringNewHoldBuffer(const Isolate *isolate, unsigned char *buffer, MSize length);
+    HORString ORStringNewHoldBuffer(Isolate *isolate, unsigned char *buffer, MSize length);
 
     MSize ORStringHash(ORString *string);
 
@@ -204,7 +204,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created TypeInfo for the type, or nullptr if creation failed
      */
-    TypeInfo *ORStringTypeInit(const Isolate *isolate);
+    TypeInfo *ORStringTypeInit(Isolate *isolate);
 }
 
 #endif // !ORBIT_ORBITER_DATATYPE_OSTRING_H_

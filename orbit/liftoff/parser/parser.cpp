@@ -1294,7 +1294,7 @@ ASTHandle<ASTNode *> Parser::ParseLiteral() {
 
     switch (this->tkcur_.type) {
         case TokenType::ATOM:
-            handle = AtomNew(this->isolate_,(const char *) this->tkcur_.buffer, this->tkcur_.length);
+            handle = AtomNew(this->isolate_, (const char *) this->tkcur_.buffer, this->tkcur_.length);
             break;
         case TokenType::BYTE_STRING:
             // TODO: ByteString

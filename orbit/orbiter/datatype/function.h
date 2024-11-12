@@ -86,7 +86,7 @@ namespace orbiter::datatype {
      *
      * @return true if setup was successful, false otherwise
      */
-    bool FunctionTypeSetup(const Isolate *isolate, TypeInfo *self);
+    bool FunctionTypeSetup(Isolate *isolate, TypeInfo *self);
 
     /**
      * @brief Create a new Function object
@@ -96,7 +96,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created Function
      */
-    Function *FunctionNew(const Isolate *isolate, const FunctionDef *def);
+    Function *FunctionNew(Isolate *isolate, const FunctionDef *def);
 
     /**
      * @brief Initialize the Function type
@@ -105,7 +105,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the TypeInfo for the Function type
      */
-    TypeInfo *FunctionTypeInit(const Isolate *isolate);
+    TypeInfo *FunctionTypeInit(Isolate *isolate);
 }
 
 #define RUNTIME_FUNCTION(name, exported_name, doc, params)                                          \

@@ -11,6 +11,10 @@
 
 #include <orbit/orbiter/memory/refcount.h>
 
+namespace orbiter {
+    class Isolate;
+}
+
 namespace orbiter::datatype {
     constexpr auto kOddBallMask = memory::RCBitOffsets::InlineMask | memory::RCBitOffsets::StrongVFLAGMask;
 
@@ -91,6 +95,8 @@ namespace orbiter::datatype {
 
         /* Instance type (enum defining various object types in Orbit) */
         InstanceType i_type;
+
+        Isolate *isolate;
 
         /* Auxiliary data storage for type-specific information */
         struct {

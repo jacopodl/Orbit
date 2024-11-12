@@ -11,12 +11,12 @@
 using namespace liftoff::scanner;
 
 StoreBuffer::~StoreBuffer() {
-    orbiter::memory::Free(this->buffer_);
+    this->allocator_.free(this->buffer_);
 }
 
 bool StoreBuffer::Enlarge(size_t increase) {
     if (this->buffer_ == nullptr) {
-        this->buffer_ = (unsigned char *) orbiter::memory::Alloc(increase + 1);
+        this->buffer_ = this->allocator_.alloc<unsigned char>(increase + 1);
         if (this->buffer_ == nullptr)
             return false;
 
@@ -26,7 +26,7 @@ bool StoreBuffer::Enlarge(size_t increase) {
 
     if ((this->end_ - this->cursor_) < increase) {
         auto newsz = ((this->end_ + 1) - this->buffer_) + increase;
-        auto tmp = (unsigned char *) orbiter::memory::Realloc(this->buffer_, newsz);
+        auto tmp = this->allocator_.realloc(this->buffer_, newsz);
         if (tmp == nullptr)
             return false;
 
@@ -50,7 +50,6 @@ bool StoreBuffer::PutChar(unsigned char chr) {
 
         if (!this->Enlarge(8))
             return false;
-
     } while (true);
 }
 

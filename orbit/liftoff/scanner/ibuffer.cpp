@@ -12,17 +12,17 @@ using namespace liftoff::scanner;
 
 InputBuffer::~InputBuffer() {
     if (this->release_)
-        orbiter::memory::Free(this->buffer_);
+        this->allocator_.free(this->buffer_);
 
     if (this->file_)
-        orbiter::memory::Free(this->last_line_);
+        this->allocator_.free(this->last_line_);
 }
 
 bool InputBuffer::AppendInput(const unsigned char *buffer, int length) {
     assert(this->release_);
 
     if (this->buffer_ == nullptr) {
-        this->buffer_ = (unsigned char *) orbiter::memory::Alloc(length);
+        this->buffer_ = this->allocator_.alloc<unsigned char>(length);
 
         if (this->buffer_ == nullptr)
             return false;
@@ -32,7 +32,7 @@ bool InputBuffer::AppendInput(const unsigned char *buffer, int length) {
     }
 
     if (this->b_length_ - this->b_wr_ < length) {
-        auto *tmp = (unsigned char *) orbiter::memory::Realloc(this->buffer_, this->b_length_ + length);
+        auto *tmp = this->allocator_.realloc(this->buffer_, this->b_length_ + length);
         if (tmp == nullptr)
             return false;
 
@@ -46,7 +46,7 @@ bool InputBuffer::AppendInput(const unsigned char *buffer, int length) {
     return true;
 }
 
-char *InputBuffer::GetCurrentLine(int *out_len) const {
+char *InputBuffer::GetCurrentLine(int *out_len) {
     char *line;
 
     size_t length;
@@ -66,7 +66,7 @@ char *InputBuffer::GetCurrentLine(int *out_len) const {
         if (out_len != nullptr)
             *out_len = (int) length;
 
-        line = (char *) orbiter::memory::Alloc(length + 1);
+        line = this->allocator_.alloc<char>(length + 1);
         if (line == nullptr)
             return nullptr;
 
@@ -85,7 +85,7 @@ char *InputBuffer::GetCurrentLine(int *out_len) const {
     if (out_len != nullptr)
         *out_len = (int) length;
 
-    line = (char *) orbiter::memory::Alloc(length + 1);
+    line = this->allocator_.alloc<char>(length + 1);
     if (line == nullptr)
         return nullptr;
 
@@ -141,14 +141,14 @@ int InputBuffer::ReadFile(FILE *fd) {
     assert(this->file_);
 
     if (this->buffer_ == nullptr) {
-        this->buffer_ = (unsigned char *) orbiter::memory::Alloc(this->b_length_);
+        this->buffer_ = this->allocator_.alloc<unsigned char>(this->b_length_);
 
         if (this->buffer_ == nullptr)
             return false;
 
         this->b_cur_ = this->b_length_;
 
-        this->last_line_ = (unsigned char *) orbiter::memory::Alloc(this->ll_size_);
+        this->last_line_ = this->allocator_.alloc<unsigned char>(this->ll_size_);
         if (this->last_line_ == nullptr)
             return false;
 
@@ -158,7 +158,7 @@ int InputBuffer::ReadFile(FILE *fd) {
     if (this->b_length_ - this->b_cur_ != 0)
         return 0;
 
-    auto read = (int) std::fread(this->buffer_, 1, this->b_length_, fd);
+    const auto read = (int) std::fread(this->buffer_, 1, this->b_length_, fd);
 
     if (ferror(fd) != 0 || read == 0 && feof(fd) != 0)
         return 0;

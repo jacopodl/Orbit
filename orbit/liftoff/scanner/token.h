@@ -7,8 +7,6 @@
 
 #include <orbit/datatype.h>
 
-#include <orbit/orbiter/memory/memory.h>
-
 namespace liftoff::scanner {
     enum class TokenType {
         // Special tokens
@@ -228,6 +226,8 @@ namespace liftoff::scanner {
     };
 
     struct Token {
+        orbiter::Isolate *isolate = nullptr;
+
         unsigned char *buffer = nullptr;
         MSize length = 0;
 
@@ -242,7 +242,10 @@ namespace liftoff::scanner {
         ~Token() {
             this->type = TokenType::TK_NULL;
 
-            orbiter::memory::Free(this->buffer);
+            if (this->isolate != nullptr && this->buffer != nullptr) {
+                const orbiter::IsolateAllocator allocator(this->isolate);
+                allocator.free(this->buffer);
+            }
 
             this->buffer = nullptr;
         }
@@ -250,6 +253,7 @@ namespace liftoff::scanner {
         Token &operator=(const Token &other) = delete;
 
         Token &operator=(Token &&other) noexcept {
+            this->isolate = other.isolate;
             this->buffer = other.buffer;
             this->length = other.length;
             this->type = other.type;

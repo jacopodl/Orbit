@@ -8,7 +8,7 @@
 
 using namespace orbiter::datatype;
 
-FuncShared *FunSharedNew(const orbiter::Isolate *isolate, const char *name, const char *doc,
+FuncShared *FunSharedNew(orbiter::Isolate *isolate, const char *name, const char *doc,
                          U16 arity, FunctionPtr func, FunctionKind kind) {
     auto s_name = ORStringNew(isolate, name);
     if (!s_name)
@@ -22,7 +22,8 @@ FuncShared *FunSharedNew(const orbiter::Isolate *isolate, const char *name, cons
             return nullptr;
     }
 
-    auto *shared = (FuncShared *) orbiter::memory::Alloc(sizeof(FuncShared));
+    orbiter::IsolateAllocator allocator(isolate);
+    auto *shared = allocator.alloc<FuncShared>(sizeof(FuncShared));
     if (shared != nullptr) {
         shared->refs = 1;
 
@@ -38,7 +39,7 @@ FuncShared *FunSharedNew(const orbiter::Isolate *isolate, const char *name, cons
     return shared;
 }
 
-void FunSharedDel(FuncShared *shared) {
+void FunSharedDel(orbiter::Isolate *isolate, FuncShared *shared) {
     if (shared->refs.fetch_sub(1) > 1)
         return;
 
@@ -48,14 +49,15 @@ void FunSharedDel(FuncShared *shared) {
     if (shared->IsInterpreted())
         Release(shared->code);
 
-    orbiter::memory::Free(shared);
+    orbiter::IsolateAllocator allocator(isolate);
+    allocator.free(shared);
 }
 
-bool orbiter::datatype::FunctionTypeSetup(const Isolate *isolate, TypeInfo *self) {
+bool orbiter::datatype::FunctionTypeSetup(Isolate *isolate, TypeInfo *self) {
     return true;
 }
 
-Function *orbiter::datatype::FunctionNew(const Isolate *isolate, const FunctionDef *def) {
+Function *orbiter::datatype::FunctionNew(Isolate *isolate, const FunctionDef *def) {
     auto kind = FunctionKind::NATIVE;
 
     if (def->method)
@@ -73,12 +75,12 @@ Function *orbiter::datatype::FunctionNew(const Isolate *isolate, const FunctionD
         return fn;
     }
 
-    FunSharedDel(f_shared);
+    FunSharedDel(isolate, f_shared);
 
     return nullptr;
 }
 
-TypeInfo *orbiter::datatype::FunctionTypeInit(const Isolate *isolate) {
+TypeInfo *orbiter::datatype::FunctionTypeInit(Isolate *isolate) {
     auto *func = MakeType(isolate, InstanceType::FUNCTION, sizeof(Function) - sizeof(OObject), 0, 0);
     return func;
 }

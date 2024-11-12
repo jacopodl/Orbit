@@ -5,22 +5,16 @@
 #ifndef ORBIT_LIFTOFF_SYMTABLE_H_
 #define ORBIT_LIFTOFF_SYMTABLE_H_
 
-#include <orbit/util/hashmap.h>
+#include <orbit/orbiter/isolate.h>
 
-#include<orbit/orbiter/isolate.h>
-
+#include <orbit/orbiter/datatype/hashmap.h>
 #include <orbit/orbiter/datatype/orstring.h>
 
-#include <orbit/orbiter/memory/memory.h>
-
 namespace liftoff {
-    using STHEntry = HEntry<orbiter::datatype::ORString *, struct Symbol *>;
-    using STHMap = HashMap<
+    using STHEntry = orbiter::datatype::HEntry<orbiter::datatype::ORString *, struct Symbol *>;
+    using STHMap = orbiter::datatype::HashMap<
         orbiter::datatype::ORString *,
         Symbol *,
-        orbiter::memory::Alloc,
-        orbiter::memory::Realloc,
-        orbiter::memory::Free,
         orbiter::datatype::ORStringEqual,
         orbiter::datatype::ORStringHash
     >;
@@ -60,24 +54,28 @@ namespace liftoff {
         PUBLIC
     };
 
-    struct Scope {
+    class Scope {
+    public:
         STHMap symbols;
 
-        Scope *back;
+        Scope *back = nullptr;
 
-        MSize line_start;
+        MSize line_start = 0;
 
-        MSize line_end;
+        MSize line_end = 0;
 
-        unsigned short current_nesting;
+        unsigned short current_nesting = 0;
 
-        unsigned short closure_offset;
+        unsigned short closure_offset = 0;
 
-        unsigned short var_offset;
+        unsigned short var_offset = 0;
 
-        unsigned short static_offset;
+        unsigned short static_offset = 0;
 
-        ScopeType type;
+        ScopeType type = ScopeType::MODULE;
+
+        explicit Scope(orbiter::Isolate *isolate) : symbols(isolate) {
+        }
     };
 
     struct Symbol {
@@ -99,7 +97,7 @@ namespace liftoff {
     };
 
     struct SymbolTable {
-        const orbiter::Isolate *isolate;
+        orbiter::Isolate *isolate;
 
         Scope *scope;
 
@@ -149,7 +147,8 @@ namespace liftoff {
          * @param line_start The start line of the symbol scope.
          * @return A pointer to the newly declared symbol.
          */
-        Symbol *DeclareSymbolScope(orbiter::datatype::ORString *name, SymbolType type, MSize offset, MSize line_start) noexcept;
+        Symbol *DeclareSymbolScope(orbiter::datatype::ORString *name, SymbolType type, MSize offset,
+                                   MSize line_start) noexcept;
 
         /**
          * @brief Declares a new symbol scope with the specified details.
@@ -224,7 +223,7 @@ namespace liftoff {
      * @param isolate Isolate associated with the symbol table.
      * @return A pointer to the newly created symbol table.
      */
-    SymbolTable *SymbolTableNew(const orbiter::Isolate *isolate) noexcept;
+    SymbolTable *SymbolTableNew(orbiter::Isolate *isolate) noexcept;
 
     /**
      * @brief Deletes the specified symbol table.

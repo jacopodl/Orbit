@@ -4,19 +4,18 @@
 
 #include <cassert>
 
-#include <orbit/orbiter/memory/memory.h>
-
 #include <orbit/liftoff/symtable.h>
 
 using namespace orbiter::datatype;
 using namespace liftoff;
 
-Scope *ScopeNew(MSize line_start) {
-    auto *scope = (Scope *) orbiter::memory::Alloc(sizeof(Scope));
+Scope *ScopeNew(orbiter::Isolate *isolate, MSize line_start) {
+    orbiter::IsolateAllocator allocator(isolate);
 
+    auto *scope = allocator.AllocObject<Scope>(isolate);
     if (scope != nullptr) {
         if (!scope->symbols.Initialize()) {
-            orbiter::memory::Free(scope);
+            allocator.FreeObject(scope);
 
             return nullptr;
         }
@@ -63,7 +62,9 @@ STHEntry *FixMemoryOffset(Scope *scope, STHEntry *cursor, int mem_id, int nestin
     return nullptr;
 }
 
-void SymbolDel(Symbol *symbol) {
+void SymbolDel(orbiter::Isolate *isolate, Symbol *symbol) {
+    orbiter::IsolateAllocator allocator(isolate);
+
     if (symbol == nullptr)
         return;
 
@@ -73,14 +74,14 @@ void SymbolDel(Symbol *symbol) {
         auto *scope = symbol->scope;
 
         for (const auto *cursor = scope->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next)
-            SymbolDel(cursor->value);
+            SymbolDel(isolate, cursor->value);
 
         scope->symbols.Finalize(nullptr);
 
-        orbiter::memory::Free(scope);
+        allocator.free(scope);
     }
 
-    orbiter::memory::Free(symbol);
+    allocator.free(symbol);
 }
 
 Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) const noexcept {
@@ -102,7 +103,8 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) cons
         return nullptr;
     }
 
-    auto *symbol = (Symbol *) orbiter::memory::Calloc(sizeof(Symbol));
+    orbiter::IsolateAllocator allocator(isolate);
+    auto *symbol = allocator.calloc<Symbol>(sizeof(Symbol));
     if (symbol == nullptr) {
         this->scope->symbols.FreeHEntry(entry);
 
@@ -157,14 +159,14 @@ Symbol *SymbolTable::DeclareSymbolScope(ORString *name, SymbolType type, MSize o
     if (sym == nullptr)
         return nullptr;
 
-    auto *scope = ScopeNew(line_start);
+    auto *scope = ScopeNew(this->isolate, line_start);
     if (scope == nullptr) {
         if (this->scope->symbols.Remove(sym->name, &entry)) {
             Release(entry->key);
 
             this->scope->symbols.FreeHEntry(entry);
 
-            SymbolDel(sym);
+            SymbolDel(this->isolate, sym);
         }
 
         return nullptr;
@@ -214,7 +216,6 @@ Symbol *SymbolTable::Lookup(ORString *name, MSize offset) const noexcept {
             && cursor->type != ScopeType::TRAIT
             && cursor->symbols.Lookup(name, &entry)) {
             const auto *sym = entry->value;
-
             if (sym->defining_scope->current_nesting >= sym->nesting && sym->decl_offset <= offset)
                 return entry->value;
         }
@@ -313,12 +314,15 @@ void SymbolTable::LeaveScope() noexcept {
         this->scope = c_scope->back;
 }
 
-SymbolTable *liftoff::SymbolTableNew(const orbiter::Isolate *isolate) noexcept {
-    auto *table = (SymbolTable *) orbiter::memory::Alloc(sizeof(SymbolTable));
+SymbolTable *liftoff::SymbolTableNew(orbiter::Isolate *isolate) noexcept {
+    orbiter::IsolateAllocator allocator(isolate);
+
+    auto *table = allocator.alloc<SymbolTable>(sizeof(SymbolTable));
     if (table != nullptr) {
-        auto *scope = ScopeNew(0);
+        auto *scope = ScopeNew(isolate, 0);
         if (scope == nullptr) {
-            orbiter::memory::Free(table);
+            allocator.free(table);
+
             return nullptr;
         }
 
@@ -344,11 +348,11 @@ void liftoff::SymbolTableDel(SymbolTable *table) noexcept {
         base = base->back;
 
     for (const auto *cursor = base->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next)
-        SymbolDel(cursor->value);
+        SymbolDel(table->isolate, cursor->value);
 
     base->symbols.Finalize(nullptr);
 
-    orbiter::memory::Free(base);
-
-    orbiter::memory::Free(table);
+    orbiter::IsolateAllocator allocator(table->isolate);
+    allocator.free(base);
+    allocator.free(table);
 }

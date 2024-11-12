@@ -8,7 +8,6 @@
 #include <orbit/orbiter/datatype/stringbuilder.h>
 
 using namespace orbiter::datatype;
-using namespace orbiter::memory;
 
 MSize StringBuilder::GetEscapedLength(const unsigned char *buffer, MSize length, bool unicode) {
     MSize str_len = 0;
@@ -130,7 +129,7 @@ int StringBuilder::ProcessUnicodeEscape(unsigned char *wb, const unsigned char *
 }
 
 StringBuilder::~StringBuilder() {
-    Free(this->buffer_);
+    this->allocator_.free(this->buffer_);
 }
 
 bool StringBuilder::BufferResize(MSize sz) {
@@ -149,7 +148,7 @@ bool StringBuilder::BufferResize(MSize sz) {
     if (this->buffer_ == nullptr)
         sz += 1;
 
-    if ((tmp = (unsigned char *) Realloc(this->buffer_, this->cap_ + sz)) == nullptr)
+    if ((tmp = this->allocator_.realloc(this->buffer_, this->cap_ + sz)) == nullptr)
         return false;
 
     this->buffer_ = tmp;
@@ -162,12 +161,11 @@ bool StringBuilder::ParseEscaped(const unsigned char *buffer, MSize length) {
     unsigned char *wbuf;
     MSize idx = 0;
     MSize uidx = 0;
-    MSize wlen;
 
     if (buffer == nullptr || length == 0)
         return true;
 
-    wlen = StringBuilder::GetUnescapedLength(buffer, length);
+    MSize wlen = GetUnescapedLength(buffer, length);
 
     if (!this->BufferResize(wlen))
         return false;

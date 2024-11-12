@@ -20,7 +20,7 @@
  *      |                           |   |   |
  *      v                           v   v   v
  *    +-+-+-----------------------+-+-+-+-+-+-+
- *    |   | Strong inline counter | G | I | S |
+ *    | O | Strong inline counter | G | I | S |
  * +  +---+-----------------------+-+-+---+---+  +
  * |                                             |
  * +----------------+ uintptr_t +----------------+
@@ -41,8 +41,16 @@
 
 #define RC_SETBIT_GC(value)             (value | RCBitOffsets::GCMask)
 
+namespace orbiter {
+    class Isolate;
+
+    namespace datatype {
+        struct OObject;
+    }
+}
+
 namespace orbiter::memory {
-    using RCObject = struct ArObject *;
+    using RCObject = datatype::OObject *;
 
     enum class RCType {
         INLINE = 0x8 | 0x2,
@@ -61,6 +69,9 @@ namespace orbiter::memory {
         /// Weak references counter.
         std::atomic_uintptr_t weak;
 
+        /// Pointer to isolate (It is needed for memory management).
+        Isolate *isolate;
+
         /// Object pointer.
         RCObject object;
     };
@@ -78,7 +89,8 @@ namespace orbiter::memory {
     public:
         RefBits() = default;
 
-        explicit constexpr RefBits(uintptr_t bits) : bits_(bits) {}
+        explicit constexpr RefBits(uintptr_t bits) : bits_(bits) {
+        }
 
         /**
          * @brief Increment strong references counter.
@@ -152,7 +164,8 @@ namespace orbiter::memory {
         RCObject GetObjectBase();
 
     public:
-        explicit constexpr RefCount(RCType status) noexcept: bits_((uintptr_t)status) {};
+        explicit constexpr RefCount(RCType status) noexcept: bits_((uintptr_t) status) {
+        };
 
         RefCount &operator=(uintptr_t type) {
             this->bits_ = type;

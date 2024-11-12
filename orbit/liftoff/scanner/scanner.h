@@ -8,12 +8,14 @@
 #include <cstdio>
 #include <cstring>
 
+#include <orbit/orbiter/isolate.h>
+
 #include <orbit/liftoff/scanner/ibuffer.h>
 #include <orbit/liftoff/scanner/sbuffer.h>
 #include <orbit/liftoff/scanner/token.h>
 
 namespace liftoff::scanner {
-    constexpr auto kScannerFileBuffer = 4096;   // 4KiB
+    constexpr auto kScannerFileBuffer = 4096; // 4KiB
     constexpr auto kScannerPromptBuffer = 1024; // 1KiB
 
     enum class ScannerStatus {
@@ -41,6 +43,8 @@ namespace liftoff::scanner {
     using InteractiveFn = int (*)(const char *prompt, FILE *fd, InputBuffer *ibuf);
 
     class Scanner {
+        orbiter::Isolate *isolate_;
+
         const char *prompt_ = nullptr;
         const char *next_prompt_ = nullptr;
 
@@ -48,9 +52,9 @@ namespace liftoff::scanner {
 
         InteractiveFn promptfn_ = nullptr;
 
-        StoreBuffer sbuf_{};
+        StoreBuffer sbuf_;
 
-        InputBuffer ibuf_{};
+        InputBuffer ibuf_;
 
         Token peeked{};
 
@@ -100,30 +104,46 @@ namespace liftoff::scanner {
         /**
          * @brief Initialize scanner using a string and length.
          *
+         * @param isolate Pointer to the Isolate
          * @param str Pointer to the string that contains the source code.
          * @param length Length of the string that contains the source code.
          */
-        Scanner(const char *str, unsigned long length) noexcept: ibuf_((unsigned char *) str, length) {}
+        Scanner(orbiter::Isolate *isolate, const char *str,
+                unsigned long length) noexcept: isolate_(isolate), ibuf_(isolate, (unsigned char *) str, length),
+                                                sbuf_(isolate) {
+        }
 
         /**
          * @brief Initialize scanner using a string.
          *
+         * @param isolate Pointer to the Isolate
          * @param str Pointer to the string that contains the source code.
          */
-        explicit Scanner(const char *str) noexcept: Scanner(str, strlen(str)) {};
+        explicit Scanner(orbiter::Isolate *isolate, const char *str) noexcept: Scanner(isolate, str, strlen(str)) {
+        };
 
         /**
          * @brief Initialize scanner using a file to read from and prompts to show (interactive mode).
          *
+         * @param isolate Pointer to the Isolate
          * @param fd Pointer to FILE.
          * @param ps1 Pointer to Prompt 1.
          * @param ps2 Pointer to Prompt 2.
          * @param buf_size Size of internal working buffer.
          */
+        Scanner(orbiter::Isolate *isolate, FILE *fd, const char *ps1, const char *ps2, int buf_size) noexcept;
 
-        Scanner(FILE *fd, const char *ps1, const char *ps2, int buf_size) noexcept;
-
-        Scanner(FILE *fd, const char *ps1, const char *ps2) noexcept: Scanner(fd, ps1, ps2, kScannerFileBuffer) {};
+        /**
+         * @brief Initialize scanner using a file to read from and prompts to show (interactive mode).
+         *
+         * @param isolate Pointer to the Isolate
+         * @param fd Pointer to FILE.
+         * @param ps1 Pointer to Prompt 1.
+         * @param ps2 Pointer to Prompt 2.
+         */
+        Scanner(orbiter::Isolate *isolate, FILE *fd, const char *ps1, const char *ps2) noexcept: Scanner(
+            isolate, fd, ps1, ps2, kScannerFileBuffer) {
+        };
 
         /**
          * @brief Reads the next token from the stream and returns it.

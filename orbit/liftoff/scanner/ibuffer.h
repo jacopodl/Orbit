@@ -7,10 +7,14 @@
 
 #include <cstdio>
 
+#include <orbit/orbiter/isolate.h>
+
 namespace liftoff::scanner {
-    constexpr const int kLastLineSize = 1024;
+    constexpr int kLastLineSize = 1024;
 
     class InputBuffer {
+        orbiter::IsolateAllocator allocator_;
+
         unsigned char *buffer_ = nullptr;
         unsigned char *last_line_ = nullptr;
 
@@ -26,21 +30,28 @@ namespace liftoff::scanner {
         bool release_ = true;
 
     public:
-        InputBuffer(const unsigned char *buffer, unsigned long length) : buffer_((unsigned char *) buffer),
-                                                                         b_length_(length),
-                                                                         release_(false) {}
+        InputBuffer(orbiter::Isolate *isolate, const unsigned char *buffer, unsigned long length) : allocator_(isolate),
+            buffer_((unsigned char *) buffer),
+            b_length_(length),
+            release_(false) {
+        }
 
-        InputBuffer(size_t buf_size, size_t last_line) : b_length_(buf_size), ll_size_(last_line), file_(true) {}
+        InputBuffer(orbiter::Isolate *isolate, size_t buf_size, size_t last_line) : allocator_(isolate),
+            b_length_(buf_size),
+            ll_size_(last_line),
+            file_(true) {
+        }
 
-        explicit InputBuffer(size_t buf_size) : b_length_(buf_size), file_(true) {}
-
-        InputBuffer() = default;
+        explicit InputBuffer(orbiter::Isolate *isolate, size_t buf_size) : allocator_(isolate),
+                                                                           b_length_(buf_size),
+                                                                           file_(true) {
+        }
 
         ~InputBuffer();
 
         bool AppendInput(const unsigned char *buffer, int length);
 
-        [[nodiscard]] char *GetCurrentLine(int *out_len) const;
+        [[nodiscard]] char *GetCurrentLine(int *out_len);
 
         int Peek(bool advance);
 

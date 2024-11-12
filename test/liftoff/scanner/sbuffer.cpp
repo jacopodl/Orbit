@@ -9,8 +9,21 @@
 
 using namespace liftoff::scanner;
 
-TEST(scanner_sbuffer, PutChar) {
-    StoreBuffer buffer;
+class ScannerSBuffer : public ::testing::Test {
+protected:
+    void SetUp() override {
+        this->isolate = orbiter::Isolate::New();
+    }
+
+    void TearDown() override {
+        // TODO: this->isolate->Delete();
+    }
+
+    orbiter::Isolate *isolate = nullptr;
+};
+
+TEST_F(ScannerSBuffer, PutChar) {
+    StoreBuffer buffer(this->isolate);
 
     ASSERT_TRUE(buffer.PutChar('A'));
 
@@ -20,11 +33,12 @@ TEST(scanner_sbuffer, PutChar) {
     ASSERT_EQ(length, 1);
     ASSERT_EQ(buf[0], 'A');
 
-    orbiter::memory::Free(buf);
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(buf);
 }
 
-TEST(scanner_sbuffer, PutCharRepeat) {
-    StoreBuffer buffer;
+TEST_F(ScannerSBuffer, PutCharRepeat) {
+    StoreBuffer buffer(this->isolate);
 
     ASSERT_TRUE(buffer.PutCharRepeat('B', 5));
 
@@ -36,12 +50,13 @@ TEST(scanner_sbuffer, PutCharRepeat) {
         ASSERT_EQ(buf[i], 'B');
     }
 
-    orbiter::memory::Free(buf);
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(buf);
 }
 
-TEST(scanner_sbuffer, PutString) {
+TEST_F(ScannerSBuffer, PutString) {
     const unsigned char str[] = "Hello";
-    StoreBuffer buffer;
+    StoreBuffer buffer(this->isolate);
 
     ASSERT_TRUE(buffer.PutString(str, 5));
 
@@ -50,11 +65,12 @@ TEST(scanner_sbuffer, PutString) {
     ASSERT_EQ(length, 5);
     ASSERT_EQ(memcmp(buf, str, 5), 0);
 
-    orbiter::memory::Free(buf);
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(buf);
 }
 
-TEST(scanner_sbuffer, GetLength) {
-    StoreBuffer buffer;
+TEST_F(ScannerSBuffer, GetLength) {
+    StoreBuffer buffer(this->isolate);
     ASSERT_EQ(buffer.GetLength(), 0);
 
     buffer.PutChar('C');
@@ -65,13 +81,15 @@ TEST(scanner_sbuffer, GetLength) {
 
     unsigned char *buf;
     buffer.GetBuffer(&buf);  // Reset buffer
-    orbiter::memory::Free(buf);
+
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(buf);
 
     ASSERT_EQ(buffer.GetLength(), 0);
 }
 
-TEST(scanner_sbuffer, Enlarge) {
-    StoreBuffer buffer;
+TEST_F(ScannerSBuffer, Enlarge) {
+    StoreBuffer buffer(this->isolate);
     ASSERT_TRUE(buffer.PutChar('E'));
     ASSERT_TRUE(buffer.PutCharRepeat('F', 1000));
 
@@ -85,5 +103,6 @@ TEST(scanner_sbuffer, Enlarge) {
         ASSERT_EQ(buf[i], 'F');
     }
 
-    orbiter::memory::Free(buf);
+    orbiter::IsolateAllocator allocator(this->isolate);
+    allocator.free(buf);
 }

@@ -43,7 +43,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to Atom object
      */
-    HAtom AtomNew(const Isolate *isolate, const char *string, MSize length);
+    HAtom AtomNew(Isolate *isolate, const char *string, MSize length);
 
     /**
      * @brief Create new atom
@@ -53,7 +53,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to Atom object
      */
-    inline HAtom AtomNew(const Isolate *isolate, const char *string) {
+    inline HAtom AtomNew(Isolate *isolate, const char *string) {
         return AtomNew(isolate, string, strlen(string));
     }
 
@@ -65,7 +65,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to Atom object
      */
-    HAtom AtomNew(const Isolate *isolate, ORString *id);
+    HAtom AtomNew(Isolate *isolate, ORString *id);
 
     /**
      * @brief Initialize and create the specified type

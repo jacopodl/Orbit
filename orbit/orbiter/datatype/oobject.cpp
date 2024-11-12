@@ -13,7 +13,7 @@ bool orbiter::datatype::Equal(const OObject *left, const OObject *right) {
     return false;
 }
 
-bool orbiter::datatype::TIPropertyAdd(const Isolate *isolate, TypeInfo *type, const char *name,
+bool orbiter::datatype::TIPropertyAdd(Isolate *isolate, TypeInfo *type, const char *name,
                                       OObject *value, PropertyDetail detail) {
     PropertyDescriptor tmp{};
     int i = 0;
@@ -64,7 +64,7 @@ bool orbiter::datatype::TIPropertyAdd(const Isolate *isolate, TypeInfo *type, co
     return true;
 }
 
-bool orbiter::datatype::TIPropertyAdd(const Isolate *isolate, TypeInfo *type, const FunctionDef *bulk) {
+bool orbiter::datatype::TIPropertyAdd(Isolate *isolate, TypeInfo *type, const FunctionDef *bulk) {
     for (auto *cursor = bulk; cursor->name != nullptr; cursor++) {
         auto *fn = FunctionNew(isolate, cursor);
         if (fn == nullptr)
@@ -80,7 +80,7 @@ bool orbiter::datatype::TIPropertyAdd(const Isolate *isolate, TypeInfo *type, co
     return true;
 }
 
-bool orbiter::datatype::TIPropertiesInit(TypeInfo *type, U8 n) {
+bool orbiter::datatype::TIPropertiesInit(Isolate *isolate, TypeInfo *type, U8 n) {
     assert(type->properties.p_array == nullptr);
 
     if (n == 0) {
@@ -90,7 +90,8 @@ bool orbiter::datatype::TIPropertiesInit(TypeInfo *type, U8 n) {
         return true;
     }
 
-    auto *tmp = (PropertyDescriptor *) memory::Calloc(sizeof(PropertyDescriptor) * n);
+    IsolateAllocator allocator(isolate);
+    auto *tmp = allocator.calloc<PropertyDescriptor>(sizeof(PropertyDescriptor) * n);
     if (tmp == nullptr)
         return false;
 
@@ -139,8 +140,11 @@ PropertyDescriptor *orbiter::datatype::TIFindProperty(const TypeInfo *type, cons
     return prop;
 }
 
-TypeInfo *orbiter::datatype::MakeType(TypeInfo *super, InstanceType type, U8 headroom, U8 props, U8 slots) {
-    auto *ti = (TypeInfo *) memory::Alloc(sizeof(TypeInfo));
+TypeInfo *orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, InstanceType type,
+                                      U8 headroom, U8 props, U8 slots) {
+    IsolateAllocator allocator(isolate);
+
+    auto *ti = allocator.alloc<TypeInfo>(sizeof(TypeInfo));
     if (ti == nullptr)
         return nullptr;
 
@@ -153,14 +157,16 @@ TypeInfo *orbiter::datatype::MakeType(TypeInfo *super, InstanceType type, U8 hea
 
     ti->headroom = headroom;
 
+    ti->isolate = isolate;
+
     ti->aux.data = nullptr;
     ti->aux.dtor = nullptr;
 
     ti->properties.count = 0;
     ti->properties.p_array = nullptr;
 
-    if (!TIPropertiesInit(ti, props)) {
-        memory::Free(ti);
+    if (!TIPropertiesInit(isolate, ti, props)) {
+        allocator.free(ti);
 
         return nullptr;
     }
