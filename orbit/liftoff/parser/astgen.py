@@ -486,7 +486,8 @@ def generate_visitor_base():
 
     return f"""
 template <typename Derived>
-struct ASTVisitor {{
+class ASTVisitor {{
+    protected:
     ASTNode* visit(ASTNode* node) {{
         switch(node->node_type) {{
         {visit_cases_str}
