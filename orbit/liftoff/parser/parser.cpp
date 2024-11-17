@@ -2065,5 +2065,8 @@ ASTHandle<Module *> Parser::Parse() noexcept {
         assert(false);
     }
 
+    module->sym_t = sym_t_;
+    this->sym_t_ = nullptr;
+
     return module;
 }
