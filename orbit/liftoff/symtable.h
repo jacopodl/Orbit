@@ -94,17 +94,10 @@ namespace liftoff {
         unsigned short offset;
 
         unsigned short nesting;
-
-        struct {
-            unsigned int start;
-            unsigned int end;
-        } liveness;
     };
 
     class SymbolTable {
         orbiter::Isolate *isolate = nullptr;
-
-        unsigned int liveness_offset = 0;
 
         friend void SymbolTableDel(SymbolTable *) noexcept;
 

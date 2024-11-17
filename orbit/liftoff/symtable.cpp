@@ -78,7 +78,7 @@ void SymbolDel(orbiter::Isolate *isolate, Symbol *symbol) {
 
         scope->symbols.Finalize(nullptr);
 
-        allocator.free(scope);
+        allocator.FreeObject(scope);
     }
 
     allocator.free(symbol);
@@ -130,11 +130,6 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
     }
 
     symbol->nesting = this->scope->current_nesting;
-
-    if (entry->value->type != SymbolType::LABEL) {
-        symbol->liveness.start = this->liveness_offset;
-        symbol->liveness.end = this->liveness_offset++;
-    }
 
     entry->key = name;
     entry->value = symbol;
@@ -221,12 +216,9 @@ Symbol *SymbolTable::Lookup(ORString *name, MSize offset) noexcept {
             && cursor->type != ScopeType::TRAIT
             && cursor->symbols.Lookup(name, &entry)) {
             const auto *sym = entry->value;
-            if (sym->defining_scope->current_nesting >= sym->nesting && sym->decl_offset <= offset) {
-                if (entry->value->type != SymbolType::LABEL)
-                    entry->value->liveness.end = this->liveness_offset++;
 
+            if (sym->defining_scope->current_nesting >= sym->nesting && sym->decl_offset <= offset)
                 return entry->value;
-            }
         }
 
         cursor = cursor->back;
@@ -361,7 +353,7 @@ void liftoff::SymbolTableDel(SymbolTable *table) noexcept {
 
     base->symbols.Finalize(nullptr);
 
-    const orbiter::IsolateAllocator allocator(table->isolate);
-    allocator.free(base);
+    orbiter::IsolateAllocator allocator(table->isolate);
+    allocator.FreeObject(base);
     allocator.free(table);
 }
