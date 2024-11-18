@@ -13,10 +13,11 @@ namespace orbiter {
 
     enum class OPCode {
         // Load/store
-        LDCST = 1,  // OPCODE | 4 DST | 4 RESERVED  | 16 IMM
-        LDIMM,      // OPCODE | 4 DST | 4 SHIFT     | 16 IMM
-        MOV,        // OPCODE | 4 DST | 4 SRC       | 16 RESERVED
-        MOWN        // OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
+        LDCST = 1,  // Load constr from Code object:    OPCODE | 4 DST | 4 RESERVED  | 16 IMM
+        LDIMM,      // Load immediate into register:    OPCODE | 4 DST | 4 SHIFT     | 16 IMM
+        MOV,        // Copy value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED
+        MOWN,       // Move value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
+        SKLDR       // Load from stack into register:   OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
     };
 }
 
