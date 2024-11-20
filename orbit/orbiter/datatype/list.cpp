@@ -1,0 +1,119 @@
+// This source file is part of the Orbit project.
+//
+// Licensed under the Apache License v2.0
+
+#include <orbit/orbiter/datatype/list.h>
+
+using namespace orbiter::datatype;
+
+bool ListCheckSize(List *list, MSize count) {
+    MSize len = list->capacity + count;
+    OObject **tmp;
+
+    if (count == 0)
+        len = (list->capacity + 1) + ((list->capacity + 1) / 2);
+
+    if (list->length + count > list->capacity) {
+        if (list->objects == nullptr)
+            len = kListInitialCapacity;
+
+        orbiter::IsolateAllocator allocator(O_GET_TYPE(list)->isolate);
+
+        if ((tmp = allocator.realloc(list->objects, len * sizeof(void *))) == nullptr)
+            return false;
+
+        list->objects = tmp;
+        list->capacity = len;
+    }
+
+    return true;
+}
+
+bool orbiter::datatype::ListTypeSetup(Isolate *isolate, TypeInfo *self) {
+    return true;
+}
+
+bool orbiter::datatype::ListAppend(List *list, OObject *object) {
+    if (!ListCheckSize(list, 1))
+        return false;
+
+    list->objects[list->length++] = O_VFY_INCREF(object);
+
+    return true;
+}
+
+bool orbiter::datatype::ListInsert(List *list, OObject *object, MSize index) {
+    if (index < 0)
+        index = ((MSize) list->length) + index;
+
+    if (index > list->length) {
+        if (!ListCheckSize(list, 1))
+            return false;
+
+        list->objects[list->length++] = O_VFY_INCREF(object);
+
+        return true;
+    }
+
+    Release(list->objects[index]);
+    list->objects[index] = O_VFY_INCREF(object);
+
+    return true;
+}
+
+bool orbiter::datatype::ListPrepend(List *list, OObject *object) {
+    if (!ListCheckSize(list, 1))
+        return false;
+
+    for (MSize i = list->length; i > 0; i--)
+        list->objects[i] = list->objects[i - 1];
+
+    list->objects[0] = O_VFY_INCREF(object);
+
+    list->length++;
+
+    return true;
+}
+
+HList orbiter::datatype::ListNew(Isolate *isolate, MSize capacity) {
+    auto *list = MakeObject<List>(isolate, InstanceType::LIST);
+    if (list == nullptr)
+        return {};
+
+    list->objects = nullptr;
+    list->capacity = capacity;
+    list->length = 0;
+
+    if (capacity > 0) {
+        IsolateAllocator allocator(isolate);
+
+        list->objects = allocator.alloc<OObject *>(capacity * sizeof(void *));
+        if (list->objects == nullptr) {
+            Release(list);
+
+            return {};
+        }
+    }
+
+    return HList(list);
+}
+
+HOObject orbiter::datatype::ListGet(List *list, bool *success, MSize index) {
+    *success = false;
+
+    if (index < 0)
+        index = (MSize) list->length + index;
+
+    if (index >= 0 && index < list->length) {
+        *success = true;
+
+        return HOObject(O_VFY_INCREF(list->objects[index]));
+    }
+
+    return {};
+}
+
+TypeInfo *orbiter::datatype::ListTypeInit(Isolate *isolate) {
+    auto *number = MakeType(isolate, InstanceType::LIST, sizeof(List) - sizeof(OObject), 0, 0);
+    return number;
+}

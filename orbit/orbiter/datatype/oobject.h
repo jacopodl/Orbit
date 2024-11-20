@@ -144,6 +144,18 @@ namespace orbiter::datatype {
         return MakeObject<T>(isolate, isolate->primitive[(int) type]);
     }
 
+    template<typename T>
+    T *MakeGCObject(Isolate *isolate, TypeInfo *type) {
+        // TODO: impl!
+        return MakeObject<T>(isolate, type);
+    }
+
+    template<typename T>
+    T *MakeGCObject(Isolate *isolate, InstanceType type) {
+        // TODO: impl!
+        return MakeObject<T>(isolate, type);
+    }
+
     /**
      * @brief Create a new TypeInfo
      *
@@ -182,18 +194,18 @@ namespace orbiter::datatype {
         T *object_;
 
     public:
-        Handle() noexcept : object_(nullptr) {
+        Handle() noexcept: object_(nullptr) {
         }
 
-        explicit Handle(T *object) noexcept : object_(object) {
+        explicit Handle(T *object) noexcept: object_(object) {
         }
 
-        Handle(Handle &&other) noexcept : object_(other.object_) {
+        Handle(Handle &&other) noexcept: object_(other.object_) {
             other.object_ = nullptr;
         }
 
-        Handle(const Handle &other) : object_(O_INCREF(other.object_)) {
-
+        Handle(const Handle &other) : object_(other.object_) {
+            O_VFY_INCREF(other.object_);
         }
 
         ~Handle() noexcept {
@@ -240,7 +252,7 @@ namespace orbiter::datatype {
 
         T *get() const noexcept { return this->object_; }
 
-        T *get_inc() const noexcept { return O_INCREF(this->object_); }
+        T *get_inc() const noexcept { return O_VFY_INCREF(this->object_); }
 
         T *release() noexcept {
             T *temp = this->object_;

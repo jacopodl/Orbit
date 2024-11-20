@@ -6,6 +6,7 @@
 #include <orbit/orbiter/datatype/code.h>
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/function.h>
+#include <orbit/orbiter/datatype/list.h>
 #include <orbit/orbiter/datatype/orstring.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/type.h>
@@ -34,7 +35,7 @@ Isolate *Isolate::New() {
 
     new(&isolate->allocator_) stratum::Memory();
 
-    if(!isolate->allocator_.Initialize()) {
+    if (!isolate->allocator_.Initialize()) {
         delete isolate;
 
         return nullptr;
@@ -46,6 +47,7 @@ Isolate *Isolate::New() {
     INIT_TYPE(InstanceType::CODE, CodeTypeInit);
     INIT_TYPE(InstanceType::DECIMAL, DecimalTypeInit);
     INIT_TYPE(InstanceType::FUNCTION, FunctionTypeInit);
+    INIT_TYPE(InstanceType::LIST, ListTypeInit);
     INIT_TYPE(InstanceType::NUMBER, NumberTypeInit);
     INIT_TYPE(InstanceType::STRING, ORStringTypeInit);
 
@@ -57,12 +59,13 @@ Isolate *Isolate::New() {
     SETUP_TYPE(InstanceType::CODE, CodeTypeSetup);
     SETUP_TYPE(InstanceType::DECIMAL, DecimalTypeSetup);
     SETUP_TYPE(InstanceType::FUNCTION, FunctionTypeSetup);
+    SETUP_TYPE(InstanceType::LIST, ListTypeSetup);
     SETUP_TYPE(InstanceType::NUMBER, NumberTypeSetup);
     SETUP_TYPE(InstanceType::STRING, ORStringTypeSetup);
 
     return isolate;
 
-ERROR:
+    ERROR:
     isolate->allocator_.Finalize();
 
     delete isolate;
