@@ -1663,7 +1663,7 @@ ASTHandle<ASTNode *> Parser::ParseTernary(ASTHandle<ASTNode *> &left) {
 
     branch->test = left.release();
 
-    branch->loc.start = left->loc.start;
+    branch->loc.start = branch->test->loc.start;
 
     this->Eat(true);
 
