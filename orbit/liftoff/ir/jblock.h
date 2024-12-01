@@ -14,22 +14,28 @@ namespace liftoff::ir {
 
     enum class JBlockType {
         LABEL,
-        LOOP
+        LOOP,
+        SYNC
     };
 
     class JBlock {
         Builder *builder_;
+
     public:
         JBlock *prev = nullptr;
 
         BasicBlock *begin = nullptr;
         BasicBlock *end = nullptr;
 
+        Object *value = nullptr;
+
         orbiter::datatype::ORString *label = nullptr;
 
         JBlockType type = JBlockType::LOOP;
 
         JBlock(Builder *builder, JBlockType type, orbiter::datatype::ORString *label);
+
+        JBlock(Builder *builder, Object *value);
 
         ~JBlock();
 

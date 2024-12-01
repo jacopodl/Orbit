@@ -12,9 +12,9 @@
 namespace orbiter {
     // Flags for arithmetic operations
     enum class ArithFlags : U8 {
-        NONE = 0x0,     // Default integer operation
-        DIV_REM = 0x1,  // Store remainder instead of quotient (MOD operation)
-        FLOAT = 0x2,    // Floating point operation
+        NONE = 0x0, // Default integer operation
+        DIV_REM = 0x1, // Store remainder instead of quotient (MOD operation)
+        FLOAT = 0x2, // Floating point operation
 
         // Combinations:
         // FLOAT | DIV_REM = MODR (floating point modulo)
@@ -29,9 +29,9 @@ namespace orbiter {
     };
 
     enum class ComparisonMode : U8 {
-        EQ = 0x1,    // Equal (LE, GE)
-        LT = 0x2,    // Less Than (<)
-        GT = 0x4,    // Greater Than (>)
+        EQ = 0x1, // Equal (LE, GE)
+        LT = 0x2, // Less Than (<)
+        GT = 0x4, // Greater Than (>)
     };
 
     enum class MembershipFlags : U8 {
@@ -44,57 +44,63 @@ namespace orbiter {
     enum class OPCode {
         // Arithmetic Operations
         // Format: OPCODE | 4 DST | 4 SRC_L | 4 SRC_R | 4 FLAGS | 8 RESERVED
-        ADD = 1,    // ADD two values
-        SUB,        // Subtract two values
-        MUL,        // Multiply two values
-        DIV,        // Divide two values (integer)
+        ADD = 1, // ADD two values
+        SUB, // Subtract two values
+        MUL, // Multiply two values
+        DIV, // Divide two values (integer)
 
         // Bitwise Operations
         // Format: OPCODE | 4 DST | 4 SRC_L | 4 SRC_R | 12 RESERVED
-        AND,        // Bitwise AND (&)
-        OR,         // Bitwise OR (|)
-        XOR,        // Bitwise XOR (^)
+        AND, // Bitwise AND (&)
+        OR, // Bitwise OR (|)
+        XOR, // Bitwise XOR (^)
 
         // Shift Operations
         // Register format:  OPCODE | 4 DST | 4 SRC | 4 SHIFT_REG | 12 RESERVED
         // Immediate format: OPCODE | 4 DST | 4 SRC | 16 IMM
-        SHLR,       // Shift Left Register (value << reg)
-        SHLI,       // Shift Left Immediate (value << imm)
-        SHRR,       // Shift Right Register (value >> reg)
-        SHRI,       // Shift Right Immediate (value >> imm)
+        SHLR, // Shift Left Register (value << reg)
+        SHLI, // Shift Left Immediate (value << imm)
+        SHRR, // Shift Right Register (value >> reg)
+        SHRI, // Shift Right Immediate (value >> imm)
 
         // Comparison & Membership Operations
         // Format: OPCODE | 4 DST | 4 SRC_L | 4 SRC_R | 12 FLAGS
-        MEMB,       // Membership test (in/not in based on flag)
-        CMP,        // Generic compare (flags for <,>,<=,>=)
-        EQ,         // Equality (== or ===)
+        MEMB, // Membership test (in/not in based on flag)
+        CMP, // Generic compare (flags for <,>,<=,>=)
+        EQ, // Equality (== or ===)
 
         // UNARY OP
         // Format: OPCODE | 4 DST | 4 SRC | 24 RESERVED
-        MVN,        // Move Not (bitwise complement)
-        NEG,        // Arithmetic negation (-value)
-        NOT,        // Logical NOT (!value)
+        MVN, // Move Not (bitwise complement)
+        NEG, // Arithmetic negation (-value)
+        NOT, // Logical NOT (!value)
 
         // Format: OPCODE | 4 SRC
-        RET,        // Return instruction
+        RET, // Return instruction
 
         // Load/Store Operations
-        LDCST,      // Load constr from Code object:    OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
-        LDIMM,      // Load immediate into register:    OPCODE | 4 DST | 4 SHIFT     | 16 IMM
-        MOV,        // Copy value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED
-        MOWN,       // Move value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
-        SKLDR,      // Load from stack into register:   OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
+        LDCST, // Load constr from Code object:    OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
+        LDIMM, // Load immediate into register:    OPCODE | 4 DST | 4 SHIFT     | 16 IMM
+        MOV, // Copy value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED
+        MOWN, // Move value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
+        SKLDR, // Load from stack into register:   OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
 
         // Jump Instructions
         // Format: OPCODE | 4 DST | 20 OFFSET
-        JEN,        // Jump if nil
-        JF,         // Jump if false
-        JT,         // Jump if true
-        JMP,        // Unconditional jump
+        JEN, // Jump if nil
+        JF, // Jump if false
+        JT, // Jump if true
+        JMP, // Unconditional jump
+
+        // Sync block Operations
+        // Format: OPCODE | 4 LOCK_REG | 20 RESERVED
+        SYNC_ENTER,
+        SYNC_EXIT,
     };
 }
 
 ENUMBITMASK_ENABLE(orbiter::ArithFlags);
+
 ENUMBITMASK_ENABLE(orbiter::ComparisonMode);
 
 #endif // !ORBIT_ORBITER_OPCODE_H_

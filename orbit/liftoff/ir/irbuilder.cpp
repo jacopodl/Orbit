@@ -190,6 +190,17 @@ Object *IRBuilder::visitBinary(parser::Binary *node) {
             right = this->visit(node->right);
 
             return this->builder_.CreateBinaryOpFlags(orbiter::OPCode::MEMB, (U8) flags, left, right);
+        case parser::NodeType::SYNC_BLOCK: {
+            left = this->visit(node->left);
+
+            const JBlock jblock(&this->builder_, left);
+
+            this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_ENTER, left);
+
+            this->visit(node->right);
+
+            this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_EXIT, left);
+        }
         default:
             assert(false);
     }
@@ -287,11 +298,13 @@ Object *IRBuilder::visitImportName(parser::ImportName *node) {
     return nullptr;
 }
 
-Object *IRBuilder::visitJump(parser::Jump *node) {
-    auto b_target = this->builder_.context->j_chain->FindLabeledBlock(node->label);
+Object *IRBuilder::visitJump(const parser::Jump *node) {
+    const auto b_target = this->builder_.context->j_chain->FindLabeledBlock(node->label);
 
     if (b_target == nullptr)
         assert(false); // TODO ERROR
+
+    this->PutSyncExit(b_target);
 
     return this->builder_.CreateJump(
         node->token_type == scanner::TokenType::KW_BREAK ? b_target->end : b_target->begin);
@@ -437,6 +450,18 @@ Object *IRBuilder::visitUnary(parser::Unary *node) {
     assert(false);
     return nullptr;
 }
+
+void IRBuilder::PutSyncExit(const JBlock *block) {
+    const auto *cursor = this->builder_.context->j_chain;
+
+    while (cursor != block) {
+        if (cursor->type == JBlockType::SYNC)
+            this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_EXIT, cursor->value);
+
+        cursor = cursor->prev;
+    }
+}
+
 
 void *IRBuilder::Generate(parser::ASTHandle<parser::Module *> &module) {
     assert(this->isolate_ == module->isolate); // Security check.

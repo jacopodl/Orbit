@@ -35,6 +35,10 @@ JBlock::JBlock(Builder *builder, JBlockType type, ORString *label) : builder_(bu
     builder->context->j_chain = this;
 }
 
+JBlock::JBlock(Builder *builder, Object *value) : JBlock(builder, JBlockType::SYNC, nullptr) {
+    this->value = value;
+}
+
 JBlock::~JBlock() {
     this->builder_->context->j_chain = this->prev;
 }
@@ -42,14 +46,14 @@ JBlock::~JBlock() {
 JBlock *JBlock::FindLabeledBlock(const ORString *label) {
     auto *cursor = this;
 
-    if (label == nullptr)
-        return this;
-
     while (cursor != nullptr) {
-        if (cursor->label != label && ORStringEqual(label, cursor->label))
+        if (label == nullptr) {
+            if (cursor->type != JBlockType::SYNC)
+                return cursor;
+        } else if (cursor->label != nullptr && ORStringEqual(label, cursor->label))
             return cursor;
 
-        cursor = this->prev;
+        cursor = cursor->prev;
     }
 
     return nullptr;

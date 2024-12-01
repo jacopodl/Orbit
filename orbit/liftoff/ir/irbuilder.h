@@ -51,7 +51,7 @@ namespace liftoff::ir {
 
         Object *visitImportName(parser::ImportName *node);
 
-        Object *visitJump(parser::Jump *node);
+        Object *visitJump(const parser::Jump *node);
 
         Object *visitLabel(const parser::Label *node);
 
@@ -81,6 +81,7 @@ namespace liftoff::ir {
 
         Object *visitUnary(parser::Unary *node);
 
+        void PutSyncExit(const JBlock *block);
     public:
         explicit IRBuilder(orbiter::Isolate *isolate) : builder_(isolate), isolate_(isolate) {
         }
