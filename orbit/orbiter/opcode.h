@@ -75,6 +75,9 @@ namespace orbiter {
         NEG,        // Arithmetic negation (-value)
         NOT,        // Logical NOT (!value)
 
+        // Format: OPCODE | 4 SRC
+        RET,        // Return instruction
+
         // Load/Store Operations
         LDCST,      // Load constr from Code object:    OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
         LDIMM,      // Load immediate into register:    OPCODE | 4 DST | 4 SHIFT     | 16 IMM

@@ -55,6 +55,13 @@ namespace liftoff::ir {
         }
     };
 
+    class ReturnInstruction : PhysInstruction {
+        friend Builder;
+
+        ReturnInstruction() : PhysInstruction(orbiter::OPCode::RET) {
+        }
+    };
+
     // *****************************************************************************************************************
     // DefInstruction
     // *****************************************************************************************************************

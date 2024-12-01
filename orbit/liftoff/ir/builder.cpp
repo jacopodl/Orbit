@@ -90,6 +90,14 @@ Instruction *Builder::LoadImmediate(const MachineSize value) {
     return instr;
 }
 
+Instruction *Builder::CreateReturn(Object *s_reg) {
+    auto *instr = this->CreateObject<ReturnInstruction>();
+
+    this->AddInstruction(instr);
+
+    return instr;
+}
+
 Module *Builder::CreateModule() noexcept {
     auto mod = this->allocator_.alloc<Module>(sizeof(Module));
     if (mod != nullptr) {

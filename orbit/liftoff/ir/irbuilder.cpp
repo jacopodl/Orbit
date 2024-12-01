@@ -431,8 +431,10 @@ Object *IRBuilder::visitUnary(parser::Unary *node) {
         }
     }
 
-    assert(false);
+    if (node->token_type == scanner::TokenType::KW_RETURN)
+        return this->builder_.CreateReturn(value);
 
+    assert(false);
     return nullptr;
 }
 

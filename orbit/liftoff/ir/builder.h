@@ -100,6 +100,8 @@ namespace liftoff::ir {
 
         Instruction *LoadImmediate(MachineSize value);
 
+        Instruction *CreateReturn(Object *s_reg);
+
         Module *CreateModule() noexcept;
 
         PhiInstr *CreatePhi();
