@@ -81,6 +81,8 @@ namespace liftoff::ir {
 
         Object *visitUnary(const parser::Unary *node);
 
+        void visitForInLoop(const parser::Loop *node);
+
         void PutSyncExit(const JBlock *block);
     public:
         explicit IRBuilder(orbiter::Isolate *isolate) : builder_(isolate), isolate_(isolate) {

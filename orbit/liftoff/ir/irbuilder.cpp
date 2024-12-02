@@ -330,6 +330,12 @@ Object *IRBuilder::visitLiteral(parser::Literal *node) {
 }
 
 Object *IRBuilder::visitLoop(const parser::Loop *node) {
+    if (node->node_type == parser::NodeType::FOR_IN) {
+        this->visitForInLoop(node);
+
+        return nullptr;
+    }
+
     const JBlock jb(&this->builder_, JBlockType::LOOP, nullptr);
 
     if (node->node_type == parser::NodeType::LOOP) {
@@ -456,6 +462,16 @@ Object *IRBuilder::visitUnary(const parser::Unary *node) {
     assert(false);
 
     return nullptr;
+}
+
+void IRBuilder::visitForInLoop(const parser::Loop *node) {
+    const JBlock jb(&this->builder_, JBlockType::FOR_IN, nullptr);
+
+    assert(false); // TODO: IMPL THIS!
+
+    this->sym_t_->EnterNestedScope(node->loc.start.offset);
+
+    this->sym_t_->LeaveNestedScope();
 }
 
 void IRBuilder::PutSyncExit(const JBlock *block) {

@@ -13,6 +13,7 @@ namespace liftoff::ir {
     class Builder;
 
     enum class JBlockType {
+        FOR_IN,
         LABEL,
         LOOP,
         SYNC
