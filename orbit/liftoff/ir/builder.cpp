@@ -8,6 +8,16 @@
 using namespace liftoff::ir;
 using namespace orbiter;
 
+Instruction *Builder::LoadImmConstant(LoadConstantMode mode) {
+    auto *instr = this->CreateObject<LoadImmConstantInstr>((U8) mode);
+
+    this->AddInstruction(instr);
+
+    instr->dest.virtID = this->context->GetIncRVirtCounter();
+
+    return instr;
+}
+
 Instruction *Builder::LoadStoreOffset(const OPCode opcode, const U16 offset) {
     auto *instr = this->CreateObject<LoadStoreWithOffsetInstr>(opcode, offset);
 
@@ -91,7 +101,7 @@ Instruction *Builder::LoadImmediate(const MachineSize value) {
 }
 
 Instruction *Builder::CreateReturn(Object *s_reg, bool yield) {
-    auto *instr = this->CreateObject<ReturnInstruction>(s_reg,yield);
+    auto *instr = this->CreateObject<ReturnInstruction>(s_reg, yield);
 
     this->AddInstruction(instr);
 
@@ -134,8 +144,8 @@ void Builder::AppendBasicBlock(BasicBlock *bb) const noexcept {
 }
 
 void Builder::AddToObjsList(Object *obj) const noexcept {
-    obj->memory_.prev = this->context->objs;
-    this->context->objs = obj;
+    obj->memory_.prev = this->context->objs_;
+    this->context->objs_ = obj;
 }
 
 void Builder::DeleteBasicBlock(BasicBlock *bb) const noexcept {
@@ -157,7 +167,7 @@ void Builder::RemoveFromObjsList(Object *obj) const noexcept {
         next->memory_.prev = prev;
 
     if (prev == nullptr) {
-        this->context->objs = next;
+        this->context->objs_ = next;
 
         return;
     }

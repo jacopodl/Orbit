@@ -32,6 +32,8 @@ namespace liftoff::ir {
             return bb;
         }
 
+        Instruction *LoadImmConstant(orbiter::LoadConstantMode mode);
+
         /**
          * @brief Loads or stores using the specified opcode and offset.
          *
@@ -96,6 +98,18 @@ namespace liftoff::ir {
 
         Instruction *LoadFromStackOffset(U16 offset) {
             return this->LoadStoreOffset(orbiter::OPCode::SKLDR, offset);
+        }
+
+        Instruction *LoadNilValue() {
+            return this->LoadImmConstant(orbiter::LoadConstantMode::NIL);
+        }
+
+        Instruction *LoadTrueValue() {
+            return this->LoadImmConstant(orbiter::LoadConstantMode::TRUE);
+        }
+
+        Instruction *LoadFalseValue() {
+            return this->LoadImmConstant(orbiter::LoadConstantMode::FALSE);
         }
 
         Instruction *LoadImmediate(MachineSize value);

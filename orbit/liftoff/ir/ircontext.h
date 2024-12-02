@@ -7,6 +7,8 @@
 
 #include <orbit/datatype.h>
 
+#include <orbit/orbiter/datatype/list.h>
+
 #include <orbit/liftoff/ir/basicblock.h>
 #include <orbit/liftoff/ir/jblock.h>
 
@@ -18,11 +20,14 @@ namespace liftoff::ir {
     };
 
     class IRContext {
-        Object *objs = nullptr;
+        Object *objs_ = nullptr;
+
+        orbiter::datatype::HList static_values;
 
         U32 logical_counter_ = 0;
 
         friend class Builder;
+
     public:
         BasicBlock *entry_ = nullptr;
         BasicBlock *current_ = nullptr;
@@ -36,6 +41,19 @@ namespace liftoff::ir {
 
         I32 GetIncRVirtCounter() noexcept {
             return (I32) this->logical_counter_++;
+        }
+
+        U16 PushStaticValue(orbiter::Isolate *isolate, orbiter::datatype::OObject *value) {
+            if (!this->static_values) {
+                this->static_values = orbiter::datatype::ListNew(isolate);
+                if (!this->static_values)
+                    throw std::bad_alloc();
+            }
+
+            if (!ListAppend(this->static_values.get(), value))
+                throw std::bad_alloc();
+
+            return this->static_values->length - 1;
         }
     };
 }

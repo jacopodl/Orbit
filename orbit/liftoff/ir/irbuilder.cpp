@@ -322,11 +322,21 @@ Object *IRBuilder::visitListExpression(parser::ListExpression *node) {
 }
 
 Object *IRBuilder::visitLiteral(parser::Literal *node) {
-    // TODO: Implement Literal visitation
-    if (!O_IS_OBJECT(node->literal))
-        return this->builder_.LoadImmediate((MachineSize) node->literal);
+    if (node->literal == orbiter::datatype::kOddBallNIL)
+        return this->builder_.LoadNilValue();
 
-    return nullptr;
+    if (!O_IS_OBJECT(node->literal)) {
+        if ((MSize) node->literal == orbiter::datatype::kOddBallFALSE)
+            return this->builder_.LoadFalseValue();
+
+        if ((MSize) node->literal == orbiter::datatype::kOddBallTRUE)
+            return this->builder_.LoadTrueValue();
+
+        return this->builder_.LoadImmediate((MachineSize) node->literal);
+    }
+
+    const auto offset = this->builder_.context->PushStaticValue(this->isolate_, node->literal);
+    return this->builder_.LoadConstant(offset);
 }
 
 Object *IRBuilder::visitLoop(const parser::Loop *node) {

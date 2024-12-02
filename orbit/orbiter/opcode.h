@@ -39,6 +39,13 @@ namespace orbiter {
         NOT_IN = 0x1
     };
 
+    enum class LoadConstantMode : U8 {
+        OFFSET = 0,
+        FALSE,
+        TRUE,
+        NIL
+    };
+
     // Single instruction format:
     // XXXXXXXX - XXXXXXXX - XXXXXXXX - XXXXXXXX <-- 32Bit
     enum class OPCode {
@@ -81,7 +88,7 @@ namespace orbiter {
         YLD, // Yield instruction
 
         // Load/Store Operations
-        LDCST, // Load constr from Code object:    OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
+        LDCST, // Load constr from Code object:    OPCODE | 4 DST | 4 FLAGS(LoadConstantMode) | 16 OFFSET
         LDIMM, // Load immediate into register:    OPCODE | 4 DST | 4 SHIFT     | 16 IMM
         MOV, // Copy value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED
         MOWN, // Move value between registers:    OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)

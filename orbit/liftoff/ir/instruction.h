@@ -132,6 +132,15 @@ namespace liftoff::ir {
         }
     };
 
+    class LoadImmConstantInstr : public DefInstruction {
+        U8 mode;
+
+        friend Builder;
+    protected:
+        explicit LoadImmConstantInstr(U8 mode) : DefInstruction(orbiter::OPCode::LDCST), mode(mode) {
+        }
+    };
+
     class LoadStoreWithOffsetInstr : public DefInstruction {
         friend Builder;
 
