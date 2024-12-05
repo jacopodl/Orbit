@@ -80,7 +80,8 @@ namespace liftoff::parser {
         "Invalid native variable import: expected string literal after 'from' keyword (e.g., 'from \"libc\"')",
         "Invalid break/continue: can only be used within a loop or switch statement",
         "Undefined label: break/continue refers to a non-existent or invalid label",
-        "Invalid function declaration: function body is required. Only methods in traits and classes can be declared without a body (abstract methods). Regular functions must always have a body defined"
+        "Invalid function declaration: function body is required. Only methods in traits and classes can be declared without a body (abstract methods). Regular functions must always have a body defined",
+        "Invalid constant(let keyword) declaration: can only be used within class, trait, or module definitions"
     };
 
     class Context;
@@ -227,7 +228,7 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<Function *> ParseFunction(bool inl);
 
-        [[nodiscard]] ASTHandle<Parameter *> ParseParameter(const scanner::Position &start, NodeType type);
+        [[nodiscard]] ASTHandle<Parameter *> ParseParameter(const scanner::Position &start, NodeType type, int offset);
 
         [[nodiscard]] orbiter::datatype::HORString GetDocString();
 

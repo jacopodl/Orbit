@@ -166,7 +166,7 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
     symbol->type = type;
     symbol->decl_offset = offset;
 
-    if (type != SymbolType::VARIABLE)
+    if (type != SymbolType::PARAMETER && type!=SymbolType::VARIABLE)
         symbol->offset = this->scope->static_offset++;
 
     symbol->nesting = table->nesting;

@@ -714,6 +714,11 @@ ASTHandle<ASTNode *> Parser::ParseTryCatchFinally() {
 ASTHandle<ASTNode *> Parser::ParseVarDecl(const Position &start, bool pub, bool constant, bool weak, bool decl_only) {
     std::vector<ASTHandle<ASTNode *> > identifiers;
 
+    if (constant && (!this->context_->Check(ContextType::CLASS)
+                     && !this->context_->Check(ContextType::TRAIT)
+                     && !this->context_->Check(ContextType::MODULE)))
+        throw ParserException(69);
+
     this->Eat(true);
 
     do {
@@ -1789,8 +1794,7 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
     if (this->Match(TokenType::LEFT_BRACES)) {
         func->body = this->ParseBlock(false).release();
         func->loc.end = func->body->loc.end;
-    }
-    else {
+    } else {
         if (!this->context_->CheckBack(ContextType::CLASS)
             && !this->context_->CheckBack(ContextType::TRAIT))
             throw ParserException(68);
@@ -1803,7 +1807,7 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
     return func;
 }
 
-ASTHandle<Parameter *> Parser::ParseParameter(const Position &start, NodeType type) {
+ASTHandle<Parameter *> Parser::ParseParameter(const Position &start, NodeType type, int offset) {
     if (!this->Match(TokenType::IDENTIFIER))
         throw ParserException(16);
 
@@ -1811,8 +1815,11 @@ ASTHandle<Parameter *> Parser::ParseParameter(const Position &start, NodeType ty
     if (!id_name)
         throw DatatypeException();
 
-    if (!this->sym_t_->Declare(id_name.get(), SymbolType::VARIABLE, TKCUR_START.offset))
+    auto sym = this->sym_t_->Declare(id_name.get(), SymbolType::PARAMETER, TKCUR_START.offset);
+    if (sym == nullptr)
         throw SymbolTableException();
+
+    sym->offset = offset;
 
     auto param = MakeParameter(this->isolate_, TKCUR_LOC, type);
 
@@ -1864,7 +1871,7 @@ std::vector<ASTHandle<ASTNode *> > Parser::ParseFuncParams() {
         if (this->Match(TokenType::ASTERISK)) {
             this->Eat(false);
 
-            params.emplace_back(this->ParseParameter(start, NodeType::KW_PARAM));
+            params.emplace_back(this->ParseParameter(start, NodeType::KW_PARAM, (int)params.size()));
 
             break;
         }
@@ -1877,12 +1884,12 @@ std::vector<ASTHandle<ASTNode *> > Parser::ParseFuncParams() {
 
             this->Eat(false);
 
-            params.emplace_back(this->ParseParameter(start, NodeType::REST_PARAM));
+            params.emplace_back(this->ParseParameter(start, NodeType::REST_PARAM,(int)params.size()));
         } else {
             if (mode > 1)
                 throw ParserException(13);
 
-            auto param = this->ParseParameter(start, NodeType::PARAM);
+            auto param = this->ParseParameter(start, NodeType::PARAM,(int)params.size());
             if (param->node_type == NodeType::NAMED_PARAM)
                 mode = 1;
             else if (mode > 0)

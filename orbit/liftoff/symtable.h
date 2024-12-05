@@ -37,6 +37,7 @@ namespace liftoff {
         MODULE,
         NATIVE_FUNC,
         NATIVE_VAR,
+        PARAMETER,
         TRAIT,
         VARIABLE,
         UPVALUE,
