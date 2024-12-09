@@ -166,8 +166,10 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
     symbol->type = type;
     symbol->decl_offset = offset;
 
-    if (type != SymbolType::PARAMETER && type!=SymbolType::VARIABLE)
-        symbol->offset = this->scope->static_offset++;
+    symbol->offset = 0;
+
+    if (type != SymbolType::UNKNOWN && type != SymbolType::PARAMETER && type != SymbolType::VARIABLE)
+        symbol->offset = (short) this->scope->static_offset++;
 
     symbol->nesting = table->nesting;
 
@@ -350,6 +352,18 @@ SymbolTable *SymbolTable::New(orbiter::Isolate *isolate) noexcept {
     return table;
 }
 
+void SymbolTable::ComputeLocalVarOffset(const SubScope *s_scope) {
+    if (s_scope->sibling != nullptr)
+        this->ComputeLocalVarOffset(s_scope->sibling);
+
+    for (auto s_cursor = s_scope; s_cursor != nullptr; s_cursor = s_cursor->next) {
+        for (auto cursor = s_cursor->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next) {
+            if (cursor->value->type == SymbolType::VARIABLE)
+                cursor->value->offset = this->scope->local_variables++;
+        }
+    }
+}
+
 void SymbolTable::Delete(SymbolTable *table) noexcept {
     if (table == nullptr)
         return;
@@ -376,6 +390,8 @@ void SymbolTable::LeaveScope(MSize offset, MSize line_end) noexcept {
 
     c_scope->sub_scope.offset_end = offset;
     c_scope->line_end = line_end;
+
+    this->ComputeLocalVarOffset(c_scope->active);
 
     if (this->c_offset == &c_scope->closure_offset)
         this->c_offset = nullptr;

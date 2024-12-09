@@ -90,6 +90,8 @@ namespace liftoff {
 
         unsigned short static_offset = 0;
 
+        unsigned short local_variables = 0;
+
         explicit Scope(orbiter::Isolate *isolate, MSize line_start) : sub_scope(isolate), line_start(line_start) {
         }
 
@@ -110,6 +112,10 @@ namespace liftoff {
 
         [[nodiscard]] U16 GetClosureSize() const {
             return this->closure_offset;
+        }
+
+        [[nodiscard]] U16 GetLocalVariableCount() const {
+            return this->local_variables;
         }
     };
 
@@ -142,6 +148,8 @@ namespace liftoff {
         ~SymbolTable();
 
         [[nodiscard]] Scope *ScopeNew(MSize line_start) const;
+
+        void ComputeLocalVarOffset(const SubScope *s_scope);
 
         void SubScopeDel(SubScope *sub_scope, bool r_memory);
 
