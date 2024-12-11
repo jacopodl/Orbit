@@ -25,6 +25,10 @@ namespace liftoff::ir {
 
         Object *CreateJumpForElvisOrNil(const parser::Binary *binary, orbiter::OPCode opcode);
 
+        Object *LoadVariable(const Symbol *symbol);
+
+        Object *StoreVariable(const Symbol *symbol, Object *value);
+
         Object *visitASTNode(parser::ASTNode *node);
 
         Object *visitAssignment(parser::Assignment *node);
@@ -43,7 +47,7 @@ namespace liftoff::ir {
 
         Object *visitDecorator(parser::Decorator *node);
 
-        Object *visitFunction(parser::Function *node);
+        Object *visitFunction(const parser::Function *node);
 
         Object *visitIdentifier(parser::Identifier *node);
 
@@ -80,6 +84,8 @@ namespace liftoff::ir {
         Object *visitTryBlock(parser::TryBlock *node);
 
         Object *visitUnary(const parser::Unary *node);
+
+        void CaptureParametersIntoClosure(const parser::Function *node);
 
         void visitForInLoop(const parser::Loop *node);
 

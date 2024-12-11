@@ -63,9 +63,9 @@ namespace liftoff::ir {
 
     protected:
         explicit ReturnInstruction(Object *source, bool yield) : PhysInstruction(
-                                                                     yield
-                                                                         ? orbiter::OPCode::YLD
-                                                                         : orbiter::OPCode::RET), source(source) {
+                yield
+                ? orbiter::OPCode::YLD
+                : orbiter::OPCode::RET), source(source) {
         }
     };
 
@@ -121,12 +121,11 @@ namespace liftoff::ir {
     };
 
     // Load/Store
-
     class OffsetInstruction : public DefInstruction {
     public:
-        U16 offset = 0;
+        I16 offset = 0;
 
-        OffsetInstruction(orbiter::OPCode opcode, U16 offset) noexcept : DefInstruction(opcode), offset(offset) {
+        OffsetInstruction(orbiter::OPCode opcode, I16 offset) noexcept: DefInstruction(opcode), offset(offset) {
         }
     };
 
@@ -134,7 +133,7 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit LoadCodeInstr(U16 offset) noexcept: OffsetInstruction(orbiter::OPCode::LDCODE, offset) {
+        explicit LoadCodeInstr(I16 offset) noexcept: OffsetInstruction(orbiter::OPCode::LDCODE, offset) {
         }
     };
 
@@ -175,11 +174,57 @@ namespace liftoff::ir {
     class LoadStoreWithOffsetInstr : public OffsetInstruction {
         friend Builder;
 
+    public:
+        Object *src = nullptr;
+
     protected:
-        explicit LoadStoreWithOffsetInstr(orbiter::OPCode opcode, U16 offset) noexcept: OffsetInstruction(
-            opcode, offset) {
+        explicit LoadStoreWithOffsetInstr(orbiter::OPCode opcode, I16 offset) noexcept: OffsetInstruction(
+                opcode, offset) {
         }
     };
+
+    class LoadStoreClosureWithOffsetInstr : public OffsetInstruction {
+        friend Builder;
+
+    public:
+        Object *src;
+
+        orbiter::ClosureLSMode mode;
+
+    protected:
+        explicit LoadStoreClosureWithOffsetInstr(orbiter::OPCode opcode, I16 offset,
+                                                 orbiter::ClosureLSMode mode, Object *value) noexcept: OffsetInstruction(
+                opcode, offset), src(value), mode(mode) {
+        }
+    };
+
+    // UnaryOp
+    class UnaryOpInstr : public DefInstruction {
+        friend Builder;
+
+    public:
+        Object *s_reg = nullptr;
+
+    protected:
+        explicit UnaryOpInstr(orbiter::OPCode opcode) noexcept: DefInstruction(opcode) {
+        }
+    };
+
+    class UnaryImmInstr : public DefInstruction {
+        friend Builder;
+
+    public:
+        U16 imm = 0;
+        U8 flags = 0;
+
+    protected:
+        explicit UnaryImmInstr(orbiter::OPCode opcode) noexcept: DefInstruction(opcode){
+        }
+    };
+
+    // *****************************************************************************************************************
+    // Virtual Instruction
+    // *****************************************************************************************************************
 
     // Phi(φ) virtual instruction
     class PhiInstr : public VirtualInstruction {
@@ -194,7 +239,7 @@ namespace liftoff::ir {
 
     public:
         PhiInstr *AddTarget(Instruction *target) {
-            assert(this->index <=2);
+            assert(this->index <= 2);
 
             this->targets_[this->index++] = target;
 
@@ -202,15 +247,21 @@ namespace liftoff::ir {
         }
     };
 
-    // UnaryOp
-    class UnaryOpInstr : public DefInstruction {
+    // *****************************************************************************************************************
+    // Other
+    // *****************************************************************************************************************
+
+    class AllocaInstr : public PhysInstruction {
         friend Builder;
 
     public:
-        Object *s_reg = nullptr;
+        orbiter::AllocaFlags flags = orbiter::AllocaFlags::DEFAULT;
+        U16 slots = 0;
 
     protected:
-        explicit UnaryOpInstr(orbiter::OPCode opcode) noexcept: DefInstruction(opcode) {
+        explicit AllocaInstr(U16 slots, orbiter::AllocaFlags flags) noexcept: PhysInstruction(orbiter::OPCode::ALLOCA),
+                                                                              slots(slots),
+                                                                              flags(flags) {
         }
     };
 }

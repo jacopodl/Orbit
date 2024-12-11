@@ -116,15 +116,77 @@ Object *IRBuilder::CreateJumpForElvisOrNil(const parser::Binary *binary, orbiter
     return phi->AddTarget((Instruction *) left)->AddTarget((Instruction *) right);
 }
 
+Object *IRBuilder::LoadVariable(const Symbol *symbol) {
+    auto offset = (I16) symbol->offset;
+
+    if (symbol->type == SymbolType::PARAMETER_UPVALUE || symbol->type == SymbolType::UPVALUE) {
+        const auto on_stack = symbol->defining_scope == this->sym_t_->scope;
+
+        return this->builder_.LoadFromClosureAtOffset(offset, on_stack ? orbiter::ClosureLSMode::STACK
+                                                                       : orbiter::ClosureLSMode::FUNC_SLOT);
+    }
+
+    // TODO: Module/Class/Trait
+
+    if (symbol->type == SymbolType::PARAMETER) {
+        const auto params_count = (I16) this->sym_t_->scope->GetParameterCount();
+        const auto p_offset = params_count - offset;
+
+        assert(p_offset > 0);
+
+        offset = (I16) -p_offset;
+    }
+
+    return this->builder_.LoadFromStackOffset(offset);
+}
+
+Object *IRBuilder::StoreVariable(const Symbol *symbol, Object *value) {
+    auto offset = (I16) symbol->offset;
+
+    if (value == nullptr)
+        value = this->builder_.LoadNilValue();
+
+    if (symbol->type == SymbolType::PARAMETER_UPVALUE || symbol->type == SymbolType::UPVALUE) {
+        const auto on_stack = symbol->defining_scope == this->sym_t_->scope;
+
+        return this->builder_.StoreToClosureAtOffset(value, offset, on_stack ? orbiter::ClosureLSMode::STACK
+                                                                             : orbiter::ClosureLSMode::FUNC_SLOT);
+    }
+
+    // TODO: Module/Class/Trait
+
+    if (symbol->type == SymbolType::PARAMETER) {
+        const auto params_count = (I16) this->sym_t_->scope->GetParameterCount();
+        const auto p_offset = params_count - offset;
+
+        assert(p_offset > 0);
+
+        offset = (I16) -p_offset;
+    }
+
+    return this->builder_.StoreToStackOffset(value, offset);
+}
+
 Object *IRBuilder::visitASTNode(parser::ASTNode *node) {
     // TODO: Implement ASTNode visitation
     return nullptr;
 }
 
 Object *IRBuilder::visitAssignment(parser::Assignment *node) {
-    // TODO: Implement Assignment visitation
+    Object *value = nullptr;
+    const Symbol *sym;
 
-    return nullptr;
+    if (node->name->node_type == parser::NodeType::TUPLE) {
+        assert(false);
+        return nullptr;
+    }
+
+    sym = this->sym_t_->Lookup(((parser::Identifier *) node->name)->value, node->name->loc.start.offset);
+
+    if (node->value != nullptr)
+        value = this->visit(node->value);
+
+    return this->StoreVariable(sym, value);
 }
 
 Object *IRBuilder::visitBinary(parser::Binary *node) {
@@ -270,8 +332,31 @@ Object *IRBuilder::visitDecorator(parser::Decorator *node) {
     return nullptr;
 }
 
-Object *IRBuilder::visitFunction(parser::Function *node) {
-    // TODO: Implement Function visitation
+Object *IRBuilder::visitFunction(const parser::Function *node) {
+    auto f_flags = orbiter::LoadFuncFlags::SIMPLE;
+
+    if (!this->sym_t_->EnterScope(node->name))
+        throw SymbolTableException();
+
+    // Alloc stack space for local variables
+    this->builder_.AllocStackSlots(this->sym_t_->scope->GetLocalVariableCount(), orbiter::AllocaFlags::DEFAULT);
+
+    // Check if this function can create a lexical environment, if yes, allocate another slot in stack
+    if (this->sym_t_->scope->ShouldCreateClosure()) {
+        this->builder_.AllocStackSlots(1, orbiter::AllocaFlags::ZERO_INIT);
+
+        const auto closure = this->builder_.CreateUnaryOp(orbiter::OPCode::CLONEW, this->sym_t_->scope->GetClosureSize());
+
+        this->builder_.StoreToStackOffset(closure, (I16)node->params.size());
+
+        this->CaptureParametersIntoClosure(node);
+    }
+
+    this->visit(node->body);
+
+
+    // params / ret addr / EBP / [locals] / [closure_ptr]
+
     return nullptr;
 }
 
@@ -280,12 +365,7 @@ Object *IRBuilder::visitIdentifier(parser::Identifier *node) {
 
     assert(sym != nullptr);
 
-    if (sym->type == SymbolType::VARIABLE) {
-        return this->builder_.LoadFromStackOffset(sym->offset);
-    }
-
-    assert(false);
-    return nullptr;
+    return this->LoadVariable(sym);
 }
 
 Object *IRBuilder::visitImport(parser::Import *node) {
@@ -307,7 +387,7 @@ Object *IRBuilder::visitJump(const parser::Jump *node) {
     this->PutSyncExit(b_target);
 
     return this->builder_.CreateJump(
-        node->token_type == scanner::TokenType::KW_BREAK ? b_target->end : b_target->begin);
+            node->token_type == scanner::TokenType::KW_BREAK ? b_target->end : b_target->begin);
 }
 
 Object *IRBuilder::visitLabel(const parser::Label *node) {
@@ -335,7 +415,7 @@ Object *IRBuilder::visitLiteral(parser::Literal *node) {
         return this->builder_.LoadImmediate((MachineSize) node->literal);
     }
 
-    const auto offset = this->builder_.context->PushStaticValue(this->isolate_, node->literal);
+    const auto offset = this->builder_.context->PushStaticValue(node->literal);
     return this->builder_.LoadConstant(offset);
 }
 
@@ -474,6 +554,27 @@ Object *IRBuilder::visitUnary(const parser::Unary *node) {
     return nullptr;
 }
 
+void IRBuilder::CaptureParametersIntoClosure(const parser::Function *node) {
+    // Traverse the parameter list and, if a parameter is an UPVALUE, store it in the closure object.
+    // This ensures the parameter is accessible in the closure's scope.
+
+    for (const auto &cursor: node->params) {
+        const auto *sym = this->sym_t_->Lookup(((parser::Identifier *)cursor.get())->value, cursor->loc.start.offset);
+
+        assert(sym != nullptr);
+
+        if (sym->type == SymbolType::PARAMETER_UPVALUE) {
+            const auto params_count = (I16) this->sym_t_->scope->GetParameterCount();
+            const auto p_offset = params_count - sym->stack_offset;
+
+            assert(p_offset > 0);
+
+            const auto value = this->builder_.LoadFromStackOffset((I16) -p_offset);
+            this->StoreVariable(sym, value);
+        }
+    }
+}
+
 void IRBuilder::visitForInLoop(const parser::Loop *node) {
     const JBlock jb(&this->builder_, JBlockType::FOR_IN, nullptr);
 
@@ -495,7 +596,6 @@ void IRBuilder::PutSyncExit(const JBlock *block) {
     }
 }
 
-
 void *IRBuilder::Generate(parser::ASTHandle<parser::Module *> &module) {
     assert(this->isolate_ == module->isolate); // Security check.
 
@@ -503,7 +603,7 @@ void *IRBuilder::Generate(parser::ASTHandle<parser::Module *> &module) {
     this->sym_t_ = module->sym_t;
 
     // Create first context
-    auto ir_module = this->builder_.CreateModule();
+    auto ir_module = this->builder_.IRContextNew(IRContextType::MODULE);
 
     for (auto &statement: module->statements) {
         this->visit(statement.get());

@@ -10,6 +10,11 @@
 #include <orbit/util/enum_bitmask.h>
 
 namespace orbiter {
+    enum class AllocaFlags : U8 {
+        DEFAULT,
+        ZERO_INIT
+    };
+
     // Flags for arithmetic operations
     enum class ArithFlags : U8 {
         NONE = 0x0, // Default integer operation
@@ -21,6 +26,11 @@ namespace orbiter {
         // FLOAT alone = DIVR (floating point division)
         // DIV_REM alone = MOD (integer modulo)
         // NONE = DIV (integer division)
+    };
+
+    enum class ClosureLSMode : U8 {
+        FUNC_SLOT = 0,
+        STACK
     };
 
     enum class ComparisonMode : U8 {
@@ -39,7 +49,8 @@ namespace orbiter {
 
         ASYNC = 0x1,
         CLOSURE = 0x2,
-        GENERATOR = 0x4
+        DEF_ARGS = 0x4,
+        GENERATOR = 0x8
     };
 
     enum class LoadConstantMode : U8 {
@@ -101,7 +112,16 @@ namespace orbiter {
         LDIMM, // Load immediate into register:     OPCODE | 4 DST | 4 SHIFT     | 16 IMM
         MOV, // Copy value between registers:       OPCODE | 4 DST | 4 SRC       | 16 RESERVED
         MOWN, // Move value between registers:      OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
-        SKLDR, // Load from stack into register:    OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
+
+        SKLDR, // Load from stack into register:    OPCODE | 4 DST | 4 RESERVED  | 16 SIGNED OFFSET
+        SKSTR, // Store register into EBP+OFFSET    OPCODE | 4 SRC | 4 RESERVED  | 16 SIGNED OFFSET
+
+        CLONEW, // Create new closure object        OPCODE | 8 RESERVED | 16 UNSIGNED SLOTS
+        CLOLDR, // Load from closure object         OPCODE | 4 RESERVED | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
+        CLOSTR, // Store to closure object          OPCODE | 4 RESERVED | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
+
+        // OPCODE | 4 FLAGS(AllocaFlags) | 4 RESERVED | 16 SLOTS
+        ALLOCA, // Allocate space for N variable on stack
 
         // OPCODE | 4 DST | 4 SRC | 4 FLAGS | 12 RESERVED
         LDFUNC, // Create function from Code object

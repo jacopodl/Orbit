@@ -3,6 +3,7 @@
 // Licensed under the Apache License v2.0
 
 #include <cassert>
+
 #include <orbit/liftoff/ir/builder.h>
 
 using namespace liftoff::ir;
@@ -18,12 +19,21 @@ Instruction *Builder::LoadImmConstant(LoadConstantMode mode) {
     return instr;
 }
 
-Instruction *Builder::LoadStoreOffset(const OPCode opcode, const U16 offset) {
+Instruction *Builder::LoadStoreOffset(const OPCode opcode, const I16 offset) {
     auto *instr = this->CreateObject<LoadStoreWithOffsetInstr>(opcode, offset);
 
     this->AddInstruction(instr);
 
-    instr->dest.virtID = this->context->GetIncRVirtCounter();
+    if (opcode == orbiter::OPCode::SKLDR)
+        instr->dest.virtID = this->context->GetIncRVirtCounter();
+
+    return instr;
+}
+
+Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
+    auto *instr = this->CreateObject<AllocaInstr>(slots, flags);
+
+    this->AddInstruction(instr);
 
     return instr;
 }
@@ -88,8 +98,30 @@ Instruction *Builder::CreateUnaryOp(const OPCode opcode, Object *s_reg) {
     return unaryOp;
 }
 
+Instruction *Builder::CreateUnaryOp(const OPCode opcode, U16 imm, U8 flags) {
+    auto *unaryOp = this->CreateObject<UnaryImmInstr>(opcode);
+
+    unaryOp->dest.virtID = this->context->GetIncRVirtCounter();
+
+    unaryOp->imm = imm;
+    unaryOp->flags = flags;
+
+    this->AddInstruction(unaryOp);
+
+    return unaryOp;
+}
+
+Instruction *Builder::LoadFunction(Object *src, LoadFuncFlags flags) {
+    auto *instr = this->CreateObject<LoadFuncInstr>(src, (U8) flags);
+
+    this->AddInstruction(instr);
+
+    return instr;
+}
+
 Instruction *Builder::LoadImmediate(const MachineSize value) {
     auto *instr = this->CreateObject<LoadImmValueInstr>(value);
+    // TODO: check size, use shift to load whole value
 
     instr->dest.virtID = this->context->GetIncRVirtCounter();
 
@@ -108,15 +140,30 @@ Instruction *Builder::CreateReturn(Object *s_reg, bool yield) {
     return instr;
 }
 
-Module *Builder::CreateModule() noexcept {
-    auto mod = this->allocator_.alloc<Module>(sizeof(Module));
-    if (mod != nullptr) {
-        new(mod) Module();
+U16 Builder::IRContextNew(IRContextType type) {
+    auto *ictx = this->allocator_.alloc<IRContext>(sizeof(IRContext));
+    if (ictx == nullptr)
+        throw std::bad_alloc();
 
-        this->context = &mod->context_;
+    new(ictx)IRContext(this->isolate_, type);
+
+    U16 r_id = 0;
+
+    if (this->context != nullptr) {
+        try {
+            r_id = this->context->PushSubContext(ictx);
+        } catch (...) {
+            ictx->~IRContext();
+
+            this->allocator_.free(ictx);
+
+            throw;
+        }
     }
 
-    return mod;
+    this->context = ictx;
+
+    return r_id;
 }
 
 PhiInstr *Builder::CreatePhi() {

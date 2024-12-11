@@ -8,13 +8,13 @@
 #include <orbit/orbiter/isolate.h>
 
 #include <orbit/liftoff/ir/ircontext.h>
-#include <orbit/liftoff/ir/module.h>
-
-#include "value.h"
+#include <orbit/liftoff/ir/value.h>
 
 namespace liftoff::ir {
     class Builder {
         orbiter::IsolateAllocator allocator_;
+
+        orbiter::Isolate *isolate_;
 
         /**
          * @brief Adds an instruction to the current basic block.
@@ -41,7 +41,7 @@ namespace liftoff::ir {
          * @param offset The offset for the load/store operation.
          * @return Pointer to the created instruction.
          */
-        Instruction *LoadStoreOffset(orbiter::OPCode opcode, U16 offset);
+        Instruction *LoadStoreOffset(orbiter::OPCode opcode, I16 offset);
 
         template<typename T, typename... Args>
         std::enable_if_t<std::is_base_of_v<Object, T>, T *> CreateObject(Args... args) {
@@ -78,8 +78,10 @@ namespace liftoff::ir {
          *
          * @param isolate Pointer to isolate.
          */
-        explicit Builder(orbiter::Isolate *isolate) noexcept: allocator_(isolate) {
+        explicit Builder(orbiter::Isolate *isolate) noexcept: allocator_(isolate), isolate_(isolate) {
         }
+
+        Instruction *AllocStackSlots(U16 slots, orbiter::AllocaFlags flags);
 
         Instruction *CreateBinaryOp(orbiter::OPCode opcode, Object *left, Object *right);
 
@@ -92,11 +94,17 @@ namespace liftoff::ir {
 
         Instruction *CreateUnaryOp(orbiter::OPCode opcode, Object *s_reg);
 
+        Instruction *CreateUnaryOp(orbiter::OPCode opcode, U16 imm, U8 flags);
+
+        Instruction *CreateUnaryOp(orbiter::OPCode opcode, U16 imm) {
+            return this->CreateUnaryOp(opcode, imm, 0);
+        }
+
         Instruction *LoadConstant(U16 offset) {
             return this->LoadStoreOffset(orbiter::OPCode::LDCST, offset);
         }
 
-        Instruction *LoadFromStackOffset(U16 offset) {
+        Instruction *LoadFromStackOffset(I16 offset) {
             return this->LoadStoreOffset(orbiter::OPCode::SKLDR, offset);
         }
 
@@ -112,11 +120,54 @@ namespace liftoff::ir {
             return this->LoadImmConstant(orbiter::LoadConstantMode::FALSE);
         }
 
+        Instruction *LoadCodeObject(U16 offset) {
+            auto *instr = this->CreateObject<LoadCodeInstr>(offset);
+
+            this->AddInstruction(instr);
+
+            instr->dest.virtID = this->context->GetIncRVirtCounter();
+
+            return instr;
+        }
+
+        Instruction *LoadFunction(Object *src, orbiter::LoadFuncFlags flags);
+
         Instruction *LoadImmediate(MachineSize value);
+
+        Instruction *LoadFromClosureAtOffset(I16 offset, orbiter::ClosureLSMode mode) {
+            auto *instr = this->CreateObject<LoadStoreClosureWithOffsetInstr>(
+                    orbiter::OPCode::CLOLDR,
+                    offset,
+                    mode,
+                    nullptr);
+
+            this->AddInstruction(instr);
+
+            return instr;
+        }
+
+        Instruction *StoreToClosureAtOffset(Object *src, I16 offset, orbiter::ClosureLSMode mode) {
+            auto *instr = this->CreateObject<LoadStoreClosureWithOffsetInstr>(orbiter::OPCode::CLOSTR,
+                                                                              offset,
+                                                                              mode,
+                                                                              src);
+
+            this->AddInstruction(instr);
+
+            return instr;
+        }
+
+        Instruction *StoreToStackOffset(Object *src, I16 offset) {
+            auto *instr = (LoadStoreWithOffsetInstr *) this->LoadStoreOffset(orbiter::OPCode::SKSTR, offset);
+
+            instr->src = src;
+
+            return instr;
+        }
 
         Instruction *CreateReturn(Object *s_reg, bool yield);
 
-        Module *CreateModule() noexcept;
+        U16 IRContextNew(IRContextType type);
 
         PhiInstr *CreatePhi();
 
@@ -149,6 +200,10 @@ namespace liftoff::ir {
          * @param bb The basic block to delete.
          */
         void DeleteBasicBlock(BasicBlock *bb) const noexcept;
+
+        void LeaveContext() noexcept {
+            this->context = this->context->back;
+        }
     };
 }
 
