@@ -1743,6 +1743,7 @@ ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
 
 ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
     Context isolate(this, ContextType::FUNC);
+    Loc last_param{};
 
     auto func = MakeFunction(this->isolate_, TKCUR_LOC);
 
@@ -1773,7 +1774,7 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
 
     sym->anon = inl;
 
-    func->params = this->ParseFuncParams();
+    func->params = this->ParseFuncParams(last_param);
 
     if (this->Match(TokenType::COLON)) {
         // TODO: parse ret_type
@@ -1792,6 +1793,10 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
         } else
             throw ParserException(0);
     }
+
+    if (!func->constant && (this->context_->CheckBack(ContextType::CLASS)
+                            || this->context_->CheckBack(ContextType::TRAIT)))
+        func->params.emplace_back(std::move(this->PushSelfParam(last_param)));
 
     this->IgnoreNewLineIF(TokenType::LEFT_BRACES);
 
@@ -1841,6 +1846,21 @@ ASTHandle<Parameter *> Parser::ParseParameter(const Position &start, NodeType ty
     return param;
 }
 
+ASTHandle<Parameter *> Parser::PushSelfParam(const Loc &loc) const {
+    auto id_name = ORStringNew(this->isolate_, "self");
+    if (!id_name)
+        throw DatatypeException();
+
+    if (this->sym_t_->Declare(id_name.get(), SymbolType::PARAMETER, loc.start.offset) == nullptr)
+        throw SymbolTableException();
+
+    auto param = MakeParameter(this->isolate_, loc, NodeType::PARAM);
+
+    param->id = id_name.release();
+
+    return param;
+}
+
 HORString Parser::GetDocString() {
     if (this->doc_.type != TokenType::COMMENT_DOC)
         return {};
@@ -1854,7 +1874,7 @@ HORString Parser::GetDocString() {
     return str;
 }
 
-std::vector<ASTHandle<ASTNode *> > Parser::ParseFuncParams() {
+std::vector<ASTHandle<ASTNode *> > Parser::ParseFuncParams(Loc &last_param) {
     std::vector<ASTHandle<ASTNode *> > params;
     int mode = 0;
 
@@ -1899,6 +1919,8 @@ std::vector<ASTHandle<ASTNode *> > Parser::ParseFuncParams() {
             params.emplace_back(param.release());
         }
     } while (this->MatchEat(TokenType::COMMA, true));
+
+    last_param = TKCUR_LOC;
 
     if (!this->MatchEat(TokenType::RIGHT_ROUND, true))
         throw ParserException(12);
