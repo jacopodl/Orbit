@@ -299,7 +299,7 @@ Symbol *SymbolTable::Lookup(const char *name, MSize offset) noexcept {
 
 Symbol *SymbolTable::LookupInsert(ORString *name, MSize offset) noexcept {
     auto *sym = this->Lookup(name, offset);
-    if (sym != nullptr) {
+    if (sym != nullptr && sym->type != SymbolType::UNKNOWN) {
         if ((sym->type != SymbolType::FUNC && sym->type != SymbolType::VARIABLE && sym->type != SymbolType::PARAMETER)
             || sym->defining_scope == nullptr
             || this->scope == sym->defining_scope
@@ -373,6 +373,8 @@ void SymbolTable::ComputeLocalVarOffset(const SubScope *s_scope) {
             const auto *value = cursor->value;
             if ((value->type == SymbolType::VARIABLE || value->type == SymbolType::FUNC) && !value->anon)
                 cursor->value->offset = this->scope->local_variables++;
+            else if(value->type == SymbolType::UNKNOWN)
+                cursor->value->offset = this->scope->unknown_variables++;
         }
     }
 }
