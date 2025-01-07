@@ -168,6 +168,8 @@ namespace liftoff::ir {
 
         JBlock *j_chain = nullptr;
 
+        U32 program_size = 0;
+
         /// Represents the type of the intermediate representation (IR) context.
         IRContextType type_;
 

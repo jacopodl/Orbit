@@ -14,8 +14,11 @@ BasicBlock *Builder::AddInstruction(Instruction *instruction) {
     if (bb == nullptr)
         bb = this->CreateAppendBasicBlock();
 
-    instruction->offset = this->context->logical_counter_++;
+    instruction->instr_offset = this->context->logical_counter_++;
     bb->AddInstruction(instruction);
+
+    bb->size += 4;
+    this->context->program_size += 4;
 
     return bb;
 }

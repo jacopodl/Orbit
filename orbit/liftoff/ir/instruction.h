@@ -87,7 +87,7 @@ namespace liftoff::ir {
 
         const U32 num_ops = 0;
 
-        U32 offset = 0;
+        U32 instr_offset = 0;
 
         I16 assigned_reg = -1;
         I16 stack_slot = -1;
@@ -101,13 +101,14 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        orbiter::OPCode opcode{};
-
         explicit PhysInstruction(orbiter::OPCode opcode) noexcept: Instruction(0), opcode(opcode) {
         }
 
         explicit PhysInstruction(orbiter::OPCode opcode, int operands) noexcept: Instruction(operands), opcode(opcode) {
         }
+
+    public:
+        orbiter::OPCode opcode{};
     };
 
     // BinaryOp

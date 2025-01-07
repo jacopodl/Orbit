@@ -155,7 +155,7 @@ namespace liftoff::ir {
 
         Instruction *LoadFalseValue() {
             return this->CreateInstruction<
-                UnaryImmInstr>(orbiter::OPCode::LDIMM, (U8) orbiter::LoadConstantMode::FALSE);
+                UnaryImmInstr>(orbiter::OPCode::LDCST, (U8) orbiter::LoadConstantMode::FALSE);
         }
 
         Instruction *LoadFromClosureAtOffset(I16 offset, orbiter::ClosureLSMode mode);
@@ -167,7 +167,7 @@ namespace liftoff::ir {
         Instruction *LoadImmediate(MachineSize value);
 
         Instruction *LoadNilValue() {
-            return this->CreateInstruction<UnaryImmInstr>(orbiter::OPCode::LDIMM, (U8) orbiter::LoadConstantMode::NIL);
+            return this->CreateInstruction<UnaryImmInstr>(orbiter::OPCode::LDCST, (U8) orbiter::LoadConstantMode::NIL);
         }
 
         /**
@@ -182,7 +182,7 @@ namespace liftoff::ir {
         Instruction *LoadFromOffset(orbiter::OPCode opcode, I16 offset, U8 flags);
 
         Instruction *LoadTrueValue() {
-            return this->CreateInstruction<UnaryImmInstr>(orbiter::OPCode::LDIMM, (U8) orbiter::LoadConstantMode::TRUE);
+            return this->CreateInstruction<UnaryImmInstr>(orbiter::OPCode::LDCST, (U8) orbiter::LoadConstantMode::TRUE);
         }
 
         Instruction *StackPop();

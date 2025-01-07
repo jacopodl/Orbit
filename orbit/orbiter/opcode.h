@@ -97,7 +97,7 @@ namespace orbiter {
         SHRI, // Shift Right Immediate (value >> imm)
 
         // Comparison & Membership Operations
-        // Format: OPCODE | 4 DST | 4 SRC_L | 4 SRC_R | 12 FLAGS
+        // Format: OPCODE | 4 DST | 4 SRC_L | 4 SRC_R | 4 FLAGS | 8 RESERVED
         MEMB, // Membership test (in/not in based on flag)
         CMP, // Generic compare (flags for <,>,<=,>=)
         EQ, // Equality (== or ===)
@@ -122,37 +122,36 @@ namespace orbiter {
         MOV, // Copy value between registers:       OPCODE | 4 DST | 4 SRC       | 16 RESERVED
         MOWN, // Move value between registers:      OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
 
-        NGBLV, // Create new module variable:                       OPCODE | 4 RESERVED | 4 FLAGS | 16 UNSIGNED OFFSET
+        NGBLV, // Create new module variable:                       OPCODE | 4 FLAGS    | 4 SRC   | 16 UNSIGNED OFFSET
         STGBL, // Store value into global variable using key:       OPCODE | 4 RESERVED | 4 SRC   | 16 UNSIGNED OFFSET
-        STGOFF,// Store value into global variable using offset:    OPCODE | 4 RESERVED | 4 SRC   | 16 UNSIGNED OFFSET
+        STGOFF, // Store value into global variable using offset:   OPCODE | 4 RESERVED | 4 SRC   | 16 UNSIGNED OFFSET
         LDGBL, // Load value from global variable using key:        OPCODE | 4 DST | 4 RESERVED   | 16 UNSIGNED OFFSET
         LDGOFF, // Load value from global variable using offset:    OPCODE | 4 DST | 4 RESERVED   | 16 UNSIGNED OFFSET
+        SKLDR, // Load from stack into register:                    OPCODE | 4 DST | 4 RESERVED   | 16 SIGNED OFFSET
+        SKSTR, // Store register into EBP+OFFSET                    OPCODE | 4 RESERVED | 4 SRC   | 16 SIGNED OFFSET
 
-        SKLDR, // Load from stack into register:    OPCODE | 4 DST      | 4 RESERVED  | 16 SIGNED OFFSET
-        SKSTR, // Store register into EBP+OFFSET    OPCODE | 4 RESERVED | 4 SRC       | 16 SIGNED OFFSET
+        PUSH, // Push value onto stack:             OPCODE | 4 RESERVED | 4 SRC | 20 RESERVED
+        POP, // Pop value from stack:               OPCODE | 4 DST | 20 RESERVED
 
-        PUSH, // Push value onto stack:            OPCODE | 4 RESERVED | 4 SRC | 20 RESERVED
-        POP, // Pop value from stack:             OPCODE | 4 DST | 20 RESERVED
+        CLONEW, // Create new closure object:       OPCODE | 8 RESERVED | 16 UNSIGNED SLOTS
+        CLOLDR, // Load from closure object:        OPCODE | 4 DST      | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
+        CLOSTR, // Store to closure object:         OPCODE | 4 FLAGS(ClosureLSMode) | 4 SRC      | 16 UNSIGNED OFFSET
 
-        CLONEW, // Create new closure object        OPCODE | 8 RESERVED | 16 UNSIGNED SLOTS
-        CLOLDR, // Load from closure object         OPCODE | 4 RESERVED | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
-        CLOSTR, // Store to closure object          OPCODE | 4 RESERVED | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
+        // Allocate space for N variable on stack
+        // Format: OPCODE | 4 RESERVED | 4 FLAGS(AllocaFlags) | 16 UNSIGNED SLOTS
+        ALLOCA,
 
-        // OPCODE | 4 FLAGS(AllocaFlags) | 4 RESERVED | 16 SLOTS
-        ALLOCA, // Allocate space for N variable on stack
-
-        // OPCODE | 4 DST | 4 SRC | 4 FLAGS | 12 RESERVED
-        LDFUNC, // Create function from Code object
+        LDFUNC, // Create function from Code object:        OPCODE | 4 DST | 4 SRC | 4 FLAGS | 12 RESERVED
 
         // Jump Instructions
         // Format: OPCODE | 4 DST | 20 OFFSET
-        JEN, // Jump if nil
-        JF, // Jump if false
-        JT, // Jump if true
-        JMP, // Unconditional jump
+        JEN, // Jump if nil:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
+        JF, // Jump if false:                       OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
+        JT, // Jump if true:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
+        JMP, // Unconditional jump:                 OPCODE | 24 OFFSET
 
         // Sync block Operations
-        // Format: OPCODE | 4 LOCK_REG | 20 RESERVED
+        // Format: OPCODE | 4 RESERVED | 4 SRC | 16 RESERVED
         SYNC_ENTER,
         SYNC_EXIT,
     };
