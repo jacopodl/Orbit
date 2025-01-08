@@ -166,11 +166,15 @@ void IRContext::ComputeLiveIntervals() {
     for (auto *block = this->entry_; block != nullptr; block = block->next) {
         for (auto *instr = block->instr.head; instr != nullptr; instr = instr->next) {
             if (instr->use_list != nullptr) {
-                U32 end = instr->use_list->user->instr_offset;
+                U32 end = 0;
 
-                for (auto *i_max = instr->use_list->next; i_max != nullptr; i_max = i_max->next) {
-                    if (i_max->user->instr_offset > end)
-                        end = i_max->user->instr_offset;
+                for (const auto *use = instr->use_list; use != nullptr; use = use->next) {
+                    if (use->user->type() != ObjectType::INSTRUCTION)
+                        continue;
+
+                    const auto *u_instr = (Instruction *) use->user;
+                    if (u_instr->instr_offset > end)
+                        end = u_instr->instr_offset;
                 }
 
                 this->live_intervals_.emplace_back(instr, instr->instr_offset, end);

@@ -376,9 +376,9 @@ Instruction *IRBuilder::visitBranch(const parser::Branch *node) {
 
     if (last != nullptr) {
         if (this->builder_.context->current_->IsInstructionListEmpty())
-            last->jmp = this->builder_.context->current_;
+            last->SetBasicBlock(this->builder_.context->current_);
         else
-            last->jmp = this->builder_.CreateAppendBasicBlock();
+            last->SetBasicBlock(this->builder_.CreateAppendBasicBlock());
     } else
         this->builder_.AppendBasicBlock(end);
 

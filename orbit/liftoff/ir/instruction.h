@@ -18,83 +18,24 @@ namespace liftoff::ir {
 
     class Builder;
 
-    class Use {
-    public:
-        class Instruction *value = nullptr;
-        Instruction *user = nullptr;
-
-        int index = 0;
-
-        Use *next = nullptr;
-    };
-
     class Instruction : public Object {
         friend Builder;
 
-        void AddUse(Use *u) noexcept {
-            u->next = this->use_list;
-            this->use_list = u;
-        }
-
-        void DeleteUse(Use *u) noexcept {
-            if (this->use_list == u) {
-                this->use_list = nullptr;
-
-                return;
-            }
-
-            auto *prev = this->use_list;
-            for (auto cur = this->use_list->next; cur != nullptr; cur = cur->next) {
-                if (cur == u) {
-                    prev->next = cur->next;
-
-                    break;
-                }
-
-                prev = cur;
-            }
-        }
-
     protected:
-        explicit Instruction(ObjectType type, int operands) noexcept: Object(type), num_ops(operands) {
-            if (operands > 0) {
-                this->operands = new Use[operands];
-
-                for (int i = 0; i < num_ops; ++i) {
-                    this->operands[i].user = this;
-                    this->operands[i].index = i;
-                }
-            }
+        explicit Instruction(ObjectType type, int operands) noexcept: Object(type, operands) {
         }
 
         explicit Instruction(int operands) noexcept: Instruction(ObjectType::INSTRUCTION, operands) {
         }
 
-        void SetOperand(int operand, Instruction *instr) noexcept {
-            if (this->operands[operand].value != nullptr)
-                this->DeleteUse(this->operands + operand);
-
-            this->operands[operand].value = instr;
-            instr->AddUse(this->operands + operand);
-        }
-
     public:
-        Use *operands = nullptr;
-        Use *use_list = nullptr;
-
         Instruction *next = nullptr;
         Instruction *prev = nullptr;
-
-        const U32 num_ops = 0;
 
         U32 instr_offset = 0;
 
         I16 assigned_reg = -1;
         I16 stack_slot = -1;
-
-        virtual ~Instruction() {
-            delete[] this->operands;
-        }
     };
 
     class PhysInstruction : public Instruction {
@@ -148,13 +89,16 @@ namespace liftoff::ir {
     class BranchInstruction : public PhysInstruction {
         friend Builder;
 
-    public:
-        BasicBlock *jmp = nullptr;
-
     protected:
         explicit BranchInstruction(orbiter::OPCode opcode, Instruction *value,
-                                   BasicBlock *jmp) noexcept: PhysInstruction(opcode, 1), jmp(jmp) {
+                                   BasicBlock *jmp) noexcept: PhysInstruction(opcode, 2) {
             this->SetOperand(0, value);
+            this->SetOperand(1, (Object *) jmp);
+        }
+
+    public:
+        void SetBasicBlock(BasicBlock *jmp) {
+            this->SetOperand(1, (Object *) jmp);
         }
     };
 
