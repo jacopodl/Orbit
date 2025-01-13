@@ -63,6 +63,31 @@ bool IRContext::ComputeLiveness() const {
     return changed;
 }
 
+orbiter::datatype::HList IRContext::GetNamesList(U16 *known_length) const {
+    MSize length = 0;
+
+    assert(known_length != nullptr);
+
+    *known_length = 0;
+
+    if (this->known_props) {
+        length = this->known_props->length;
+        *known_length = (U16) length;
+    }
+
+    if (this->unknown_props)
+        length += this->unknown_props->length;
+
+    auto res = orbiter::datatype::ListNew(this->isolate_, length);
+    if (!res)
+        throw std::bad_alloc();
+
+    ListAppend(res.get(), this->known_props.get());
+    ListAppend(res.get(), this->unknown_props.get());
+
+    return res;
+}
+
 Instruction *IRContext::GetLastActiveVariableLoad(const Symbol *symbol) {
     auto instr = this->active_regs_.find(symbol);
 
@@ -162,7 +187,7 @@ void IRContext::AddActiveVar(const Symbol *symbol, Instruction *instr) {
     this->active_regs_.insert({symbol, instr});
 }
 
-void IRContext::ComputeLiveIntervals() {
+std::vector<LiveInterval> &IRContext::ComputeLiveIntervals() {
     for (auto *block = this->entry_; block != nullptr; block = block->next) {
         for (auto *instr = block->instr.head; instr != nullptr; instr = instr->next) {
             if (instr->use_list != nullptr) {
@@ -181,6 +206,8 @@ void IRContext::ComputeLiveIntervals() {
             }
         }
     }
+
+    return this->live_intervals_;
 }
 
 void IRContext::InvalidateActiveVar(const Symbol *symbol) {

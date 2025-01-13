@@ -106,8 +106,6 @@ namespace liftoff::ir {
 
         orbiter::datatype::HList unknown_props;
 
-        orbiter::datatype::HList static_values;
-
         /**
          * @struct sub
          *
@@ -168,6 +166,8 @@ namespace liftoff::ir {
 
         JBlock *j_chain = nullptr;
 
+        orbiter::datatype::HList static_values;
+
         U32 program_size = 0;
 
         /// Represents the type of the intermediate representation (IR) context.
@@ -187,6 +187,22 @@ namespace liftoff::ir {
         [[nodiscard]] bool ComputeLiveness() const;
 
         /**
+         * @brief Retrieves a list of names associated with the IRContext.
+         *
+         * This method returns a list containing names from both known and unknown properties
+         * associated with the instance of IRContext. It additionally provides the total number
+         * of known names through the `known_length` parameter. The resultant list combines
+         * entries from both known and unknown properties, preserving their respective order.
+         * If either of these properties is absent, their contribution to the list is skipped.
+         *
+         * @param known_length A pointer to a U16 where the method will store the number of known properties' names.
+         * Must not be null.
+         * @return A handle to a list (HList) containing the combined names from both known
+         *         and unknown properties.
+         */
+        [[nodiscard]] orbiter::datatype::HList GetNamesList(U16 *known_length) const;
+
+        /**
          * @brief Retrieves the last active load instruction associated with the provided symbol.
          *
          * This method checks the active register mappings to determine if a load instruction
@@ -198,6 +214,25 @@ namespace liftoff::ir {
          *         or nullptr if no such instruction is found.
          */
         Instruction *GetLastActiveVariableLoad(const Symbol *symbol);
+
+        /**
+         * @brief Retrieves a subcontext by its index.
+         *
+         * This function returns a pointer to a subcontext based on the given index `n`.
+         * If the index is within the valid range, the corresponding subcontext is
+         * returned. Otherwise, it returns a null pointer.
+         *
+         * @param n The index of the desired subcontext. Must be a non-negative integer.
+         *        If `n` is out of bounds, the function will return nullptr.
+         * @return A pointer to the subcontext at the specified index if it exists,
+         *         or nullptr if the index is out of range.
+         */
+        [[nodiscard]] IRContext *GetSubContext(int n) const noexcept {
+            if (n < this->sub.count)
+                return sub.context[n];
+
+            return nullptr;
+        }
 
         /**
          * @brief Retrieves the number of subcontexts currently managed within this IRContext.
@@ -243,7 +278,7 @@ namespace liftoff::ir {
          * last usage. The results are stored in the collection of live intervals maintained within the
          * IRContext instance.
          */
-        void ComputeLiveIntervals();
+        std::vector<LiveInterval> &ComputeLiveIntervals();
 
         /**
          * @brief Invalidates a specific active variable or clears all active variables in the

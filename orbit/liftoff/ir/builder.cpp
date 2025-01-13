@@ -234,12 +234,12 @@ void Builder::DeleteBasicBlock(BasicBlock *bb) const noexcept {
 }
 
 void Builder::LeaveContext() {
+    /*
     bool changed = this->context->ComputeLiveness();
 
     while (changed)
         changed = this->context->ComputeLiveness();
-
-    this->context->ComputeLiveIntervals();
+    */
 
     if (this->context->back != nullptr)
         this->context = this->context->back;
