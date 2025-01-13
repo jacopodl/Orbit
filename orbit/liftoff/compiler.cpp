@@ -2,169 +2,76 @@
 //
 // Licensed under the Apache License v2.0
 
+#include <orbit/orbiter/vm.h>
+
+#include <orbit/liftoff/scanner/scanner.h>
+#include <orbit/liftoff/parser/parser.h>
+
+#include <orbit/liftoff/ir/irbuilder.h>
+#include <orbit/liftoff/ir/linearscan.h>
+
+#include <orbit/liftoff/codegen.h>
+
 #include <orbit/liftoff/compiler.h>
 
-#include "parser/parser.h"
-
 using namespace liftoff;
+using namespace liftoff::ir;
 using namespace liftoff::parser;
 
-ASTNode *Compiler::visitASTNode(ASTNode *node) {
-    // TODO: Implement ASTNode visitation
-    return node;
-}
+orbiter::datatype::HList Compiler::BuildCodesList(IRContext *ir) {
+    orbiter::datatype::HList codes{};
 
-ASTNode *Compiler::visitAssignment(Assignment *node) {
-    // TODO: Implement Assignment visitation
-    return node;
-}
+    const auto count = ir->GetSubcontextCount();
+    if (count > 0) {
+        codes = orbiter::datatype::ListNew(this->isolate_, count);
+        if (!codes)
+            return {};
 
-ASTNode *Compiler::visitBinary(Binary *node) {
-    switch (node->node_type) {
-        case NodeType::BINARY:
-            this->visit(node->left);
-            // TODO: Make OP
-            this->visit(node->right);
-            break;
-        default:
-            assert(false);
-    }
-    return node;
-}
-
-ASTNode *Compiler::visitBlock(Block *node) {
-    // TODO: Implement Block visitation
-    return node;
-}
-
-ASTNode *Compiler::visitBranch(Branch *node) {
-    // TODO: Implement Branch visitation
-    return node;
-}
-
-ASTNode *Compiler::visitCall(Call *node) {
-    // TODO: Implement Call visitation
-    return node;
-}
-
-ASTNode *Compiler::visitCatchBlock(CatchBlock *node) {
-    // TODO: Implement CatchBlock visitation
-    return node;
-}
-
-ASTNode *Compiler::visitConstruct(Construct *node) {
-    // TODO: Implement Construct visitation
-    return node;
-}
-
-ASTNode *Compiler::visitDecorator(Decorator *node) {
-    // TODO: Implement Decorator visitation
-    return node;
-}
-
-ASTNode *Compiler::visitFunction(Function *node) {
-    // TODO: Implement Function visitation
-    return node;
-}
-
-ASTNode *Compiler::visitIdentifier(Identifier *node) {
-    // TODO: Implement Identifier visitation
-    return node;
-}
-
-ASTNode *Compiler::visitImport(Import *node) {
-    // TODO: Implement Import visitation
-    return node;
-}
-
-ASTNode *Compiler::visitImportName(ImportName *node) {
-    // TODO: Implement ImportName visitation
-    return node;
-}
-
-ASTNode *Compiler::visitJump(Jump *node) {
-    // TODO: Implement Jump visitation
-    return node;
-}
-
-ASTNode *Compiler::visitLabel(Label *node) {
-    // TODO: Implement Label visitation
-    return node;
-}
-
-ASTNode *Compiler::visitListExpression(ListExpression *node) {
-    // TODO: Implement ListExpression visitation
-    return node;
-}
-
-ASTNode *Compiler::visitLiteral(Literal *node) {
-    // Il numero lo carico direttamente
-    // Anche nil e i bool
-    // Gli oggetti li scrivo nella memoria statica
-    return node;
-}
-
-ASTNode *Compiler::visitLoop(Loop *node) {
-    // TODO: Implement Loop visitation
-    return node;
-}
-
-ASTNode *Compiler::visitModule(Module *node) {
-    // TODO: Implement Module visitation
-    return node;
-}
-
-ASTNode *Compiler::visitNativeFunc(NativeFunc *node) {
-    // TODO: Implement NativeFunc visitation
-    return node;
-}
-
-ASTNode *Compiler::visitNativeParameter(NativeParameter *node) {
-    // TODO: Implement NativeParameter visitation
-    return node;
-}
-
-ASTNode *Compiler::visitNativeVariable(NativeVariable *node) {
-    // TODO: Implement NativeVariable visitation
-    return node;
-}
-
-ASTNode *Compiler::visitParameter(Parameter *node) {
-    // TODO: Implement Parameter visitation
-    return node;
-}
-
-ASTNode *Compiler::visitSubscript(Subscript *node) {
-    // TODO: Implement Subscript visitation
-    return node;
-}
-
-ASTNode *Compiler::visitSwitchCase(SwitchCase *node) {
-    // TODO: Implement SwitchCase visitation
-    return node;
-}
-
-ASTNode *Compiler::visitSwitchBlock(SwitchBlock *node) {
-    // TODO: Implement SwitchBlock visitation
-    return node;
-}
-
-ASTNode *Compiler::visitTryBlock(TryBlock *node) {
-    // TODO: Implement TryBlock visitation
-    return node;
-}
-
-ASTNode *Compiler::visitUnary(Unary *node) {
-    // TODO: Implement Unary visitation
-    return node;
-}
-
-orbiter::datatype::OObject *Compiler::compile(ASTHandle<Module *> &module) {
-    assert(this->isolate_ == module->isolate); // Security check.
-
-    for (auto &statement: module->statements) {
-        this->visit(statement.get());
+        for (int i = 0; i < count; i++) {
+            if (!ListAppend(codes.get(), (orbiter::datatype::OObject *) this->Compile(ir->GetSubContext(i)).get()))
+                return {};
+        }
     }
 
-    return {};
+    return codes;
+}
+
+orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
+    LinearScan rAllocator(orbiter::kGeneralPurposeRegistersCount);
+    Codegen codegen(this->isolate_);
+
+    rAllocator.Allocate(ir->ComputeLiveIntervals());
+
+    auto code = codegen.Generate(ir);
+    if (code) {
+        if (ir->GetSubcontextCount() > 0) {
+            code->codes = this->BuildCodesList(ir).get();
+            if (code->codes == nullptr)
+                return {};
+        }
+    }
+
+    return code;
+}
+
+orbiter::datatype::HCode Compiler::Compile(const char *filename, scanner::Scanner &scanner) {
+    Parser parser(this->isolate_, filename, scanner);
+    IRBuilder builder(this->isolate_, this->level_);
+
+    auto ast = parser.Parse();
+    if (!ast) {
+        assert(false);
+    }
+
+    auto ir = builder.Generate(ast);
+    if (ir == nullptr)
+        assert(false);
+
+    return this->Compile(ir);
+}
+
+orbiter::datatype::HCode Compiler::Compile(const char *filename, FILE *fd) {
+    scanner::Scanner scanner(this->isolate_, fd, nullptr, nullptr);
+
+    return this->Compile(filename, scanner);
 }

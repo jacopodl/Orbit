@@ -257,18 +257,31 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
     return m_code;
 }
 
-orbiter::datatype::HCode Codegen::Generate(ir::IRContext *ir) {
-    // TODO: stub code
-    orbiter::IsolateAllocator allocator_(this->isolate_);
-
-    auto *m_code = allocator_.alloc<unsigned char>(ir->program_size);
+orbiter::datatype::HCode Codegen::Generate(IRContext *ir) {
+    auto *m_code = this->allocator_.alloc<unsigned char>(ir->program_size);
     if (m_code == nullptr)
         throw std::bad_alloc();
 
     auto *m_cursor = m_code;
-
     for (auto *b_cursor = ir->entry_; b_cursor; b_cursor = b_cursor->next)
-        m_cursor = this->EmitOpcodes(b_cursor, m_code);
+        m_cursor = this->EmitOpcodes(b_cursor, m_cursor);
 
-    return {};
+    U16 knows_length = 0;
+    auto names = ir->GetNamesList(&knows_length);
+    auto code = CodeNew(this->allocator_.GetIsolate(),
+                        nullptr,
+                        names.get(),
+                        ir->static_values.get(),
+                        nullptr,
+                        m_code,
+                        ir->program_size,
+                        knows_length,
+                        0);
+    if (!code) {
+        this->allocator_.free(m_code);
+
+        throw std::bad_alloc();
+    }
+
+    return code;
 }
