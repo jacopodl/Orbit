@@ -37,12 +37,17 @@ orbiter::datatype::HList Compiler::BuildCodesList(IRContext *ir) {
 }
 
 orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
-    LinearScan rAllocator(orbiter::kGeneralPurposeRegistersCount);
-    Codegen codegen(this->isolate_);
+    // Step 1: Optimization
+    // TODO: Implement optimization phase here...
 
-    rAllocator.Allocate(ir->ComputeLiveIntervals());
+    // Step 2: Perform Liveness Analysis
+    ir->ComputeLiveIntervals();
 
-    auto code = codegen.Generate(ir);
+    // Step 3: Allocate Registers
+    LinearScan(this->isolate_, orbiter::kGeneralPurposeRegistersCount).Allocate(ir);
+
+    // Step 4: Generate machine code
+    auto code = Codegen(this->isolate_).Generate(ir);
     if (code) {
         if (ir->GetSubcontextCount() > 0) {
             code->codes = this->BuildCodesList(ir).get();
@@ -55,15 +60,12 @@ orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
 }
 
 orbiter::datatype::HCode Compiler::Compile(const char *filename, scanner::Scanner &scanner) {
-    Parser parser(this->isolate_, filename, scanner);
-    IRBuilder builder(this->isolate_, this->level_);
-
-    auto ast = parser.Parse();
+    auto ast = Parser(this->isolate_, filename, scanner).Parse();
     if (!ast) {
         assert(false);
     }
 
-    auto ir = builder.Generate(ast);
+    auto ir = IRBuilder(this->isolate_, this->level_).Generate(ast);
     if (ir == nullptr)
         assert(false);
 

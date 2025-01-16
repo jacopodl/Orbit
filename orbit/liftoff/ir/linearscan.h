@@ -7,24 +7,34 @@
 
 #include <vector>
 
+#include <orbit/liftoff/ir/builder.h>
 #include <orbit/liftoff/ir/ircontext.h>
 
 namespace liftoff::ir {
     class LinearScan {
-        const int total_regs_;
-
         std::vector<LiveInterval *> active_;
-        std::vector<I16> free_registers_;
-        std::vector<Instruction *> spilled_;
+
+        std::vector<U16> free_registers_;
+        std::vector<U16> free_stack_slot_;
+
+        Builder builder_;
+
+        U16 stack_offset_ = 0;
+
+        const U16 total_regs_;
+
+        U16 GetFreeStackSlot();
+
+        void EmitStackLoad(Instruction *instruction);
 
         void ExpireOldIntervals(U32 position);
 
         void HandleSpill(LiveInterval *interval);
 
     public:
-        explicit LinearScan(int total_regs);
+        explicit LinearScan(orbiter::Isolate *isolate, U16 total_regs);
 
-        void Allocate(std::vector<LiveInterval> &intervals);
+        void Allocate(IRContext *ir);
     };
 }
 
