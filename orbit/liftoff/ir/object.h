@@ -64,8 +64,10 @@ namespace liftoff::ir {
             if (this->operands[operand].value != nullptr)
                 this->DeleteUse(this->operands + operand);
 
-            this->operands[operand].value = object;
-            object->AddUse(this->operands + operand);
+            if (object != nullptr) {
+                this->operands[operand].value = object;
+                object->AddUse(this->operands + operand);
+            }
         }
 
         explicit Object(ObjectType type, int operands) noexcept: objType_(type), num_ops(operands) {

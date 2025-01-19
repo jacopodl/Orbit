@@ -145,8 +145,6 @@ Instruction *Builder::LoadImmediate(const MachineSize value) {
     auto *instr = this->CreateInstruction<LoadImmValueInstr>(value);
     // TODO: check size, use shift to load whole value
 
-    this->AddInstruction(instr);
-
     return instr;
 }
 
