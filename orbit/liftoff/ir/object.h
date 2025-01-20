@@ -60,9 +60,9 @@ namespace liftoff::ir {
             }
         }
 
-        void SetOperand(int operand, Object *object) noexcept {
+        void SetOperand(int operand, Object *object) const noexcept {
             if (this->operands[operand].value != nullptr)
-                this->DeleteUse(this->operands + operand);
+                this->operands[operand].value->DeleteUse(this->operands + operand);
 
             if (object != nullptr) {
                 this->operands[operand].value = object;
