@@ -217,6 +217,10 @@ namespace liftoff::ir {
          */
         Instruction *GetLastActiveVariableLoad(const Symbol *symbol);
 
+        [[nodiscard]] orbiter::Isolate *GetIsolate() const noexcept {
+            return this->isolate_;
+        }
+
         /**
          * @brief Retrieves a subcontext by its index.
          *

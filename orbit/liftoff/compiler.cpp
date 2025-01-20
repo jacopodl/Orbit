@@ -53,7 +53,7 @@ orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
     ir->ComputeLiveIntervals();
 
     // Step 3-4: Allocate Registers / Phi resolution
-    LinearScan(this->isolate_, orbiter::kGeneralPurposeRegistersCount).Allocate(ir);
+    LinearScan(ir,orbiter::kGeneralPurposeRegistersCount).Allocate();
 
     // Step 5: Generate machine code
     auto code = Codegen(this->isolate_).Generate(ir);

@@ -19,6 +19,8 @@ namespace liftoff::ir {
 
         Builder builder_;
 
+        IRContext *ir_;
+
         U16 stack_offset_ = 0;
 
         const U16 total_regs_;
@@ -32,9 +34,9 @@ namespace liftoff::ir {
         void HandleSpill(LiveInterval *interval);
 
     public:
-        explicit LinearScan(orbiter::Isolate *isolate, U16 total_regs);
+        explicit LinearScan(IRContext *ir, U16 total_regs) noexcept;
 
-        void Allocate(IRContext *ir);
+        void Allocate();
     };
 }
 

@@ -100,6 +100,11 @@ namespace liftoff::ir {
         explicit Builder(orbiter::Isolate *isolate) noexcept: allocator_(isolate), isolate_(isolate) {
         }
 
+        explicit Builder(IRContext *ir) noexcept: allocator_(ir->GetIsolate()),
+                                                  isolate_(ir->GetIsolate()),
+                                                  context(ir) {
+        }
+
         /**
          * @brief Creates and appends a new basic block to the builder's context.
          *

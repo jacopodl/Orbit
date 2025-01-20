@@ -6,11 +6,15 @@
 
 using namespace liftoff::ir;
 
-LinearScan::LinearScan(orbiter::Isolate *isolate, U16 total_regs): builder_(isolate), total_regs_(total_regs) {
+LinearScan::LinearScan(IRContext *ir, U16 total_regs) noexcept : builder_(ir),
+                                                                 ir_(ir),
+                                                                 total_regs_(total_regs) {
     assert(total_regs >= 2);
 
     for (auto i = total_regs - 1; i >= 0; --i)
         this->free_registers_.push_back(i);
+
+    this->stack_offset_ = ir->stack_slot;
 }
 
 U16 LinearScan::GetFreeStackSlot() {
@@ -25,13 +29,7 @@ U16 LinearScan::GetFreeStackSlot() {
 }
 
 void LinearScan::EmitStackLoad(Instruction *instruction) {
-    // 1) Generate a store instruction to save the value to the specified stack slot
-    auto *store = this->builder_.GetStoreToStackOffset(instruction, instruction->stack_slot);
-
-    // Insert the store instruction immediately after the current instruction
-    IRContext::InsertInstructionAfter(instruction, store);
-
-    // 2) Iterate through the use-list of the instruction to load the value back from the stack
+    // 1) Iterate through the use-list of the instruction to load the value back from the stack
     for (auto use = instruction->use_list; use != nullptr; use = use->next) {
         auto *target = (Instruction *) use->user;
 
@@ -48,6 +46,12 @@ void LinearScan::EmitStackLoad(Instruction *instruction) {
         // Update the operand in the target instruction to reference the load instead of the original instruction
         target->ReplaceOperand(instruction, load);
     }
+
+    // 2) Generate a store instruction to save the value to the specified stack slot
+    auto *store = this->builder_.GetStoreToStackOffset(instruction, instruction->stack_slot);
+
+    // Insert the store instruction immediately after the current instruction
+    IRContext::InsertInstructionAfter(instruction, store);
 }
 
 void LinearScan::ExpireOldIntervals(U32 position) {
@@ -106,8 +110,8 @@ void LinearScan::HandleSpill(LiveInterval *interval) {
 // PUBLIC
 // *********************************************************************************************************************
 
-void LinearScan::Allocate(IRContext *ir) {
-    for (auto &interval: ir->live_intervals_) {
+void LinearScan::Allocate() {
+    for (auto &interval: this->ir_->live_intervals_) {
         if (interval.instr->assigned_reg == kDoNotAllocateReg)
             continue;
 
@@ -123,4 +127,7 @@ void LinearScan::Allocate(IRContext *ir) {
 
         this->active_.push_back(&interval);
     }
+
+    // Update the stack slot of the IR context to the current stack size
+    this->ir_->stack_slot = this->stack_offset_;
 }
