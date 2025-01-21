@@ -90,17 +90,17 @@ TEST_F(SymbolTableTest, DuplicateError) {
     ASSERT_TRUE(this->table->Declare("var1", SymbolType::VARIABLE, 0));
     ASSERT_FALSE(this->table->Declare("var1", SymbolType::VARIABLE, 5));
 
-    ASSERT_EQ(this->table->last_error, liftoff::SymbolTableError::SYMBOL_ALREADY_EXISTS);
+    ASSERT_EQ(this->table->status, liftoff::SymbolTableError::SYMBOL_ALREADY_EXISTS);
 }
 
 TEST_F(SymbolTableTest, EnterScope) {
     ASSERT_FALSE(this->table->EnterScope("func1"));
-    ASSERT_EQ(this->table->last_error, liftoff::SymbolTableError::SYMBOL_NOT_FOUND);
+    ASSERT_EQ(this->table->status, liftoff::SymbolTableError::SYMBOL_NOT_FOUND);
 
     ASSERT_TRUE(this->table->Declare("var1", SymbolType::VARIABLE, 1));
 
     ASSERT_FALSE(this->table->EnterScope("var1"));
-    ASSERT_EQ(this->table->last_error, liftoff::SymbolTableError::SCOPE_NOT_FOUND);
+    ASSERT_EQ(this->table->status, liftoff::SymbolTableError::SCOPE_NOT_FOUND);
 
     ASSERT_TRUE(this->table->DeclareSymbolScope("func1", SymbolType::FUNC, 10, 5) != nullptr);
 

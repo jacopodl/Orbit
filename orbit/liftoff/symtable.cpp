@@ -19,7 +19,7 @@ bool SymbolTable::DeclareNestedScope(MSize offset) noexcept {
         new(sub)SubScope(this->isolate);
 
         if (!sub->symbols.Initialize(kSTMapSubscopeCapacity)) {
-            this->last_error = SymbolTableError::MEMORY_ERROR;
+            this->status = SymbolTableError::MEMORY_ERROR;
 
             allocator.free(sub);
 
@@ -50,13 +50,13 @@ bool SymbolTable::EnterScope(ORString *name) noexcept {
     STHEntry *entry;
 
     if (!this->scope->active->symbols.Lookup(name, &entry)) {
-        this->last_error = SymbolTableError::SYMBOL_NOT_FOUND;
+        this->status = SymbolTableError::SYMBOL_NOT_FOUND;
 
         return false;
     }
 
     if (entry->value->scope == nullptr) {
-        this->last_error = SymbolTableError::SCOPE_NOT_FOUND;
+        this->status = SymbolTableError::SCOPE_NOT_FOUND;
 
         return false;
     }
@@ -71,7 +71,7 @@ bool SymbolTable::EnterScope(ORString *name) noexcept {
 bool SymbolTable::EnterScope(const char *name) noexcept {
     const auto o_name = ORStringNew(this->isolate, name);
     if (!o_name) {
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
         return false;
     }
 
@@ -107,6 +107,18 @@ bool SymbolTable::EnterNestedScope(MSize offset) const noexcept {
     return false;
 }
 
+const char *SymbolTable::GetStatusMessage() const {
+    static const char *messages[] = {
+        "no error",
+        "memory allocation failed",
+        "scope not found",
+        "symbol already exists",
+        "symbol not found"
+    };
+
+    return messages[(int) this->status];
+}
+
 Scope *SymbolTable::ScopeNew(MSize line_start) const {
     orbiter::IsolateAllocator allocator(this->isolate);
 
@@ -135,7 +147,7 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
 
     if (table->symbols.Lookup(name, &entry)) {
         if (entry->value->decl_offset != offset) {
-            this->last_error = SymbolTableError::SYMBOL_ALREADY_EXISTS;
+            this->status = SymbolTableError::SYMBOL_ALREADY_EXISTS;
             return nullptr;
         }
 
@@ -145,7 +157,7 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
     }
 
     if ((entry = table->symbols.AllocHEntry()) == nullptr) {
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
@@ -154,7 +166,7 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
     if (symbol == nullptr) {
         table->symbols.FreeHEntry(entry);
 
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
 
         return nullptr;
     }
@@ -196,7 +208,7 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
 Symbol *SymbolTable::Declare(const char *name, SymbolType type, MSize offset) noexcept {
     auto o_name = ORStringNew(this->isolate, name);
     if (!o_name) {
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
@@ -253,7 +265,7 @@ Symbol *SymbolTable::DeclareSymbolScope(ORString *name, SymbolType type, MSize o
 Symbol *SymbolTable::DeclareSymbolScope(const char *name, SymbolType type, MSize offset, MSize line_start) noexcept {
     const auto o_name = ORStringNew(this->isolate, name);
     if (!o_name) {
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
@@ -283,14 +295,14 @@ Symbol *SymbolTable::Lookup(ORString *name, MSize offset) noexcept {
         scope = scope->back;
     }
 
-    this->last_error = SymbolTableError::SYMBOL_NOT_FOUND;
+    this->status = SymbolTableError::SYMBOL_NOT_FOUND;
     return nullptr;
 }
 
 Symbol *SymbolTable::Lookup(const char *name, MSize offset) noexcept {
     const auto o_name = ORStringNew(this->isolate, name);
     if (!o_name) {
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
@@ -323,7 +335,7 @@ Symbol *SymbolTable::LookupInsert(ORString *name, MSize offset) noexcept {
         return sym;
     }
 
-    this->last_error = SymbolTableError::OK;
+    this->status = SymbolTableError::OK;
 
     if (sym != nullptr)
         return sym;
@@ -334,7 +346,7 @@ Symbol *SymbolTable::LookupInsert(ORString *name, MSize offset) noexcept {
 Symbol *SymbolTable::LookupInsert(const char *name, MSize offset) noexcept {
     const auto o_name = ORStringNew(this->isolate, name);
     if (!o_name) {
-        this->last_error = SymbolTableError::MEMORY_ERROR;
+        this->status = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
@@ -361,7 +373,7 @@ SymbolTable *SymbolTable::New(orbiter::Isolate *isolate) noexcept {
 
         table->isolate = isolate;
 
-        table->last_error = SymbolTableError::OK;
+        table->status = SymbolTableError::OK;
     }
 
     return table;
@@ -400,7 +412,7 @@ void SymbolTable::LeaveNestedScope(MSize offset) const noexcept {
 }
 
 void SymbolTable::LeaveScope(MSize offset, MSize line_end) noexcept {
-    this->last_error = SymbolTableError::OK;
+    this->status = SymbolTableError::OK;
 
     auto *c_scope = this->scope;
 
@@ -419,7 +431,7 @@ void SymbolTable::LeaveScope(MSize offset, MSize line_end) noexcept {
 }
 
 void SymbolTable::LeaveScope() noexcept {
-    this->last_error = SymbolTableError::OK;
+    this->status = SymbolTableError::OK;
 
     if (this->scope->type != ScopeType::MODULE)
         this->scope = this->scope->back;

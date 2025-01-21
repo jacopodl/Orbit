@@ -17,10 +17,10 @@ namespace liftoff {
 
     using STHEntry = orbiter::datatype::HEntry<orbiter::datatype::ORString *, struct Symbol *>;
     using STHMap = orbiter::datatype::HashMap<
-            orbiter::datatype::ORString *,
-            Symbol *,
-            orbiter::datatype::ORStringEqual,
-            orbiter::datatype::ORStringHash
+        orbiter::datatype::ORString *,
+        Symbol *,
+        orbiter::datatype::ORStringEqual,
+        orbiter::datatype::ORStringHash
     >;
 
     enum class SymbolTableError {
@@ -178,9 +178,16 @@ namespace liftoff {
         void SymbolDel(Symbol *symbol);
 
     public:
+        /**
+         * @brief Represents the current scope in a symbol table.
+         *
+         * This pointer is used to manage and navigate the active scope within the symbol table.
+         * It is initially set to `nullptr`.
+         */
         Scope *scope = nullptr;
 
-        SymbolTableError last_error = SymbolTableError::OK;
+        /// @brief Represents the status of operations performed on a symbol table.
+        SymbolTableError status = SymbolTableError::OK;
 
         /**
          * @brief Creates a new symbol table with the specified isolate.
@@ -222,6 +229,13 @@ namespace liftoff {
          * @return True if the scope was successfully entered, false if not found.
          */
         bool EnterNestedScope(MSize offset) const noexcept;
+
+        /**
+         * @brief Get SymbolTable status message.
+         *
+         * @return SymbolTable status message.
+         */
+        [[nodiscard]] const char *GetStatusMessage() const;
 
         /**
          * @brief Declares a new symbol with the specified name, type, and offset.
