@@ -81,34 +81,95 @@ namespace liftoff::parser {
         "Invalid break/continue: can only be used within a loop or switch statement",
         "Undefined label: break/continue refers to a non-existent or invalid label",
         "Invalid function declaration: function body is required. Only methods in traits and classes can be declared without a body (abstract methods). Regular functions must always have a body defined",
-        "Invalid constant(let keyword) declaration: can only be used within class, trait, or module definitions"
+        "Invalid constant(let keyword) declaration: can only be used within class, trait, or module definitions",
+        "Unsupported syntax: the current implementation does not support this construction"
     };
 
     class Context;
+
+    enum class ParserErrorType {
+        OK,
+
+        GENERIC_ERROR,
+        NOMEM,
+        SYNTAX
+    };
+
+    class ParserError {
+    public:
+        /// @brief Holds the state of the parsing process represented by a `ParserErrorType` enumeration value.
+        ParserErrorType type = ParserErrorType::OK;
+
+        /**
+         * @brief Pointer to a constant character string representing the error message.
+         *
+         * This variable is used to store a descriptive message related to parsing errors.
+         * It is assigned a specific error message based on the type of error encountered
+         * during the parsing process.
+         */
+        const char *message = nullptr;
+
+        /// @brief Last processed token (if applicable)
+
+        scanner::Token token;
+    };
 
     class Parser {
         using LedMeth = ASTHandle<ASTNode *> (Parser::*)(ASTHandle<ASTNode *> &);
         using NudMeth = ASTHandle<ASTNode *> (Parser::*)();
 
-        friend Context;
-
+        /**
+         * @brief Pointer to an instance of orbiter::Isolate used for managing and isolating execution contexts.
+         *
+         * This variable is initialized to nullptr by default and serves as the Isolate context
+         * for the execution of code, memory management, and other runtime tasks within the orbiter environment.
+         * It must be properly initialized before usage to ensure correct functionality.
+         */
         orbiter::Isolate *isolate_ = nullptr;
 
+        /// @brief Stores the name of the source file being parsed.
         const char *filename_ = nullptr;
 
+        /// @brief Context used during the parsing process to maintain state and enforce rules.
         Context *context_ = nullptr;
 
-        std::vector<orbiter::datatype::HORString> exports{};
-
-        std::vector<orbiter::datatype::HORString> imports{};
-
+        /// @brief Pointer to the symbol table used by the parser.
         SymbolTable *sym_t_ = nullptr;
 
+        /// @brief A collection of HORString objects representing exported definitions.
+        std::vector<orbiter::datatype::HORString> exports{};
+
+        /**
+         * @brief Stores information about the most recent error encountered during parsing.
+         *
+         * This variable is an instance of the `ParserError` class and is used to capture details
+         * about errors that occur during the parsing process, including the error type, associated message,
+         * and the token where the error was identified. It is updated accordingly as errors are encountered
+         * to facilitate error reporting and debugging.
+         */
+        ParserError error_;
+
+        /// @brief Reference to a Scanner instance used for scanning tokens from the source code.
         scanner::Scanner &scanner_;
 
+        /**
+         * @brief Represents the current token being processed by the parser.
+         *
+         * This variable holds the token obtained from the scanner. It is used to track
+         * and manage the parser's position within the source code, enabling token
+         * matching, consumption, and validation during parsing operations.
+         */
         scanner::Token tkcur_;
 
+        /**
+         * @brief Stores the current documentation comment token being processed by the parser.
+         *
+         * This token represents a documentation comment (e.g., docstring) encountered during parsing.
+         * It is updated with the most recently parsed documentation comment, if applicable.
+         */
         scanner::Token doc_;
+
+        friend Context;
 
         [[nodiscard]] bool Match(scanner::TokenType type) const noexcept {
             return this->tkcur_.type == type;
@@ -249,15 +310,7 @@ namespace liftoff::parser {
         void EatNL();
 
         void IgnoreNewLineIF(scanner::TokenType type);
-
-        /*
-         * @brief Report a parsing error.
-         *
-         * @param message Error message.
-         * @param location Location in the source where the error occurred.
-         */
-        //void ReportError(const std::string &message, const scanner::SourceLocation &location);
-
+        
     public:
         /**
          * @brief Initialize the parser with a filename and the scanner.
@@ -265,8 +318,12 @@ namespace liftoff::parser {
          * @param filename Source code name.
          * @param scanner Reference to Scanner.
          */
-        Parser(orbiter::Isolate *isolate, const char *filename,
-               scanner::Scanner &scanner) noexcept: isolate_(isolate), filename_(filename), scanner_(scanner) {
+        Parser(orbiter::Isolate *isolate, const char *filename, scanner::Scanner &scanner) noexcept: isolate_(isolate),
+            filename_(filename), scanner_(scanner) {
+        }
+
+        ~Parser() {
+            SymbolTable::Delete(this->sym_t_);
         }
 
         /**
@@ -275,6 +332,8 @@ namespace liftoff::parser {
          * @return A ASTHandle to the root node of the AST or nullptr in case of unrecoverable error.
          */
         ASTHandle<Module *> Parse() noexcept;
+
+        ParserError GetLastError()  noexcept;
     };
 }
 

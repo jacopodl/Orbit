@@ -1015,9 +1015,8 @@ ASTHandle<ASTNode *> Parser::ParseExpression(int precedence) {
     LedMeth led;
     NudMeth nud;
 
-    if ((nud = LookupNUD(TKCUR_TYPE)) == nullptr) {
-        assert(false);
-    }
+    if ((nud = LookupNUD(TKCUR_TYPE)) == nullptr)
+        throw ParserException(0);
 
     auto left = (this->*nud)();
 
@@ -1788,7 +1787,8 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
     if (this->Match(TokenType::COLON)) {
         // TODO: parse ret_type
         this->Eat(true);
-        assert(false);
+
+        throw ParserException(70);
     }
 
     while (TKCUR_TYPE > TokenType::KEYWORD_BEGIN && TKCUR_TYPE < TokenType::KEYWORD_END) {
@@ -2133,13 +2133,34 @@ ASTHandle<Module *> Parser::Parse() noexcept {
 
         module->sym_t = this->sym_t_;
         this->sym_t_ = nullptr;
-    } catch (ParserException &e) {
-        printf("%s\n", kStandardError[e.err_idx]);
-        assert(false);
-    }
-    catch (...) {
-        assert(false);
+
+        return module;
+    } catch (DatatypeException &) {
+        this->error_.type = ParserErrorType::NOMEM;
+    }catch (ParserException &e) {
+        this->error_.type = ParserErrorType::SYNTAX;
+        this->error_.message = kStandardError[e.err_idx];
+        this->error_.token = std::move(this->tkcur_);
+    }catch (ScannerException &) {
+        this->error_.type = ParserErrorType::SYNTAX;
+
+        if (this->scanner_.status == ScannerStatus::NOMEM)
+            this->error_.type = ParserErrorType::NOMEM;
+
+        this->error_.message = this->scanner_.GetStatusMessage();
+    }catch (SymbolTableException &) {
+        this->error_.type = ParserErrorType::GENERIC_ERROR;
+
+        if (this->sym_t_->status == SymbolTableError::MEMORY_ERROR)
+            this->error_.type = ParserErrorType::NOMEM;
+
+        this->error_.message = this->sym_t_->GetStatusMessage();
+        this->error_.token = std::move(this->tkcur_);
     }
 
-    return module;
+    return {};
+}
+
+ParserError Parser::GetLastError() noexcept {
+    return std::move(this->error_);
 }
