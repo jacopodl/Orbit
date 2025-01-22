@@ -97,7 +97,7 @@ namespace liftoff::ir {
 
         [[nodiscard]] ObjectType type() const noexcept { return objType_; }
 
-        void ReplaceOperand(const Object *old, Object *new_value) noexcept {
+        void ReplaceOperand(const Object *old, Object *new_value) const noexcept {
             for (int i = 0; i < this->num_ops; ++i) {
                 if (this->operands[i].value == old) {
                     this->SetOperand(i, new_value);

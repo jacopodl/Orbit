@@ -8,7 +8,6 @@
 #include <orbit/orbiter/isolate.h>
 
 #include <orbit/liftoff/ir/ircontext.h>
-#include <orbit/liftoff/ir/value.h>
 
 namespace liftoff::ir {
     /**
