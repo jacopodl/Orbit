@@ -91,6 +91,8 @@ namespace orbiter::datatype {
         /* Size of the object represented by this datatype (used for memory allocation) */
         U16 i_size;
 
+        U16 offset;
+
         /* Additional headroom space */
         U8 headroom;
 
@@ -123,10 +125,11 @@ namespace orbiter::datatype {
         OROBJ_HEAD;
     };
 
-#define O_GET_HEAD(object)                 ((object)->head_)
-#define O_GET_RC(object)                   (O_GET_HEAD(object).ref_count_)
-#define O_UNSAFE_GET_RC(object)            (*((MSize *) &O_GET_HEAD(object).ref_count_))
-#define O_GET_TYPE(object)                 (O_GET_HEAD(object).type_)
+#define O_GET_HEAD(object)                  ((object)->head_)
+#define O_GET_RC(object)                    (O_GET_HEAD(object).ref_count_)
+#define O_UNSAFE_GET_RC(object)             (*((MSize *) &O_GET_HEAD(object).ref_count_))
+#define O_GET_TYPE(object)                  (O_GET_HEAD(object).type_)
+#define O_CAST(object, hr_type)             ((hr_type *) (((unsigned char*) object) + (O_GET_TYPE((OObject*) object)->offset)))
 
 #define O_IS_SMI(object)                    ((MSize)object & 0x01u)
 #define O_IS_ODDBALL(object)                ((!O_IS_SMI(object)) && (((MSize)object & orbiter::datatype::kOddBallMask) == orbiter::datatype::kOddBallMask))

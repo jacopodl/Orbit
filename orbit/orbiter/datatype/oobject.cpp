@@ -149,11 +149,18 @@ TypeInfo *orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, Instanc
         return nullptr;
 
     O_UNSAFE_GET_RC(ti) = (MSize) memory::RCType::INLINE;
-    O_GET_HEAD(ti).type_ = O_VFY_INCREF(super);
+    O_GET_HEAD(ti).type_ = nullptr;
+
+    U16 offset = sizeof(OObject);
+    if (super != nullptr) {
+        O_GET_HEAD(ti).type_ = O_INCREF(super);
+        offset = super->i_size;
+    }
 
     ti->i_type = type;
 
-    ti->i_size = sizeof(OObject) + headroom + (slots * sizeof(void *));
+    ti->i_size = offset + headroom + (slots * sizeof(void *));
+    ti->offset = offset;
 
     ti->headroom = headroom;
 
