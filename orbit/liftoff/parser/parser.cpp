@@ -1099,7 +1099,9 @@ ASTHandle<ASTNode *> Parser::ParseExprOrTuple() {
 }
 
 ASTHandle<ASTNode *> Parser::ParseFunc() {
-    return this->ParseFunction(true);
+    auto start = TKCUR_START;
+
+    return this->ParseFunction(start, true, false);
 }
 
 ASTHandle<ASTNode *> Parser::ParseFuncCall(ASTHandle<ASTNode *> &left) {
@@ -1582,15 +1584,7 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 stmt = this->ParseForInStatement();
                 break;
             case TokenType::KW_FUNC: {
-                auto func = this->ParseFunction(false);
-
-                func->loc.start = start;
-                func->pub = pub;
-
-                if (pub && !func->anon)
-                    this->exports.emplace_back(func->name);
-
-                stmt = std::move(func);
+                stmt = this->ParseFunction(start, false, pub);
                 break;
             }
             case TokenType::KW_IF:
@@ -1755,11 +1749,13 @@ ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
     return decl;
 }
 
-ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
+ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(const Position &start, bool inl, bool pub) {
     Context isolate(this, ContextType::FUNC);
     Loc last_param{};
 
     auto func = MakeFunction(this->isolate_, TKCUR_LOC);
+
+    func->loc.start = start;
 
     func->doc = this->GetDocString().release();
 
@@ -1787,6 +1783,7 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
         throw SymbolTableException();
 
     sym->anon = inl;
+    sym->access = pub ? AccessModifier::PUBLIC : AccessModifier::PRIVATE;
 
     func->params = this->ParseFuncParams(last_param);
 
@@ -1827,6 +1824,9 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(bool inl) {
     }
 
     this->sym_t_->LeaveScope(func->loc.end.offset, func->loc.end.line);
+
+    if (pub && !func->anon)
+        this->exports.emplace_back(func->name);
 
     return func;
 }

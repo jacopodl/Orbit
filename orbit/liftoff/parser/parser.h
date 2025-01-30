@@ -287,7 +287,7 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseWalrus(ASTHandle<ASTNode *> &left);
 
-        [[nodiscard]] ASTHandle<Function *> ParseFunction(bool inl);
+        [[nodiscard]] ASTHandle<Function *> ParseFunction(const scanner::Position &start, bool inl, bool pub);
 
         [[nodiscard]] ASTHandle<Parameter *> ParseParameter(const scanner::Position &start, NodeType type);
 
