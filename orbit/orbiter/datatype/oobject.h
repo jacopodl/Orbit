@@ -36,7 +36,7 @@ namespace orbiter::datatype {
      */
     inline bool TIPropertyAdd(TypeInfo *type, const char *name, U16 offset, PropertyDetail detail) {
         offset = type->offset + type->headroom + (offset * sizeof(void *));
-        return TIPropertyAdd(type, name, (OObject *) offset, detail | PropertyDetail::INLINE);
+        return TIPropertyAdd(type, name, (OObject *) offset, detail | PropertyDetail::IN_OBJECT);
     }
 
     /**
@@ -62,7 +62,7 @@ namespace orbiter::datatype {
      * @return true if the property was added successfully, false otherwise.
      */
     inline bool TIPropertyAdd(TypeInfo *type, OObject *name, U16 offset, PropertyDetail detail) {
-        return TIPropertyAdd(type, name, (OObject *) offset, detail | PropertyDetail::INLINE);
+        return TIPropertyAdd(type, name, (OObject *) offset, detail | PropertyDetail::IN_OBJECT);
     }
 
     /**
@@ -104,7 +104,7 @@ namespace orbiter::datatype {
      * @param t Pointer to the object to release
      */
     template<typename T>
-    inline void Release(T *t) {
+    void Release(T *t) {
         Release((OObject *) t);
     }
 
@@ -133,14 +133,13 @@ namespace orbiter::datatype {
      *
      * @tparam T Type of the object to create
      *
-     * @param isolate Pointer to the Isolate
      * @param type Pointer to the TypeInfo for the object
      *
      * @return Pointer to the newly created object, or nullptr if allocation failed
      */
     template<typename T>
-    T *MakeObject(Isolate *isolate, TypeInfo *type) {
-        IsolateAllocator allocator(isolate);
+    T *MakeObject(TypeInfo *type) {
+        IsolateAllocator allocator(O_GET_ISOLATE(type));
 
         auto *ret = allocator.alloc<OObject>(type->i_size);
         if (ret == nullptr)
@@ -164,7 +163,7 @@ namespace orbiter::datatype {
      */
     template<typename T>
     T *MakeObject(Isolate *isolate, InstanceType type) {
-        return MakeObject<T>(isolate, isolate->primitive[(int) type]);
+        return MakeObject<T>(isolate->primitive[(int) type]);
     }
 
     template<typename T>
@@ -206,6 +205,21 @@ namespace orbiter::datatype {
      */
     inline TypeInfo *MakeType(Isolate *isolate, InstanceType type, U8 headroom, U8 props, U8 slots) {
         return MakeType(isolate, isolate->primitive[(int) InstanceType::TYPE], type, headroom, props, slots);
+    }
+
+    /**
+     * @brief Create a new TypeInfo that extend a base TypeInfo.
+     *
+     * @param isolate Pointer to the Isolate instance managing the process.
+     * @param type Instance type to specify the type information.
+     * @param headroom The headroom size to allocate for the type.
+     * @param props Number of properties associated with the type.
+     * @param slots Number of slots used in the type definition.
+     *
+     * @return Pointer to the created TypeInfo.
+     */
+    inline TypeInfo *MakeTypeExtended(Isolate *isolate, InstanceType type, U8 headroom, U8 props, U8 slots) {
+        return MakeType(isolate, isolate->primitive[(int) type], type, headroom, props, slots);
     }
 
     // *****************************************************************************************************************

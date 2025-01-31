@@ -43,7 +43,10 @@ namespace orbiter::datatype {
 #define FUNCTIONDEF_SENTINEL {nullptr, nullptr, nullptr, 0, false}
 
     enum class PropertyDetail {
-        INLINE = 0x01
+        IN_OBJECT = 0x01,
+
+        IS_PUBLIC = 0x01 << 1,
+        IS_CONSTANT = 0x01 << 2
     };
 
     struct PropertyDescriptor {
@@ -129,6 +132,7 @@ namespace orbiter::datatype {
 #define O_GET_RC(object)                    (O_GET_HEAD(object).ref_count_)
 #define O_UNSAFE_GET_RC(object)             (*((MSize *) &O_GET_HEAD(object).ref_count_))
 #define O_GET_TYPE(object)                  (O_GET_HEAD(object).type_)
+#define O_GET_ISOLATE(object)               (O_GET_TYPE(object)->isolate)
 #define O_CAST(object, hr_type)             ((hr_type *) (((unsigned char*) object) + (O_GET_TYPE((OObject*) object)->offset)))
 
 #define O_IS_SMI(object)                    ((MSize)object & 0x01u)

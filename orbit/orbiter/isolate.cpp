@@ -7,8 +7,9 @@
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/list.h>
-#include <orbit/orbiter/datatype/orstring.h>
+#include <orbit/orbiter/datatype/module.h>
 #include <orbit/orbiter/datatype/number.h>
+#include <orbit/orbiter/datatype/orstring.h>
 #include <orbit/orbiter/datatype/type.h>
 
 #include <orbit/orbiter/isolate.h>
@@ -48,6 +49,7 @@ Isolate *Isolate::New() {
     INIT_TYPE(InstanceType::DECIMAL, DecimalTypeInit);
     INIT_TYPE(InstanceType::FUNCTION, FunctionTypeInit);
     INIT_TYPE(InstanceType::LIST, ListTypeInit);
+    INIT_TYPE(InstanceType::MODULE, ModuleInit);
     INIT_TYPE(InstanceType::NUMBER, NumberTypeInit);
     INIT_TYPE(InstanceType::STRING, ORStringTypeInit);
 
@@ -60,12 +62,13 @@ Isolate *Isolate::New() {
     SETUP_TYPE(InstanceType::DECIMAL, DecimalTypeSetup);
     SETUP_TYPE(InstanceType::FUNCTION, FunctionTypeSetup);
     SETUP_TYPE(InstanceType::LIST, ListTypeSetup);
+    SETUP_TYPE(InstanceType::MODULE, ModuleSetup);
     SETUP_TYPE(InstanceType::NUMBER, NumberTypeSetup);
     SETUP_TYPE(InstanceType::STRING, ORStringTypeSetup);
 
     return isolate;
 
-    ERROR:
+ERROR:
     isolate->allocator_.Finalize();
 
     delete isolate;
