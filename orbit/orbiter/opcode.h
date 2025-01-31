@@ -65,7 +65,7 @@ namespace orbiter {
         NOT_IN = 0x1
     };
 
-    enum class NewVariableFlags : U8 {
+    enum class VariableFlags : U8 {
         VARIABLE = 0x0,
         CONSTANT = 0x1,
         PUBLIC = 0x2,
@@ -163,6 +163,6 @@ ENUMBITMASK_ENABLE(orbiter::ComparisonMode);
 
 ENUMBITMASK_ENABLE(orbiter::LoadFuncFlags);
 
-ENUMBITMASK_ENABLE(orbiter::NewVariableFlags);
+ENUMBITMASK_ENABLE(orbiter::VariableFlags);
 
 #endif // !ORBIT_ORBITER_OPCODE_H_

@@ -57,10 +57,12 @@ namespace liftoff::ir {
     public:
         orbiter::datatype::HORString name;
 
-        orbiter::NewVariableFlags flags;
+        orbiter::VariableFlags flags;
 
-        ExportedName(orbiter::datatype::ORString *name, orbiter::NewVariableFlags flags) noexcept: name(O_INCREF(name)),
-            flags(flags) {
+        U16 slot;
+
+        ExportedName(orbiter::datatype::ORString *name, orbiter::VariableFlags flags,
+                     U16 slot) noexcept: name(O_INCREF(name)), flags(flags), slot(slot) {
         }
     };
 
@@ -265,15 +267,6 @@ namespace liftoff::ir {
         }
 
         /**
-         * @brief Retrieves the number of subcontexts currently managed within this IRContext.
-         *
-         * @return The total count of subcontexts.
-         */
-        [[nodiscard]] U16 GetSubcontextCount() const noexcept {
-            return this->sub.count;
-        }
-
-        /**
          * @brief Adds a new entry into the collection of known exported names with the associated properties.
          *
          * This function inserts the given identifier and its associated flags into the exported_names
@@ -281,11 +274,20 @@ namespace liftoff::ir {
          * configuration, encapsulated in the flags parameter. Upon adding the new entry, the function
          * returns the total number of previously stored entries before the insertion.
          *
-         * @param id Pointer to an ORString object representing the identifier to be added.
+         * @param symbol Pointer to symbol object.
          * @param flags Configuration flags associated with the identifier.
          * @return The size of the exported_names collection before the addition.
          */
-        U16 PushKnownProps(orbiter::datatype::ORString *id, orbiter::NewVariableFlags flags);
+        U16 ExportSymbol(const Symbol *symbol, orbiter::VariableFlags flags);
+
+        /**
+         * @brief Retrieves the number of subcontexts currently managed within this IRContext.
+         *
+         * @return The total count of subcontexts.
+         */
+        [[nodiscard]] U16 GetSubcontextCount() const noexcept {
+            return this->sub.count;
+        }
 
         /**
          * @brief Adds an unknown property identifier to the internal list of unknown names.

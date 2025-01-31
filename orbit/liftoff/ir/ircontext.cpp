@@ -81,10 +81,10 @@ Instruction *IRContext::GetLastActiveVariableLoad(const Symbol *symbol) {
     return nullptr;
 }
 
-U16 IRContext::PushKnownProps(orbiter::datatype::ORString *id, orbiter::NewVariableFlags flags) {
+U16 IRContext::ExportSymbol(const Symbol *symbol, orbiter::VariableFlags flags) {
     const auto length = this->exported_names.size();
 
-    this->exported_names.emplace_back(id, flags);
+    this->exported_names.emplace_back(symbol->name, flags, symbol->offset);
 
     return length;
 }

@@ -277,9 +277,9 @@ void Codegen::ExportSymbols(orbiter::datatype::HCode &code) {
 
         symbol->name = cursor.name.get_inc();
         symbol->flags = cursor.flags;
+        symbol->slot = cursor.slot;
     }
 }
-
 
 orbiter::datatype::HCode Codegen::Generate() noexcept {
     const auto *ir = this->ir_;

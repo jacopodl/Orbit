@@ -15,7 +15,9 @@ namespace orbiter::datatype {
     struct ExportedSymbol {
         ORString *name;
 
-        NewVariableFlags flags;
+        VariableFlags flags;
+
+        U16 slot;
     };
 
     struct Code {

@@ -133,8 +133,7 @@ Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
     }
 
     if (symbol->type == SymbolType::UNKNOWN) {
-        offset = (I16) (symbol->defining_scope->GetLocalVariableCount()
-                        + this->builder_.context->PushUnknownProps(symbol->name));
+        offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
 
         ret = this->builder_.LoadFromOffset(orbiter::OPCode::LDGBL, offset, 0);
 
@@ -144,8 +143,7 @@ Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
     // TODO: Class/Trait
     if (symbol->defining_scope->type == ScopeType::MODULE) {
         if (this->level_ == OptimizationLevel::OFF) {
-            offset = (I16) (this->builder_.context->PushUnknownProps(symbol->name)
-                            + this->sym_t_->scope->GetLocalVariableCount());
+            offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
 
             ret = this->builder_.LoadFromOffset(orbiter::OPCode::LDGBL, offset, 0);
         } else
@@ -181,13 +179,13 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
     if (value == nullptr)
         value = this->builder_.LoadNilValue();
 
-    auto v_flags = orbiter::NewVariableFlags::VARIABLE;
+    auto v_flags = orbiter::VariableFlags::VARIABLE;
 
     if (symbol->type == SymbolType::CONSTANT)
-        v_flags = orbiter::NewVariableFlags::CONSTANT;
+        v_flags = orbiter::VariableFlags::CONSTANT;
 
     if (symbol->access == AccessModifier::PUBLIC)
-        v_flags |= orbiter::NewVariableFlags::PUBLIC;
+        v_flags |= orbiter::VariableFlags::PUBLIC;
 
     if (symbol->upvalue) {
         this->builder_.StoreToClosureAtOffset(value, offset,
@@ -199,8 +197,7 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
     }
 
     if (symbol->type == SymbolType::UNKNOWN) {
-        offset = (I16) (this->builder_.context->PushUnknownProps(symbol->name)
-                        + this->sym_t_->scope->GetLocalVariableCount());
+        offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
 
         this->builder_.CreateStoreVariable(orbiter::OPCode::STGBL, offset, 0, value);
 
@@ -215,13 +212,12 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
         }
 
         if (this->level_ == OptimizationLevel::OFF) {
-            offset = (I16) (this->sym_t_->scope->GetLocalVariableCount() +
-                            this->builder_.context->PushUnknownProps(symbol->name));
+            offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
 
             this->builder_.CreateStoreVariable(orbiter::OPCode::STGBL, offset, 0, value);
         } else {
             if (decl && symbol->access == AccessModifier::PUBLIC)
-                this->builder_.context->PushKnownProps(symbol->name, v_flags);
+                this->builder_.context->ExportSymbol(symbol, v_flags);
 
             this->builder_.CreateStoreVariable(orbiter::OPCode::STGOFF, offset, 0, value);
         }
