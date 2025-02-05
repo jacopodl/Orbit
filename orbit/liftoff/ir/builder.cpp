@@ -148,7 +148,7 @@ Instruction *Builder::LoadFunction(Instruction *src, LoadFuncFlags flags) {
 }
 
 Instruction *Builder::LoadImmediate(const MachineSize value) {
-    auto *instr = this->CreateInstruction<LoadImmValueInstr>(value);
+    auto *instr = this->CreateInstruction<UnaryImmInstr>(OPCode::LDIMM, 0, value);
     // TODO: check size, use shift to load whole value
 
     return instr;
