@@ -2,16 +2,24 @@
 //
 // Licensed under the Apache License v2.0
 
+#include <cassert>
 #include <orbit/orbiter/datatype/module.h>
 
 using namespace orbiter::datatype;
+
+HModule orbiter::datatype::ModuleNew(TypeInfo *tp_module) {
+    assert(tp_module->i_type == InstanceType::MODULE);
+
+    auto *module = MakeGCObject<Module>(tp_module);
+    return HModule(module);
+}
 
 TypeInfo *orbiter::datatype::ModuleInit(Isolate *isolate) {
     auto *module = MakeType(isolate, InstanceType::MODULE, 0, 0, 0);
     return module;
 }
 
-TypeInfo *orbiter::datatype::ModuleNew(Isolate *isolate, ORString *name, ORString *doc, U16 exported, U16 slots) {
+TypeInfo *orbiter::datatype::ModuleTypeNew(Isolate *isolate, ORString *name, ORString *doc, U16 exported, U16 slots) {
     const auto total_props = exported + 2; // name + doc
 
     auto *module = MakeTypeExtended(isolate, InstanceType::MODULE, 0, total_props, slots);
@@ -32,10 +40,10 @@ ERROR:
     return nullptr;
 }
 
-TypeInfo *orbiter::datatype::ModuleNew(Code *code, ORString *name) {
+TypeInfo *orbiter::datatype::ModuleTypeNew(Code *code, ORString *name) {
     auto *isolate = O_GET_ISOLATE(code);
 
-    auto *module = ModuleNew(isolate, name, nullptr, code->exported.length, code->slots_count);
+    auto *module = ModuleTypeNew(isolate, name, nullptr, code->exported.length, code->slots_count);
     if (module != nullptr) {
         for (auto i = 0; i < code->exported.length; i++) {
             const auto *symbol = code->exported.symbols + i;

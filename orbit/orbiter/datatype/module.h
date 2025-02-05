@@ -12,6 +12,19 @@ namespace orbiter::datatype {
     struct Module {
         OROBJ_HEAD;
     };
+    using HModule = Handle<Module>;
+
+    /**
+     * @brief Create a new module instance
+     *
+     * Constructs a new module object based on the provided type information.
+     * This function initializes the module and returns a handle to the newly created module.
+     *
+     * @param tp_module Pointer to the TypeInfo that defines the type of the module
+     *
+     * @return Handle to the created module instance, or an empty handle if creation failed
+     */
+    HModule ModuleNew(TypeInfo *tp_module);
 
     /**
      * @brief Initialize and create the specified type
@@ -40,7 +53,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created module TypeInfo, or nullptr if creation failed
      */
-    TypeInfo *ModuleNew(Isolate *isolate, ORString *name, ORString *doc, U16 exported, U16 slots);
+    TypeInfo *ModuleTypeNew(Isolate *isolate, ORString *name, ORString *doc, U16 exported, U16 slots);
 
     /**
      * @brief Creates a new module with the given code and name
@@ -55,7 +68,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created TypeInfo object for the module, or nullptr if creation failed
      */
-    TypeInfo *ModuleNew(Code *code, ORString *name);
+    TypeInfo *ModuleTypeNew(Code *code, ORString *name);
 
     /**
      * @brief Set up additional features and properties for the specified type

@@ -167,9 +167,9 @@ namespace orbiter::datatype {
     }
 
     template<typename T>
-    T *MakeGCObject(Isolate *isolate, TypeInfo *type) {
+    T *MakeGCObject(TypeInfo *type) {
         // TODO: impl!
-        return MakeObject<T>(isolate, type);
+        return MakeObject<T>(type);
     }
 
     template<typename T>
