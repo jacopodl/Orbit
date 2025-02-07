@@ -136,6 +136,7 @@ namespace orbiter::datatype {
 #define O_GET_TYPE(object)                  (O_GET_HEAD(object).type_)
 #define O_GET_ISOLATE(object)               (O_GET_TYPE(object)->isolate)
 #define O_CAST(object, hr_type)             ((hr_type *) (((unsigned char*) object) + (O_GET_TYPE((OObject*) object)->offset)))
+#define O_SLOT(object)                      ((orbiter::datatype::OObject **) (O_CAST(object, unsigned char) + O_GET_TYPE(object)->headroom))
 
 #define O_IS_SMI(object)                    ((MSize)object & 0x01u)
 #define O_IS_ODDBALL(object)                ((!O_IS_SMI(object)) && (((MSize)object & orbiter::datatype::kOddBallMask) == orbiter::datatype::kOddBallMask))

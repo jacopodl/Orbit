@@ -24,7 +24,8 @@ namespace orbiter {
         struct {
             datatype::Context *context;
             datatype::Module *module;
-        };
+            datatype::Code *code;
+        } context;
 
         /**
          * Returns the current thread-local Fiber instance.
@@ -32,6 +33,8 @@ namespace orbiter {
          * @return A pointer to the current Fiber instance if one exists, otherwise nullptr.
          */
         static Fiber *Current() noexcept;
+
+        static void SetCurrent(Fiber *fiber) noexcept;
 
         /**
          * Creates a new Fiber instance associated with the provided Isolate and initializes

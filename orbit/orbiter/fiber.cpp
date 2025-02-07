@@ -22,6 +22,10 @@ Fiber *Fiber::Current() noexcept {
     return thl_fiber;
 }
 
+void Fiber::SetCurrent(Fiber *fiber) noexcept {
+    thl_fiber = fiber;
+}
+
 Fiber *Fiber::New(Isolate *isolate, MSize stackSize) noexcept {
     IsolateAllocator allocator(isolate);
 

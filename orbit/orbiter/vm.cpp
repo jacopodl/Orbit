@@ -7,6 +7,8 @@
 
 #include <orbit/orbiter/vm.h>
 
+#include <orbit/orbiter/fiber.h>
+
 using namespace orbiter;
 using namespace orbiter::datatype;
 
@@ -34,9 +36,9 @@ bool orbiter::VMStackInit(VMStack *vms, Isolate *isolate, MSize stackSize) noexc
     return true;
 }
 
-void *orbiter::eval(VMContext *vmc, Code *code) {
-    auto *regs = &vmc->regs;
-    auto *stack = &vmc->stack;
+void *orbiter::eval(Fiber *fiber) {
+    auto *regs = &fiber->vm.regs;
+    auto *stack = &fiber->vm.stack;
 
 #define TARGET_OP(op)   case OPCode::op:
 #define CGOTO           continue
@@ -58,6 +60,13 @@ CGOTO
 
 #define FETCH_R_DST(instr)      ((instr >> 20) & 0xFu)
 #define FETCH_R_SRC(instr)      ((instr >> 16) & 0xFu)
+#define FETCH_IMM(instr)        ((instr) & 0xFFFFu)
+
+    auto *code = fiber->context.code;
+
+    OObject **module_slots = nullptr;
+    if (fiber->context.module != nullptr)
+        module_slots = O_SLOT(fiber->context.module);
 
     while (1) {
         const auto instr = FETCH;
@@ -72,6 +81,35 @@ CGOTO
                 const auto dst = FETCH_R_DST(instr);
 
                 REG_N(dst) = REG_N(dst) | (imm << (16 * shift));
+
+                DISPATCH;
+            }
+            TARGET_OP(STGBL) {
+                const auto value = REG_N(FETCH_R_SRC(instr));
+                const auto k_index = FETCH_IMM(instr);
+
+                ContextSet(fiber->context.context, (ORString *) code->unknown_symbols->objects[k_index],
+                           (OObject *) value);
+
+                DISPATCH;
+            }
+            TARGET_OP(STGOFF) {
+                const auto value = REG_N(FETCH_R_SRC(instr));
+                const auto slot = FETCH_IMM(instr);
+
+                assert(module_slots != nullptr);
+
+                *(module_slots + slot) = O_VFY_INCREF((OObject *) value);
+
+                DISPATCH;
+            }
+            TARGET_OP(LDGOFF) {
+                const auto r_dest = FETCH_R_DST(instr);
+                const auto slot = FETCH_IMM(instr);
+
+                assert(module_slots != nullptr);
+
+                REG_N(r_dest) = (PtrSize) *(module_slots + slot);
 
                 DISPATCH;
             }
@@ -92,7 +130,7 @@ CGOTO
                 DISPATCH;
             }
             default:
-                assert(false);
+                DISPATCH;
         }
 
         NEXT_IP;
