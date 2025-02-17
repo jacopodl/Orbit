@@ -54,6 +54,8 @@ MSize GC::CollectRCQueue() noexcept {
     MSize count = 0;
     MSize bytes = 0;
 
+    std::unique_lock _(this->context_.rel_lock);
+
     this->ScanVMRegisters();
 
     rc_trashing = true;
@@ -279,7 +281,7 @@ MSize GC::Collect() noexcept {
 }
 
 MSize GC::Collect(int generation) noexcept {
-    GCHead *unreachable = nullptr;
+    std::unique_lock lock(this->context_.track_lock, std::defer_lock);
 
     generation = generation % kGCGenerations;
 
@@ -289,12 +291,17 @@ MSize GC::Collect(int generation) noexcept {
 
     const auto selected = this->context_.generations + generation;
 
+    if (generation == 0)
+        lock.lock();
+
     this->ResetStats(generation);
 
     if (selected->list == nullptr)
         return 0;
 
     selected->times += 1;
+
+    GCHead *unreachable = nullptr;
 
     const auto total = selected->count;
 
@@ -303,6 +310,9 @@ MSize GC::Collect(int generation) noexcept {
 
     // 2) Trace all objects reachable from roots
     TraceRoots(selected, &unreachable);
+
+    if (lock.owns_lock())
+        lock.unlock();
 
     // 3) Scan all VMs Registers
     this->ScanVMRegisters();
@@ -388,6 +398,10 @@ void GC::RemoveFiber(Fiber *fiber) noexcept {
 void GC::ThresholdCollect() noexcept {
     auto allocated_bytes = this->context_.allocated_bytes.load(std::memory_order_relaxed);
 
+    bool running = false;
+    if (!this->running_.compare_exchange_strong(running, true, std::memory_order_relaxed))
+        return;
+
     if (this->enabled_) {
         if (allocated_bytes < ((this->max_heap_size_ * 90) / 100)) {
             if (allocated_bytes >= (U32) ((this->max_heap_size_ * 40) / 100)) {
@@ -414,6 +428,8 @@ void GC::ThresholdCollect() noexcept {
         return;
 
     this->CollectRCQueue();
+
+    this->running_.store(false, std::memory_order_relaxed);
 }
 
 void GC::Track(OObject *object) noexcept {

@@ -111,6 +111,7 @@ namespace orbiter {
             MSize max_heap_size_;
 
             std::atomic_bool enabled_;
+            std::atomic_bool running_;
 
             explicit GC(Isolate *isolate, U32 heap_size) noexcept : allocator_(isolate),
                                                                     fibers_(nullptr),
@@ -122,6 +123,10 @@ namespace orbiter {
 
             explicit GC(Isolate *isolate) noexcept : GC(isolate, kGCMaxHeapSize) {
             }
+
+            MSize Collect() noexcept;
+
+            MSize Collect(int generation) noexcept;
 
             /**
              * @brief Executes the reference-count based garbage collection process by traversing the release list.
@@ -154,10 +159,6 @@ namespace orbiter {
             friend Isolate;
 
         public:
-            MSize Collect() noexcept;
-
-            MSize Collect(int generation) noexcept;
-
             datatype::OObject *AllocObject(MSize size) noexcept;
 
             void AddFiber(Fiber *fiber) noexcept;
