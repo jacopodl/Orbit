@@ -10,43 +10,43 @@
 using namespace orbiter::datatype;
 
 RUNTIME_METHOD(type_hash, hash,
-                 "Return hash value of an object if it has one.",
-                 0) {
+               "Return hash value of an object if it has one.",
+               0) {
     // TODO: IMPL
     return nullptr;
 }
 
 RUNTIME_METHOD(type_id, id,
-                 "Returns a unique integer identifier for an object. "
-                 "This identifier remains constant throughout the object's lifetime.",
-                 0) {
+               "Returns a unique integer identifier for an object. "
+               "This identifier remains constant throughout the object's lifetime.",
+               0) {
     // TODO: IMPL
     return nullptr;
 }
 
 RUNTIME_METHOD(type_repr, repr,
-                 "Return a string containing a printable representation of an object.",
-                 0) {
+               "Return a string containing a printable representation of an object.",
+               0) {
     // TODO: IMPL
     return nullptr;
 }
 
 RUNTIME_METHOD(type_str, str, "Return a string version of an object.",
-                 0) {
+               0) {
     // TODO: IMPL
     return nullptr;
 }
 
 const FunctionDef type_methods[] = {
-        type_hash,
-        type_id,
-        type_str,
-        type_repr,
-        FUNCTIONDEF_SENTINEL
+    type_hash,
+    type_id,
+    type_str,
+    type_repr,
+    FUNCTIONDEF_SENTINEL
 };
 
 TypeInfo *orbiter::datatype::TypeInit(Isolate *isolate) {
-    auto *type = MakeType(isolate, InstanceType::TYPE, 0, 4, 0);
+    auto *type = MakeType(isolate, nullptr, InstanceType::TYPE, 0, 4, 0);
     return type;
 }
 
