@@ -3,38 +3,14 @@
 // Licensed under the Apache License v2.0
 
 #include <cassert>
+
 #include <orbit/orbiter/opcode.h>
+#include <orbit/orbiter/fiber.h>
 
 #include <orbit/orbiter/vm.h>
 
-#include <orbit/orbiter/fiber.h>
-
 using namespace orbiter;
 using namespace orbiter::datatype;
-
-bool orbiter::VMContextInit(VMContext *vmc, Isolate *isolate, MSize stackSize) noexcept {
-    if (!VMStackInit(&vmc->stack, isolate, stackSize))
-        return false;
-
-    memory::MemoryZero(&vmc->regs, sizeof(Registers));
-
-    vmc->state = VMState::RUNNABLE;
-
-    return true;
-}
-
-bool orbiter::VMStackInit(VMStack *vms, Isolate *isolate, MSize stackSize) noexcept {
-    memory::IsolateAllocator allocator(isolate);
-
-    vms->stack = allocator.alloc<Byte>(stackSize);
-    if (vms->stack == nullptr)
-        return false;
-
-    vms->current = 0;
-    vms->stackSize = stackSize;
-
-    return true;
-}
 
 OObject *orbiter::eval(Fiber *fiber) {
     auto *regs = &fiber->vm.regs;

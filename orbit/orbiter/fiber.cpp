@@ -28,15 +28,19 @@ void Fiber::SetCurrent(Fiber *fiber) noexcept {
     thl_fiber = fiber;
 }
 
-Fiber *Fiber::New(Isolate *isolate, MSize stackSize) noexcept {
+Fiber *Fiber::New(Isolate *isolate, MSize stack_size, MSize stack_limit) noexcept {
     memory::IsolateAllocator allocator(isolate);
 
     const auto fiber = allocator.alloc<Fiber>(sizeof(Fiber));
     if (fiber != nullptr) {
-        if (!VMContextInit(&fiber->vm, isolate, stackSize)) {
+        if (!fiber->vm.stack.Init(isolate, stack_size, stack_limit)) {
             allocator.free(fiber);
             return nullptr;
         }
+
+        memory::MemoryZero(&fiber->vm.regs, sizeof(Registers));
+
+        fiber->vm.state = VMState::RUNNABLE;
 
         fiber->error.value_ = nullptr;
         fiber->error.r_value_ = &fiber->error.value_;

@@ -40,7 +40,7 @@ namespace orbiter {
         } queue;
 
         /**
-         * Returns the current thread-local Fiber instance.
+         * @brief Returns the current thread-local Fiber instance.
          *
          * @return A pointer to the current Fiber instance if one exists, otherwise nullptr.
          */
@@ -49,19 +49,23 @@ namespace orbiter {
         static void SetCurrent(Fiber *fiber) noexcept;
 
         /**
-         * Creates a new Fiber instance associated with the provided Isolate and initializes
-         * its context with the given stack size.
+         * @brief Creates a new Fiber instance associated with the provided Isolate.
+         *
+         * Create a new Fiber instance and initializes its context with the given stack size and stack limit.
          *
          * @param isolate A pointer to the Isolate to which the new Fiber will belong.
-         * @param stackSize The size of the stack to allocate for the Fiber.
+         * @param stack_size The size of the stack to allocate for the Fiber.
+         * @param stack_limit The limit of the stack size for the Fiber.
+         *
          * @return A pointer to the newly created Fiber instance. Returns nullptr if the Fiber
          *         could not be created or initialized successfully.
          */
-        static Fiber *New(Isolate *isolate, MSize stackSize) noexcept;
+        static Fiber *New(Isolate *isolate, MSize stack_size, MSize stack_limit) noexcept;
 
         /**
-         * Deletes the provided Fiber instance, releasing associated resources. Behavior
-         * is undefined if an invalid Fiber instance is passed.
+         * @brief Deletes the provided Fiber instance, releasing associated resources.
+         *
+         * Behavior is undefined if an invalid Fiber instance is passed.
          *
          * @param fiber A pointer to the Fiber instance to be deleted.
          */

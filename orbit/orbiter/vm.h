@@ -5,16 +5,12 @@
 #ifndef ORBIT_ORBITER_VM_H_
 #define ORBIT_ORBITER_VM_H_
 
-#include <orbit/datatype.h>
-
-#include <orbit/orbiter/datatype/code.h>
+#include <orbit/orbiter/vmstack.h>
 
 namespace orbiter {
     constexpr auto kGeneralPurposeRegistersCount = 13;
     constexpr auto kSpecialPurposeRegistersCount = 3;
     constexpr auto kInternalRegistersCount = 2;
-
-    constexpr size_t kMinStackSize = 16 * memory::kToKBytes;
 
     using MachineWord = U32;
 
@@ -54,13 +50,6 @@ namespace orbiter {
         Register CP; // Catch point register
     };
 
-    struct VMStack {
-        Bytes stack;
-
-        MSize current;
-        MSize stackSize;
-    };
-
     enum class VMState {
         RUNNABLE,
         RUNNING,
@@ -74,10 +63,6 @@ namespace orbiter {
 
         VMState state;
     };
-
-    bool VMContextInit(VMContext *vmc, Isolate *isolate, MSize stackSize) noexcept;
-
-    bool VMStackInit(VMStack *vms, Isolate *isolate, MSize stackSize) noexcept;
 
     datatype::OObject *eval(Fiber *fiber);
 }

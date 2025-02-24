@@ -18,20 +18,25 @@ namespace orbiter {
         U32 pool_size_ = kFiberPoolSize;
         U32 stack_size_ = kMinStackSize;
 
+        U64 stack_limit_ = kMaxStackSize;
+
     public:
-        explicit FiberPool(Isolate *isolate, I32 pool_size, I32 stack_size) noexcept : queue_(
+        explicit FiberPool(Isolate *isolate, I32 pool_size, I32 stack_size, I64 stack_limit) noexcept : queue_(
                 pool_size > 0 ? pool_size : kFiberPoolSize), isolate_(isolate) {
             if (pool_size > 0)
                 this->pool_size_ = pool_size;
 
             if (stack_size > 0)
                 this->stack_size_ = stack_size;
+
+            if (stack_limit > 0)
+                this->stack_limit_ = stack_limit;
         }
 
         Fiber *NewFiber() noexcept {
             auto *fiber = this->queue_.Dequeue();
             if (fiber == nullptr)
-                fiber = Fiber::New(this->isolate_, this->stack_size_);
+                fiber = Fiber::New(this->isolate_, this->stack_size_, this->stack_limit_);
 
             return fiber;
         }

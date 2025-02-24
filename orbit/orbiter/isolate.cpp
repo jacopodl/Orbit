@@ -50,7 +50,7 @@ Isolate *Isolate::New() {
     if (!isolate->allocator_->Initialize())
         goto ERROR;
 
-    isolate->fpool_ = new FiberPool(isolate, -1, -1);
+    isolate->fpool_ = new FiberPool(isolate, -1, -1, -1);
 
     isolate->gc = new memory::GC(isolate);
 
