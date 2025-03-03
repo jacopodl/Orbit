@@ -20,7 +20,7 @@ namespace orbiter::datatype {
         Handle() noexcept: object_(nullptr) {
         }
 
-        explicit Handle(T *object) noexcept: object_(O_VFY_INCREF(object)) {
+        explicit Handle(T *object) noexcept: object_(O_INCREF(object)) {
         }
 
         Handle(Handle &&other) noexcept: object_(other.object_) {
@@ -28,7 +28,7 @@ namespace orbiter::datatype {
         }
 
         Handle(const Handle &other) : object_(other.object_) {
-            O_VFY_INCREF(other.object_);
+            O_INCREF(other.object_);
         }
 
         ~Handle() noexcept {
@@ -61,7 +61,7 @@ namespace orbiter::datatype {
                 if (this->object_ != nullptr)
                     this->reset();
 
-                this->object_ = O_VFY_INCREF(other.object_);
+                this->object_ = O_INCREF(other.object_);
             }
 
             return *this;
@@ -75,7 +75,7 @@ namespace orbiter::datatype {
 
         T *get() const noexcept { return this->object_; }
 
-        T *get_inc() const noexcept { return O_VFY_INCREF(this->object_); }
+        T *get_inc() const noexcept { return O_INCREF(this->object_); }
 
         T *release() noexcept {
             T *temp = this->object_;

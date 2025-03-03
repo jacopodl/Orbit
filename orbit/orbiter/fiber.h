@@ -124,9 +124,11 @@ namespace orbiter {
          * @param code A pointer to the Code object containing executable code.
          */
         void SetContext(datatype::Context *context, datatype::Module *module, datatype::Code *code) noexcept {
-            this->context.context = O_INCREF(context);
-            this->context.module = O_VFY_INCREF(module);
-            this->context.code = O_INCREF(code);
+            assert(code != nullptr);
+
+            this->context.context = O_FAST_INCREF(context);
+            this->context.module = O_FAST_INCREF(module);
+            this->context.code = O_FAST_INCREF(code);
 
             this->vm.regs.IP.reg = (PtrSize) code->m_code;
         }
@@ -141,9 +143,13 @@ namespace orbiter {
          * execution context is unset and its associated data is cleaned up.
          */
         void UnsetContext() noexcept {
-            Release(&this->context.context);
-            Release(&this->context.module);
-            Release(&this->context.code);
+            O_FAST_DECREF(this->context.context);
+            O_FAST_DECREF(this->context.module);
+            O_FAST_DECREF(this->context.code);
+
+            this->context.context = nullptr;
+            this->context.module = nullptr;
+            this->context.code = nullptr;
         }
     };
 } // namespace orbiter

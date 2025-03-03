@@ -37,7 +37,7 @@ bool orbiter::datatype::ListAppend(List *list, OObject *object) {
     if (!ListCheckSize(list, 1))
         return false;
 
-    list->objects[list->length++] = O_VFY_INCREF(object);
+    list->objects[list->length++] = O_INCREF(object);
 
     return true;
 }
@@ -50,7 +50,7 @@ bool orbiter::datatype::ListAppend(List *list, const List *other) {
         return false;
 
     for (MSize i = 0; i < other->length; i++)
-        list->objects[list->length++] = O_VFY_INCREF(other->objects[i]);
+        list->objects[list->length++] = O_INCREF(other->objects[i]);
 
     return true;
 }
@@ -63,13 +63,13 @@ bool orbiter::datatype::ListInsert(List *list, OObject *object, MSize index) {
         if (!ListCheckSize(list, 1))
             return false;
 
-        list->objects[list->length++] = O_VFY_INCREF(object);
+        list->objects[list->length++] = O_INCREF(object);
 
         return true;
     }
 
     O_DECREF(list->objects[index]);
-    list->objects[index] = O_VFY_INCREF(object);
+    list->objects[index] = O_INCREF(object);
 
     return true;
 }
@@ -81,7 +81,7 @@ bool orbiter::datatype::ListPrepend(List *list, OObject *object) {
     for (MSize i = list->length; i > 0; i--)
         list->objects[i] = list->objects[i - 1];
 
-    list->objects[0] = O_VFY_INCREF(object);
+    list->objects[0] = O_INCREF(object);
 
     list->length++;
 

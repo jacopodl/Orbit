@@ -158,7 +158,6 @@ namespace orbiter::datatype {
 
 #define O_INCREF(object)                    (O_IS_OBJECT(object) ? (O_GET_RC(object).IncStrong(), object) : object)
 #define O_FAST_INCREF(object)               ((object != nullptr) ? (O_GET_RC(object).IncStrong(), object) : object)
-#define O_VFY_INCREF(object)                ((object != nullptr && O_IS_OBJECT(object)) ? (O_GET_RC(object).IncStrong(), object) : object)
 
 #define O_GET_SLOT_COUNT(type)              (((type->i_size) - sizeof(OObject)) / sizeof(MSize))
 }

@@ -90,7 +90,7 @@ CGOTO
 
                 assert(module_slots != nullptr);
 
-                *(module_slots + slot) = O_VFY_INCREF((OObject *) value);
+                *(module_slots + slot) = O_INCREF((OObject *) value);
 
                 DISPATCH;
             }
@@ -108,7 +108,7 @@ CGOTO
                 const auto src = FETCH_R_SRC(instr);
                 const auto dst = FETCH_R_DST(instr);
 
-                REG_N(dst) = (PtrSize) O_VFY_INCREF((OObject*)REG_N(src));
+                REG_N(dst) = (PtrSize) O_INCREF((OObject*)REG_N(src));
 
                 DISPATCH;
             }
