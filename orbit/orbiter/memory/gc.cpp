@@ -109,7 +109,7 @@ void GC::Free(GCHead *head) noexcept {
 
     // TODO: Call DTOR!
 
-    Release(O_GET_TYPE(obj));
+    O_DECREF(O_GET_TYPE(obj));
 
     this->allocator_.free(head);
 

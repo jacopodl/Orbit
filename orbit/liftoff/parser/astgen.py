@@ -268,7 +268,7 @@ def generate_cleanup(fields):
         if type == "orbiter::datatype::OHandle":
             cleanup_lines.append(f"        node->{name}.~Handle();")
         elif type.startswith("orbiter::datatype::"):
-            cleanup_lines.append(f"        Release(node->{name});")
+            cleanup_lines.append(f"        O_DECREF(node->{name});")
         elif type.startswith("std::vector"):
             cleanup_lines.append(f"        node->{name}.~vector();")
         elif type.startswith("SymbolTable"):

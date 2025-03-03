@@ -152,7 +152,7 @@ Symbol *SymbolTable::SymbolNew(ORString *name, SymbolType type, MSize offset) no
 
     symbol->defining_scope = this->scope;
 
-    symbol->name = O_INCREF(name);
+    symbol->name = O_FAST_INCREF(name);
 
     symbol->type = type;
     symbol->decl_offset = offset;
@@ -210,16 +210,16 @@ Symbol *SymbolTable::Declare(ORString *name, SymbolType type, MSize offset) noex
         return nullptr;
     }
 
-    entry->key = O_INCREF(name);
+    entry->key = O_FAST_INCREF(name);
     entry->value = this->SymbolNew(name, type, offset);
     if (entry->value == nullptr) {
-        Release(entry->key);
+        O_FAST_DECREF(entry->key);
 
         return nullptr;
     }
 
     if (!table->symbols.Insert(entry)) {
-        Release(entry->key);
+        O_FAST_DECREF(entry->key);
 
         SymbolDel(entry->value);
 
@@ -253,7 +253,7 @@ Symbol *SymbolTable::DeclareSymbolScope(ORString *name, SymbolType type, MSize o
     auto *scope = this->ScopeNew(line_start);
     if (scope == nullptr) {
         if (table->symbols.Remove(sym->name, &entry)) {
-            Release(entry->key);
+            O_FAST_DECREF(entry->key);
 
             table->symbols.FreeHEntry(entry);
 
@@ -488,7 +488,7 @@ void SymbolTable::SymbolDel(Symbol *symbol) const noexcept {
     const orbiter::memory::IsolateAllocator allocator(this->isolate);
 
     while (symbol != nullptr) {
-        Release(symbol->name);
+        O_FAST_DECREF(symbol->name);
 
         if (symbol->scope != nullptr)
             this->ScopeDel(symbol->scope);
@@ -503,7 +503,7 @@ void SymbolTable::SymbolDel(Symbol *symbol) const noexcept {
 
 void SymbolTable::SubScopeDel(SubScope *sub_scope, bool r_memory) const noexcept {
     sub_scope->symbols.Finalize([this](const STHEntry *entry) {
-        Release(entry->key);
+        O_FAST_DECREF(entry->key);
 
         this->SymbolDel(entry->value);
     });

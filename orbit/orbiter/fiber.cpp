@@ -36,8 +36,7 @@ bool Fiber::PushState() noexcept {
 
     for (auto i = 0; i < kGeneralPurposeRegistersCount + 1; i++) {
         auto *value = (datatype::OObject *) *((PtrSize *) (((Register *) &this->vm.regs) + i));
-        if (value != nullptr && O_IS_OBJECT(value))
-            O_INCREF(value);
+        O_INCREF(value);
     }
 
     return true;
@@ -85,11 +84,10 @@ void Fiber::PopState() noexcept {
     auto *stack_base = this->vm.stack.stack + this->vm.regs.BP.reg;
 
     memory::MemoryCopy(&this->context, stack_base, sizeof(FiberContext));
-    memory::MemoryCopy(&this->vm.regs, stack_base + sizeof(FiberContext),sizeof(Registers));
+    memory::MemoryCopy(&this->vm.regs, stack_base + sizeof(FiberContext), sizeof(Registers));
 
     for (auto i = 0; i < kGeneralPurposeRegistersCount + 1; i++) {
         auto *value = (datatype::OObject *) *((PtrSize *) (((Register *) &this->vm.regs) + i));
-        if (value != nullptr && O_IS_OBJECT(value))
-            Release(value);
+        O_DECREF(value);
     }
 }

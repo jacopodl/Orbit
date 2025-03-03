@@ -269,7 +269,10 @@ namespace orbiter {
                 const auto head = GC_GET_HEAD(object);
                 const auto size = head->size;
 
-                // TODO: if (dtor && O_GET_TYPE(object)->)
+                if (dtor && O_GET_TYPE(object)->dtor != nullptr)
+                    O_GET_TYPE(object)->dtor(object);
+
+                O_FAST_DECREF(O_GET_TYPE(object));
 
                 this->allocator_.free(head);
 

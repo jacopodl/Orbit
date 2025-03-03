@@ -69,16 +69,12 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *va
 
 bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const FunctionDef *bulk) {
     for (auto *cursor = bulk; cursor->name != nullptr; cursor++) {
-        auto *fn = FunctionNew(type->isolate, cursor);
-        if (fn == nullptr)
+        auto fn = FunctionNew(type->isolate, cursor);
+        if (!fn)
             return false;
 
-        if (!TIPropertyAdd(type, cursor->name, (OObject *) fn, {})) {
-            // TODO: Remove release
-            Release(fn);
-
+        if (!TIPropertyAdd(type, cursor->name, (OObject *) fn.get(), {}))
             return false;
-        }
     }
 
     return true;

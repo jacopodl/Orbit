@@ -87,7 +87,7 @@ namespace orbiter::datatype {
 
         void reset() noexcept {
             if (this->object_ != nullptr) {
-                Release(this->object_);
+                O_DECREF(this->object_);
                 this->object_ = nullptr;
             }
         }

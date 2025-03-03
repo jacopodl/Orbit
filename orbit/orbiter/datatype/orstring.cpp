@@ -27,7 +27,8 @@ ORString *MkStringContainer(orbiter::Isolate *isolate, MSize len, bool mkbuf) {
             orbiter::memory::IsolateAllocator allocator(isolate);
             str->buffer = allocator.alloc<unsigned char>(len + 1);
             if (str->buffer == nullptr) {
-                Release(str);
+                isolate->gc->RawFree((OObject *) str, false);
+
                 return nullptr;
             }
 

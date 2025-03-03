@@ -71,6 +71,8 @@ namespace orbiter::datatype {
         FuncShared *shared;
     };
 
+    using HFunction = Handle<Function>;
+
     /**
      * @brief Set up additional features and properties for the specified type
      *
@@ -95,7 +97,7 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created Function
      */
-    Function *FunctionNew(Isolate *isolate, const FunctionDef *def);
+    HFunction FunctionNew(Isolate *isolate, const FunctionDef *def);
 
     /**
      * @brief Initialize and create the specified type

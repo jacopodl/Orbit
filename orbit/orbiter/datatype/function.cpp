@@ -54,7 +54,7 @@ bool orbiter::datatype::FunctionTypeSetup(TypeInfo *self) {
     return true;
 }
 
-Function *orbiter::datatype::FunctionNew(Isolate *isolate, const FunctionDef *def) {
+HFunction orbiter::datatype::FunctionNew(Isolate *isolate, const FunctionDef *def) {
     // TODO: FIX THIS!
     auto kind = FunctionKind::NATIVE;
 
@@ -63,19 +63,19 @@ Function *orbiter::datatype::FunctionNew(Isolate *isolate, const FunctionDef *de
 
     auto *f_shared = FunSharedNew(isolate, def->name, def->doc, def->params, def->func, kind);
     if (f_shared == nullptr)
-        return nullptr;
+        return {};
 
     auto *fn = MakeObject<Function>(isolate, InstanceType::FUNCTION);
 
     if (fn != nullptr) {
         fn->shared = f_shared;
 
-        return fn;
+        O_GC_TRACK_RETURN(isolate, fn, false);
     }
 
     FunSharedDel(isolate, f_shared);
 
-    return nullptr;
+    return {};
 }
 
 HOType orbiter::datatype::FunctionTypeInit(Isolate *isolate) {
