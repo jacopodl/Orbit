@@ -7,6 +7,8 @@
 
 #include <atomic>
 
+#include <orbit/util/macros.h>
+
 #include <orbit/orbiter/datatype/obase.h>
 
 #include <orbit/orbiter/memory/iallocator.h>
@@ -27,6 +29,17 @@ namespace orbiter {
         constexpr unsigned int kGCThresholdElementsCount = 10000;
         constexpr unsigned int kGCRCThresholdElementsCount = 2000;
 
+        constexpr unsigned char kGCPromotionThresholdGen0 = 2;
+        constexpr unsigned char kGCPromotionThresholdGen1 = 3;
+
+#ifdef _ORBIT_ENVIRON_64BIT_
+        constexpr unsigned char kGCMaxEpoch = 0xFFFFFFFFFFFFFE; // (1u<<56) - 2
+#elif  _ORBIT_ENVIRON_32BIT_
+        constexpr unsigned char kGCMaxEpoch = 0xFFFFFE;         // (1u<<24) - 2
+#else
+#error "invalid environment."
+#endif
+
         /**
          * @brief Represents a node in the garbage collection (GC) management chain with metadata for object tracking.
          *
@@ -41,7 +54,20 @@ namespace orbiter {
             GCHead *next = nullptr;
             GCHead **prev = nullptr;
 
-            MSize r_count = 0;
+#ifdef _ORBIT_ENVIRON_64BIT_
+            struct {
+                MSize epoch: 56 = 0;
+                MSize age: 8 = 0;
+            };
+#elif  _ORBIT_ENVIRON_32BIT_
+            struct {
+                MSize epoch: 24 = 0;
+                MSize age: 8 = 0;
+            };
+#else
+#error "invalid environment"
+#endif
+
             MSize size = 0;
 
             [[nodiscard]] bool IsContainer() const {
@@ -57,8 +83,8 @@ namespace orbiter {
                 return this->prev != nullptr;
             }
 
-            [[nodiscard]] bool IsVisited() const {
-                return ((((uintptr_t) this->next) & GCBitOffsets::VisitedMask) >> GCBitOffsets::VisitedShift);
+            [[nodiscard]] bool IsVisited(MSize epoch) const {
+                return this->epoch == epoch || this->epoch == (epoch - 1);
             }
 
             [[nodiscard]] GCHead *Next() const {
@@ -79,10 +105,83 @@ namespace orbiter {
                 this->next = (GCHead *) (((uintptr_t) head) | ((uintptr_t) this->next & ~GCBitOffsets::AddressMask));
             }
 
-            void SetVisited(bool visited) {
-                this->next = (GCHead *) (visited
-                                             ? (uintptr_t) this->next | GCBitOffsets::VisitedMask
-                                             : (uintptr_t) this->next & ~GCBitOffsets::VisitedMask);
+            void SetVisited(MSize epoch) {
+                this->epoch = epoch;
+            }
+        };
+
+        /**
+         * @brief Represents a transient list for managing garbage collection (GC) objects in a temporary context.
+         *
+         * The GCTransientList class provides utility for managing a temporary collection of GCHead objects during
+         * garbage collection operations. It allows operations such as merging its contents into another list and
+         * adding new GC objects to the head of the list while maintaining proper pointers and metadata integrity.
+         * This class ensures the tracked objects are organized in a chain with appropriate connection and disconnection
+         * mechanisms.
+         */
+        class GCTransientList {
+            MSize count = 0;
+
+        public:
+            GCHead *head = nullptr;
+            GCHead *tail = nullptr;
+
+            /**
+             * @brief Merges the current list into a destination list, resetting the source list and returning the number of elements transferred.
+             *
+             * This method combines the contents of the current GCTransientList into the specified destination.
+             * The source list (represented by this object) is cleared after transfer, and the number of elements moved
+             * is returned. Updates are made to ensure proper linkage between the lists to maintain their integrity.
+             *
+             * @param destination A double pointer to the head of the destination list, where the elements from the current list
+             *                    should be appended.
+             * @return The number of elements transferred from the current list to the destination list.
+             */
+            MSize MergeTo(GCHead **destination) {
+                const auto count = this->count;
+
+                if (this->head == nullptr)
+                    return 0;
+
+                this->tail->SetNext(*destination);
+
+                if (*destination != nullptr)
+                    (*destination)->prev = &this->tail->next;
+
+                *destination = this->head;
+                this->head->prev = destination;
+
+                this->head = nullptr;
+                this->tail = nullptr;
+                this->count = 0;
+
+                return count;
+            }
+
+            /**
+             * @brief Adds a GCHead node to the head of the GCTransientList.
+             *
+             * @param head A pointer to the GCHead object to be added to the head of the list.
+             */
+            void AddHead(GCHead *head) {
+                if (this->head == nullptr) {
+                    head->SetNext(nullptr);
+                    head->prev = &this->head;
+                } else {
+                    head->SetNext(this->head);
+
+                    if (this->head != nullptr)
+                        this->head->prev = &head->next;
+
+                    head->prev = &this->head;
+                }
+
+                this->head = head;
+
+                if (this->tail == nullptr)
+                    this->tail = head;
+
+                this->count += 1;
             }
         };
 
@@ -96,14 +195,13 @@ namespace orbiter {
          */
         struct GCGeneration {
             GCHead *list;
-            GCHead *simple_objects;
 
             MSize count;
-            MSize simple_count;
 
             MSize collected;
             MSize uncollected;
 
+            U32 promotion_threshold;
             U32 threshold;
             U32 times;
         };
@@ -113,7 +211,7 @@ namespace orbiter {
          *
          * The GCContext class provides critical synchronization mechanisms and metadata structures
          * required to manage garbage collection in a memory system. It encapsulates locks and
-         * data structures for generational garbage collection, reference counting, and object tracking.
+         * data structures for generational garbage collection, and object tracking.
          * It serves as the core structure for coordinating the various components involved in garbage
          * collection processes.
          *
@@ -121,8 +219,7 @@ namespace orbiter {
          *
          * - Synchronization:
          *   Contains multiple mutex locks to ensure thread-safe operations across garbage collection tasks,
-         *   such as garbage list updates, reference counting manipulations, tracked object management,
-         *   and interactions with the virtual machine.
+         *   such as garbage list updates, tracked object management and interactions with the virtual machine.
          *
          * - Generational Collection:
          *   Manages multiple generations for garbage collection using the `generations` array, enabling
@@ -136,18 +233,13 @@ namespace orbiter {
         class GCContext {
         public:
             std::mutex garbage_lock;
-            std::mutex rc_lock;
             std::mutex track_lock;
+            std::mutex run_lock;
             std::mutex vm_lock;
 
             GCGeneration generations[kGCGenerations]{};
 
             GCHead *garbage = nullptr;
-
-            //GCHead *rc_list = nullptr;
-
-            MSize rc_count = 0;
-            MSize rc_bytes = 0;
 
             MSize tracked_count = 0;
             MSize tracked_bytes = 0;
@@ -168,10 +260,11 @@ namespace orbiter {
 
             Fiber *fibers_;
 
+            MSize epoch = 2;
+
             MSize max_heap_size_;
 
             std::atomic_bool enabled_ = true;
-            std::atomic_bool running_ = false;
 
             std::atomic_uintptr_t allocated_bytes_ = 0;
 
@@ -180,24 +273,19 @@ namespace orbiter {
                                                                     max_heap_size_(heap_size) {
                 if (heap_size < kGCMinHeapSize)
                     this->max_heap_size_ = kGCMinHeapSize;
+
+                this->context_.generations[0].promotion_threshold = kGCPromotionThresholdGen0;
+                this->context_.generations[1].promotion_threshold = kGCPromotionThresholdGen1;
             }
 
             explicit GC(Isolate *isolate) noexcept : GC(isolate, kGCMaxHeapSize) {
             }
 
-            MSize Collect() noexcept;
+            MSize Collect() noexcept {
+                return this->Collect(0, kGCGenerations);
+            }
 
-            MSize Collect(int generation) noexcept;
-
-            /**
-             * @brief Executes the reference-count based garbage collection process by traversing the release list.
-             *
-             * It identifies and collects objects with a reference count of zero or removes actively used objects
-             * (with a strong reference count greater than zero) from the release list to prevent erroneous collection.
-             *
-             * @return The number of objects that were successfully collected during the process.
-             */
-            MSize CollectRCQueue(int generation) noexcept;
+            MSize Collect(int start, int end) noexcept;
 
             void Free(GCHead *head) noexcept;
 
@@ -205,23 +293,34 @@ namespace orbiter {
 
             static void HeadRemove(const GCHead *head) noexcept;
 
+            void NextEpoch() noexcept;
+
             void ResetStats(int generation) noexcept;
 
             void ScanVMRegisters() noexcept;
 
             void Sweep() noexcept;
 
-            static void SearchRoots(const GCGeneration *generation) noexcept;
+            void ScanRoots(const GCGeneration *generation) const noexcept;
 
-            static void Trace(datatype::OObject *object, bool inc) noexcept;
+            static void Trace(datatype::OObject *object, MSize epoch) noexcept;
 
-            static void TraceRoots(GCGeneration *generation, GCHead **unreachable) noexcept;
-
-            void Trashing(GCGeneration *nextgen, GCHead *unreachable) noexcept;
+            void TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransientList *unreachable) noexcept;
 
             friend Isolate;
 
         public:
+            /**
+             * @brief Triggers a forced garbage collection in the current context.
+             *
+             * The ForceCollect method immediately initiates a garbage collection cycle, ensuring
+             * that unreferenced objects are removed and memory is reclaimed. It operates safely
+             * within the context's locking mechanism and guarantees thread-safe execution.
+             *
+             * @return Returns the total number of objects successfully reclaimed during the garbage collection process.
+             */
+            MSize ForceCollect() noexcept;
+
             /**
              * @brief Allocates memory for a new object managed by the garbage collector.
              *
@@ -272,19 +371,7 @@ namespace orbiter {
              * @param object A pointer to the garbage-collected object to be deallocated.
              * @param dtor Indicates whether the destructor of the object should be called (true) or not (false).
              */
-            void RawFree(datatype::OObject *object, bool dtor) noexcept {
-                const auto head = GC_GET_HEAD(object);
-                const auto size = head->size;
-
-                if (dtor && O_GET_TYPE(object)->dtor != nullptr)
-                    O_GET_TYPE(object)->dtor(object);
-
-                O_FAST_DECREF(O_GET_TYPE(object));
-
-                this->allocator_.free(head);
-
-                this->allocated_bytes_ -= size;
-            }
+            void RawFree(datatype::OObject *object, bool dtor) noexcept;
 
             /**
              * @brief Removes the specified Fiber instance from the fiber tracking list in the garbage collector.
@@ -295,7 +382,7 @@ namespace orbiter {
              *
              * @param fiber A pointer to the Fiber instance to be removed from the tracking list.
              */
-            void RemoveFiber(Fiber *fiber) noexcept;
+            void RemoveFiber(const Fiber *fiber) noexcept;
 
             /**
              * @brief Performs a threshold-based garbage collection process to manage allocated memory.
@@ -316,7 +403,6 @@ namespace orbiter {
              *
              * This method ensures that the provided object is registered for tracking
              * in the current generation of objects monitored by the garbage collector.
-             * The object is added to the appropriate list based on its type (container or simple).
              *
              * @param object A pointer to the object to be tracked. The object must be properly
              *               initialized and convertible to the expected type.

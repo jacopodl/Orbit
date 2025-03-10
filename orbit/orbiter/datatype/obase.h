@@ -23,7 +23,7 @@ namespace orbiter::datatype {
     constexpr auto kOddBallTRUE = 0x10u | kOddBallMask;
 
     using DtorFn = bool (*)(OObject *);
-    using TraceFn = void (*)(OObject *self, void (*gc_callback)(OObject *));
+    using TraceFn = void (*)(OObject *self, void (*gc_callback)(OObject *, MSize));
 
     using FunctionPtr = OObject *(*)(struct Function *, OObject **argv, OObject *kwargs, U16 argc);
 

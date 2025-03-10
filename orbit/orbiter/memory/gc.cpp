@@ -12,95 +12,91 @@ using namespace orbiter;
 using namespace orbiter::datatype;
 using namespace orbiter::memory;
 
-thread_local bool rc_trashing = false;
-
-void InitGCRefCount(GCHead *head) {
-    head->r_count = O_GET_RC(GC_GET_OBJ(head)).GetStrongCount();
-    head->SetVisited(true);
-}
-
-void GCDecRef(OObject *self) {
-    if (self == nullptr || !O_IS_OBJECT(self) || !RC_CHECK_IS_GCOBJ(O_UNSAFE_GET_RC(self)))
-        return;
-
-    auto *head = GC_GET_HEAD(self);
-
-    if (!head->IsVisited())
-        InitGCRefCount(head);
-
-    head->r_count -= 1;
-}
-
-void GCIncRef(OObject *self) {
-    if (self == nullptr || !O_IS_OBJECT(self) || !RC_CHECK_IS_GCOBJ(O_UNSAFE_GET_RC(self)))
-        return;
-
-    auto *head = GC_GET_HEAD(self);
-
-    if (head->IsVisited()) {
-        head->SetVisited(false);
-
-        O_GET_TYPE(self)->trace(self, GCIncRef);
-    }
-
-    head->r_count += 1;
-}
+thread_local bool gen_z_lock = false;
 
 // *********************************************************************************************************************
 // PRIVATE
 // *********************************************************************************************************************
 
-MSize GC::CollectRCQueue(int generation) noexcept {
-    MSize count = 0;
-    MSize bytes = 0;
+MSize GC::Collect(int start, int end) noexcept {
+    std::unique_lock lock(this->context_.track_lock, std::defer_lock);
 
-    std::unique_lock _(this->context_.rc_lock);
+    GCTransientList unreachable{};
+    GCTransientList nextgen[2]{};
 
+    int next_gen = start;
+    int chg = 0;
+
+    // Ensure 'start' and 'end' are within valid generation indices
+    start = start % kGCGenerations;
+    end = end % kGCGenerations;
+
+    assert(start <= end);
+
+    // Move to the next epoch to avoid revisiting old objects
+    this->NextEpoch();
+
+    // 1) Scan active virtual machine registers for reachable objects
     this->ScanVMRegisters();
 
-    rc_trashing = true;
+    for (auto i = start; i < end; i++) {
+        // Determine the next generation for promoting objects
+        if ((next_gen = (i + 1) % kGCGenerations) == 0)
+            next_gen = kGCGenerations - 1;
 
-    GCHead *next;
-    for (auto *cursor = this->context_.generations[generation].simple_objects; cursor != nullptr; cursor = next) {
-        next = cursor->Next();
+        const auto selected = this->context_.generations + i;
+        const auto total = selected->count;
 
-        // If the reference count is zero, the object is unused and not in VM registers
-        if (cursor->r_count == 0) {
-            HeadRemove(cursor);
-
-            bytes += cursor->size;
-
-            this->Free(cursor);
-
-            count += 1;
-
-            continue;
+        // Lock for generation 0 to ensure thread safety
+        if (i == 0) {
+            gen_z_lock = true;
+            lock.lock();
         }
 
-        // Check the strong reference count of the object to determine its active usage
-        MSize r_count = O_GET_RC(GC_GET_OBJ(cursor)).GetStrongCount();
-        if (r_count > 0) {
-            // If the strong reference count is greater than zero, the object is actively used.
-            // This means it is not only potentially in a VM register but might also
-            // be part of a container like a list, dictionary, or other complex structure.
-            // In this case, remove it from the release list to ensure it is not mistakenly collected.
-            HeadRemove(cursor);
+        // Reset collection statistics for the current generation
+        this->ResetStats(i);
 
-            bytes += cursor->size;
+        if (selected->list == nullptr)
+            return 0;
+
+        // Increment the number of times this generation has been collected
+        selected->times += 1;
+
+        // 2) Scan root elements (objects directly accessible from the generation)
+        ScanRoots(selected);
+
+        // 3) Trace and classify unreachable objects
+        TraceRoots(selected, &nextgen[1 - chg], &unreachable);
+
+        // Unlock after scanning and tracing for generation 0
+        if (i == 0) {
+            gen_z_lock = false;
+            lock.unlock();
         }
 
-        // Reset the r_count for the next cycle to prepare it for a future check
-        cursor->r_count = 0;
+        // Promote objects from the previous generation to the current generation
+        if (nextgen[chg].head != nullptr)
+            selected->count += nextgen[chg].MergeTo(&selected->list);
+
+        // Alternate between nextgen lists for temporary storage
+        chg ^= 1;
+
+        // Update statistics for collection
+        selected->collected = total - selected->count;
+        selected->uncollected = selected->count;
     }
 
-    rc_trashing = false;
+    // Promote remaining objects in the nextgen list to the next generation
+    if (nextgen[chg].head != nullptr) {
+        const auto selected = this->context_.generations + next_gen;
 
-    this->context_.generations[generation].simple_count -= count;
+        selected->count += nextgen[chg].MergeTo(&selected->list);
+    }
 
-    this->context_.rc_count -= count;
-    this->context_.rc_bytes -= bytes;
+    // Move unreachable objects to the garbage list
+    std::unique_lock _(this->context_.garbage_lock);
 
-    return count;
+    return unreachable.MergeTo(&this->context_.garbage);
 }
 
 void GC::Free(GCHead *head) noexcept {
@@ -142,6 +138,13 @@ void GC::HeadRemove(const GCHead *head) noexcept {
         next->prev = head->prev;
 }
 
+void GC::NextEpoch() noexcept {
+    this->epoch += 2;
+
+    if (this->epoch > kGCMaxEpoch)
+        this->epoch = 2;
+}
+
 void GC::ResetStats(int generation) noexcept {
     if (generation > 0)
         this->context_.generations[generation - 1].times = 0;
@@ -160,23 +163,32 @@ void GC::ScanVMRegisters() noexcept {
         for (auto i = 0; i < sizeof(Registers); i++) {
             auto *obj = (OObject *) ((PtrSize *) (regs + i));
 
-            if (obj == nullptr || !O_IS_OBJECT(obj))
+            if (!O_IS_OBJECT(obj))
                 continue;
 
             auto *head = GC_GET_HEAD(obj);
-            head->r_count += 1;
+            if (!head->IsVisited(this->epoch)) {
+                head->epoch = this->epoch - 1;
+
+                if (head->IsContainer())
+                    Trace(obj, this->epoch);
+            }
         }
     }
 }
 
-void GC::SearchRoots(const GCGeneration *generation) noexcept {
+void GC::ScanRoots(const GCGeneration *generation) const noexcept {
     for (auto *cursor = generation->list; cursor != nullptr; cursor = cursor->Next()) {
         auto *obj = GC_GET_OBJ(cursor);
 
-        if (!cursor->IsVisited())
-            InitGCRefCount(cursor);
+        if (O_GET_RC(obj).GetStrongCount() > 0) {
+            const auto visited = cursor->IsVisited(this->epoch);
 
-        Trace(obj, false);
+            cursor->epoch = this->epoch;
+
+            if (!visited && cursor->IsContainer())
+                Trace(obj, this->epoch);
+        }
     }
 }
 
@@ -197,7 +209,7 @@ void GC::Sweep() noexcept {
     }
 }
 
-void GC::Trace(OObject *object, bool inc) noexcept {
+void GC::Trace(OObject *object, MSize epoch) noexcept {
     const auto *info = O_GET_TYPE(object);
 
     assert(info != nullptr);
@@ -209,84 +221,77 @@ void GC::Trace(OObject *object, bool inc) noexcept {
         for (auto i = 0; i < slots_count; i++) {
             auto *obj = slots[i];
 
-            if (O_IS_OBJECT(obj) && RC_CHECK_IS_GCOBJ(O_UNSAFE_GET_RC(obj))) {
-                auto *head = GC_GET_HEAD(obj);
+            if (!O_IS_OBJECT(obj))
+                continue;
 
-                if (!inc) {
-                    if (!head->IsVisited())
-                        InitGCRefCount(head);
+            auto *head = GC_GET_HEAD(obj);
+            if (!head->IsVisited(epoch)) {
+                head->SetVisited(true);
 
-                    head->r_count -= 1;
-
-                    continue;
-                }
-
-                if (head->IsVisited()) {
-                    head->SetVisited(false);
-
-                    Trace(obj, true);
-                }
-
-                head->r_count += 1;
+                if (head->IsContainer())
+                    Trace(obj, epoch);
             }
         }
 
         if (info->trace != nullptr)
-            info->trace(object, inc ? GCIncRef : GCDecRef);
+            info->trace(object, Trace);
 
         info = info->head_.type_;
     } while (info != nullptr);
 }
 
-void GC::TraceRoots(GCGeneration *generation, GCHead **unreachable) noexcept {
-    GCHead *next;
+void GC::TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransientList *unreachable) noexcept {
+    std::unique_lock lock(this->context_.track_lock, std::defer_lock);
 
+    const auto first_gen = generation == this->context_.generations;
+    const auto last_gen = generation == &this->context_.generations[kGCGenerations - 1];
+
+    GCHead *next;
     for (auto *cursor = generation->list; cursor != nullptr; cursor = next) {
         next = cursor->Next();
 
-        if (cursor->r_count == 0) {
-            cursor->SetFinalize(true);
+        if (this->epoch == cursor->epoch) {
+            cursor->age += 1;
 
-            HeadRemove(cursor);
-            HeadInsert(unreachable, cursor);
+            if (!last_gen && cursor->age >= generation->promotion_threshold) {
+                cursor->age = 0;
 
-            generation->count -= 1;
+                HeadRemove(cursor);
+
+                generation->count -= 1;
+
+                nextgen->AddHead(cursor);
+            }
 
             continue;
         }
-
-        if (cursor->IsVisited()) {
-            cursor->SetVisited(false);
-
-            Trace(GC_GET_OBJ(cursor), true);
-        }
-    }
-}
-
-void GC::Trashing(GCGeneration *nextgen, GCHead *unreachable) noexcept {
-    GCHead *next;
-
-    std::unique_lock _(this->context_.garbage_lock);
-
-    for (auto *cursor = unreachable; cursor != nullptr; cursor = next) {
-        next = cursor->Next();
 
         HeadRemove(cursor);
 
-        // Check if objects are really unreachable
-        if (cursor->r_count == 0) {
-            HeadInsert(&this->context_.garbage, cursor);
+        generation->count -= 1;
 
-            this->context_.tracked_count -= 1;
-            this->context_.tracked_bytes -= cursor->size;
+        if (!first_gen && this->epoch - 1 == cursor->epoch) {
+            if (!gen_z_lock)
+                lock.lock();
+
+            cursor->age = 0;
+
+            HeadInsert(&this->context_.generations[0].list, cursor);
+
+            this->context_.generations[0].count += 1;
+
+            if (!gen_z_lock)
+                lock.unlock();
 
             continue;
         }
 
-        cursor->SetFinalize(false);
+        cursor->SetFinalize(true);
 
-        HeadInsert(&nextgen->list, cursor);
-        nextgen->count += 1;
+        unreachable->AddHead(cursor);
+
+        this->context_.tracked_count -= 1;
+        this->context_.tracked_bytes -= cursor->size;
     }
 }
 
@@ -294,59 +299,10 @@ void GC::Trashing(GCGeneration *nextgen, GCHead *unreachable) noexcept {
 // PUBLIC
 // *********************************************************************************************************************
 
-MSize GC::Collect() noexcept {
-    MSize collected = 0;
+MSize GC::ForceCollect() noexcept {
+    std::unique_lock _(this->context_.run_lock);
 
-    for (auto i = 0; i < kGCGenerations; i++)
-        collected += this->Collect(i);
-
-    return collected;
-}
-
-MSize GC::Collect(int generation) noexcept {
-    std::unique_lock lock(this->context_.track_lock, std::defer_lock);
-
-    generation = generation % kGCGenerations;
-
-    int next_gen;
-    if ((next_gen = (generation + 1) % kGCGenerations) == 0)
-        next_gen = kGCGenerations - 1;
-
-    const auto selected = this->context_.generations + generation;
-
-    if (generation == 0)
-        lock.lock();
-
-    this->ResetStats(generation);
-
-    if (selected->list == nullptr)
-        return 0;
-
-    selected->times += 1;
-
-    GCHead *unreachable = nullptr;
-
-    const auto total = selected->count;
-
-    // 1) Enumerate roots
-    SearchRoots(selected);
-
-    // 2) Trace all objects reachable from roots
-    TraceRoots(selected, &unreachable);
-
-    if (lock.owns_lock())
-        lock.unlock();
-
-    // 3) Scan all VMs Registers
-    this->ScanVMRegisters();
-
-    // 4) Collect unreachable objects
-    Trashing(this->context_.generations + next_gen, unreachable);
-
-    selected->collected = total - selected->count;
-    selected->uncollected = selected->count;
-
-    return selected->collected;
+    return this->Collect();
 }
 
 OObject *GC::AllocObject(MSize size) noexcept {
@@ -358,6 +314,8 @@ OObject *GC::AllocObject(MSize size) noexcept {
     if (head != nullptr) {
         new(head)GCHead();
 
+        head->epoch = 0;
+        head->age = 0;
         head->size = allocate;
 
         this->allocated_bytes_ += allocate;
@@ -390,7 +348,21 @@ void GC::AddFiber(Fiber *fiber) noexcept {
     this->fibers_ = fiber;
 }
 
-void GC::RemoveFiber(Fiber *fiber) noexcept {
+void GC::RawFree(OObject *object, bool dtor) noexcept {
+    const auto head = GC_GET_HEAD(object);
+    const auto size = head->size;
+
+    if (dtor && O_GET_TYPE(object)->dtor != nullptr)
+        O_GET_TYPE(object)->dtor(object);
+
+    O_FAST_DECREF(O_GET_TYPE(object));
+
+    this->allocator_.free(head);
+
+    this->allocated_bytes_ -= size;
+}
+
+void GC::RemoveFiber(const Fiber *fiber) noexcept {
     std::unique_lock _(this->context_.vm_lock);
 
     auto *next = fiber->gc_set.next;
@@ -405,40 +377,31 @@ void GC::RemoveFiber(Fiber *fiber) noexcept {
 void GC::ThresholdCollect() noexcept {
     auto allocated_bytes = this->allocated_bytes_.load(std::memory_order_relaxed);
 
-    bool running = false;
-    if (!this->running_.compare_exchange_strong(running, true, std::memory_order_relaxed))
+    if (!this->enabled_ && allocated_bytes < ((this->max_heap_size_ * 90) / 100))
         return;
 
-    if (this->enabled_) {
-        if (allocated_bytes < ((this->max_heap_size_ * 90) / 100)) {
-            if (allocated_bytes >= (U32) ((this->max_heap_size_ * 40) / 100)) {
-                this->Collect(0);
+    std::unique_lock _(this->context_.run_lock);
+    
+    allocated_bytes = this->allocated_bytes_.load(std::memory_order_relaxed);
 
-                for (unsigned short i = 1; i < kGCGenerations; i++) {
-                    const auto *generations = this->context_.generations;
+    if (allocated_bytes < ((this->max_heap_size_ * 90) / 100)) {
+        if (allocated_bytes >= (U32) ((this->max_heap_size_ * 40) / 100)) {
+            auto i = 1;
 
-                    if (generations[i - 1].times < generations[i].threshold
-                        && generations[i].count < kGCThresholdElementsCount)
-                        break;
+            for (; i < kGCGenerations; i++) {
+                const auto *generations = this->context_.generations;
 
-                    Collect(i);
-                }
+                if (generations[i - 1].times < generations[i].threshold
+                    && generations[i].count < kGCThresholdElementsCount)
+                    break;
             }
-        } else
-            this->Collect();
 
-        this->Sweep();
-    }
+            this->Collect(0, i);
+        }
+    } else
+        this->Collect();
 
-    auto rc_max_memory = this->max_heap_size_ - this->context_.tracked_bytes;
-
-    if (this->context_.rc_bytes < ((rc_max_memory * 20) / 100)
-        && this->context_.rc_count < kGCRCThresholdElementsCount)
-        return;
-
-    this->CollectRCQueue(0);
-
-    this->running_.store(false, std::memory_order_relaxed);
+    this->Sweep();
 }
 
 void GC::Track(OObject *object, bool is_container) noexcept {
@@ -446,23 +409,12 @@ void GC::Track(OObject *object, bool is_container) noexcept {
 
     auto *generation = this->context_.generations;
 
-    if (is_container) {
-        std::unique_lock _(this->context_.rc_lock);
-
-        if (!head->IsTracked()) {
-            HeadInsert(&generation->simple_objects, head);
-            generation->simple_count += 1;
-
-            this->context_.rc_count += 1;
-            this->context_.rc_bytes += head->size;
-        }
-
-        return;
-    }
-
     std::unique_lock _(this->context_.track_lock);
 
     if (!head->IsTracked()) {
+        if (is_container)
+            head->SetContainerType();
+
         HeadInsert(&generation->list, head);
         generation->count += 1;
 
