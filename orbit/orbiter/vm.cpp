@@ -151,6 +151,23 @@ CGOTO
 
                 DISPATCH;
             }
+            TARGET_OP(ALLOCA) {
+                const auto flags = (AllocaFlags) ((instr >> 16) & 0xFu);
+                const auto size = FETCH_IMM(instr) * sizeof(void *);
+
+                if (stack->Check(fiber->isolate, regs->SP.reg, size)) {
+                    if (flags == AllocaFlags::ZERO_INIT)
+                        memory::MemoryZero(stack->stack + regs->SP.reg, size);
+
+                    regs->SP.reg += size;
+
+                    DISPATCH;
+                }
+
+                // TODO: ERROR!
+
+                DISPATCH;
+            }
             TARGET_OP(JEN) {
                 const auto src = FETCH_R_SRC(instr);
                 const auto offset = FETCH_IMM(instr);
