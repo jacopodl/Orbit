@@ -13,9 +13,7 @@ bool orbiter::datatype::NumberTypeSetup(TypeInfo *self) {
 }
 
 HNumber orbiter::datatype::IntNew(Isolate *isolate, IntegerUnderlying value) {
-    auto inline_max = 0x1ULL << ((sizeof(MSize) * 8) - 1);
-
-    if (value < inline_max)
+    if (value < kSMIMaxSize)
         return HNumber((Number *) ((value << 1) | 0x1));
 
     auto *num = MakeObject<Number>(isolate, InstanceType::NUMBER);

@@ -4,6 +4,8 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/datatype/number.h>
+
 #include <orbit/orbiter/opcode.h>
 #include <orbit/orbiter/fiber.h>
 
@@ -11,6 +13,23 @@
 
 using namespace orbiter;
 using namespace orbiter::datatype;
+
+HOObject VMAdd(Isolate *isolate, PtrSize left, PtrSize right) {
+    if (O_IS_SMI(left) && O_IS_SMI(right)) {
+        left -= 1;
+
+        const auto res = left + right;
+        if (res >= kSMIMaxSize)
+            return (HOObject) IntNew(isolate, (((IntegerUnderlying) left) >> 1) + (((IntegerUnderlying) right) >> 1));
+
+        return HOObject((OObject *) res);
+    }
+
+    // TODO: NON SMI, Other object
+    assert(false);
+
+    return {};
+}
 
 OObject *orbiter::eval(Fiber *fiber) {
     auto *regs = &fiber->vm.regs;
@@ -39,6 +58,7 @@ CGOTO
 
 #define FETCH_R_DST(instr)      ((instr >> 20) & 0xFu)
 #define FETCH_R_SRC(instr)      ((instr >> 16) & 0xFu)
+#define FETCH_R_RSRC(instr)     ((instr >> 12) & 0xFu)
 #define FETCH_IMM(instr)        ((instr) & 0xFFFFu)
 
     auto *code = fiber->context.code;
@@ -51,10 +71,19 @@ CGOTO
         const auto instr = FETCH;
 
         switch (FETCH_OP(instr)) {
+            TARGET_OP(ADD) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src_l = FETCH_R_SRC(instr);
+                const auto src_r = FETCH_R_RSRC(instr);
+
+                REG_N(dst) = (PtrSize) VMAdd(fiber->isolate, REG_N(src_l), REG_N(src_r)).get();
+
+                DISPATCH;
+            }
             TARGET_OP(EQ) {
                 const auto dst = FETCH_R_DST(instr);
-                const auto src_l = (instr >> 16) & 0xFu;
-                const auto src_r = (instr >> 12) & 0xFu;
+                const auto src_l = FETCH_R_SRC(instr);
+                const auto src_r = FETCH_R_RSRC(instr);
                 const auto flags = (EqualityMode) ((instr >> 8) & 0xFu);
                 bool res;
 
