@@ -144,7 +144,6 @@ namespace orbiter {
         LDFUNC, // Create function from Code object:        OPCODE | 4 DST | 4 SRC | 4 FLAGS | 12 RESERVED
 
         // Jump Instructions
-        // Format: OPCODE | 4 DST | 20 OFFSET
         JEN, // Jump if nil:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
         JF, // Jump if false:                       OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
         JT, // Jump if true:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET

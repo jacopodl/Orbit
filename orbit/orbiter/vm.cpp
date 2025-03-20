@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/number.h>
 
 #include <orbit/orbiter/opcode.h>
@@ -96,6 +97,14 @@ CGOTO
 
                 DISPATCH;
             }
+            TARGET_OP(LDCODE) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto imm = FETCH_IMM(instr);
+
+                REG_N(dst) = (PtrSize) code->codes->objects[imm];
+
+                DISPATCH;
+            }
             TARGET_OP(LDCST) {
                 const auto dst = FETCH_R_DST(instr);
                 const auto flags = (LoadConstantMode) FETCH_R_SRC(instr);
@@ -151,6 +160,37 @@ CGOTO
 
                 DISPATCH;
             }
+            TARGET_OP(PUSH) {
+                const auto src = FETCH_R_SRC(instr);
+                auto value = (OObject *) REG_N(src);
+
+                if (stack->Check(fiber->isolate, regs->SP.reg, sizeof(void *))) {
+                    // TODO: Error!
+                }
+
+                stack->stack[regs->SP.reg] = (PtrSize) value;
+                regs->SP.reg += sizeof(void *);
+
+                if (O_IS_OBJECT(value))
+                    O_GET_RC(value).IncStrong();
+
+                DISPATCH;
+            }
+            TARGET_OP(POP) {
+                const auto dst = FETCH_R_DST(instr);
+                auto value = (OObject *) stack->stack[regs->SP.reg];
+
+                stack->stack[regs->SP.reg] = 0;
+
+                regs->SP.reg -= sizeof(void *);
+
+                REG_N(dst) = (PtrSize) value;
+
+                if (O_IS_OBJECT(value))
+                    O_GET_RC(value).DecStrong(nullptr);
+
+                DISPATCH;
+            }
             TARGET_OP(ALLOCA) {
                 const auto flags = (AllocaFlags) ((instr >> 16) & 0xFu);
                 const auto size = FETCH_IMM(instr) * sizeof(void *);
@@ -165,6 +205,24 @@ CGOTO
                 }
 
                 // TODO: ERROR!
+
+                DISPATCH;
+            }
+            TARGET_OP(LDFUNC) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src = FETCH_R_SRC(instr);
+                const auto flags = (LoadFuncFlags) ((instr >> 12) & 0xFu);
+                auto fn_kind = (FunctionKind) 0;
+
+                if (flags == LoadFuncFlags::ASYNC)
+                    fn_kind = FunctionKind::ASYNC;
+
+                auto func = FunctionNew((Code *) REG_N(src), fn_kind);
+                if (!func) {
+                    // TODO: error!
+                }
+
+                REG_N(dst) = (PtrSize) func.get();
 
                 DISPATCH;
             }
