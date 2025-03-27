@@ -178,12 +178,12 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
             case orbiter::OPCode::SKLDR:
                 *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode,
                                                            instr->assigned_reg,
-                                                           ((ir::OffsetInstruction *) instr)->offset);
+                                                           ((ir::OffsetInstruction *) instr)->offset & 0xFFFF);
                 break;
             case orbiter::OPCode::SKSTR:
                 *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                           ((ir::OffsetInstruction *) instr)->offset);
+                                                           (((ir::OffsetInstruction *) instr)->offset & 0xFFFF));
                 break;
             case orbiter::OPCode::PUSH:
                 *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
