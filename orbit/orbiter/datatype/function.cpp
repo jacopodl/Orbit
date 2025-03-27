@@ -2,6 +2,8 @@
 //
 // Licensed under the Apache License v2.0
 
+#include <orbit/orbiter/fiber.h>
+
 #include <orbit/orbiter/datatype/function.h>
 
 using namespace orbiter::datatype;
@@ -41,8 +43,11 @@ FuncShared *FunSharedNew(orbiter::Isolate *isolate, const char *name, const char
 }
 
 void FunSharedDel(orbiter::Isolate *isolate, FuncShared *shared) {
-    if (shared->refs.fetch_sub(1) > 1)
+    if (shared == nullptr || shared->refs.fetch_sub(1) > 1)
         return;
+
+    O_FAST_DECREF(shared->context);
+    O_DECREF(shared->module);
 
     O_FAST_DECREF(shared->name);
     O_FAST_DECREF(shared->doc);
@@ -92,7 +97,12 @@ HFunction orbiter::datatype::FunctionNew(Code *code, FunctionKind kind) {
 
     auto *fn = MakeObject<Function>(isolate, InstanceType::FUNCTION);
     if (fn != nullptr) {
+        const auto fiber = Fiber::Current();
+
         fn->shared = f_shared;
+
+        fn->shared->context = O_FAST_INCREF(fiber->context.context);
+        fn->shared->module = O_INCREF(fiber->context.module);
 
         O_GC_TRACK_RETURN(isolate, fn, false);
     }

@@ -77,14 +77,16 @@ void Fiber::Delete(Fiber *fiber) noexcept {
 }
 
 void Fiber::PopState() noexcept {
-    auto size = this->vm.regs.SP.reg - this->vm.regs.BP.reg;
+    const auto size = this->vm.regs.SP.reg - this->vm.regs.BP.reg;
 
     assert(size == sizeof(FiberContext) + sizeof(Registers));
 
-    auto *stack_base = this->vm.stack.stack + this->vm.regs.BP.reg;
+    const auto *stack_base = this->vm.stack.stack + this->vm.regs.BP.reg;
 
     memory::MemoryCopy(&this->context, stack_base, sizeof(FiberContext));
     memory::MemoryCopy(&this->vm.regs, stack_base + sizeof(FiberContext), sizeof(Registers));
+
+    this->vm.regs.SP.reg = this->vm.regs.BP.reg;
 
     for (auto i = 0; i < kGeneralPurposeRegistersCount + 1; i++) {
         auto *value = (datatype::OObject *) *((PtrSize *) (((Register *) &this->vm.regs) + i));

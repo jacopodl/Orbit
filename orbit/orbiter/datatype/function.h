@@ -9,8 +9,9 @@
 
 #include <orbit/orbiter/isolate.h>
 
-#include <orbit/orbiter/datatype/oobject.h>
+#include <orbit/orbiter/datatype/context.h>
 #include <orbit/orbiter/datatype/code.h>
+#include <orbit/orbiter/datatype/module.h>
 
 namespace orbiter::datatype {
     enum class FunctionKind : U8 {
@@ -30,6 +31,12 @@ namespace orbiter::datatype {
     struct FuncShared {
         /// Reference count for this shared data
         std::atomic_uint refs;
+
+        /// Pointer to the context associated with the function.
+        Context *context;
+
+        /// Pointer to the module associated with the function (if any).
+        Module *module;
 
         /// Name of the function
         ORString *name;

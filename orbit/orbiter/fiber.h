@@ -5,6 +5,8 @@
 #ifndef ORBIT_ORBITER_FIBER_H_
 #define ORBIT_ORBITER_FIBER_H_
 
+#include <cassert>
+
 #include <orbit/orbiter/datatype/context.h>
 #include <orbit/orbiter/datatype/module.h>
 
