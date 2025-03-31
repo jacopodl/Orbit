@@ -65,6 +65,14 @@ BasicBlock *Builder::CreateAppendBasicBlock() {
     return bb;
 }
 
+bool Builder::CheckIfLastInstructionIs(OPCode opcode) const {
+    if (this->context->current_->instr.tail->objType_ == ObjectType::INSTRUCTION)
+        return ((PhysInstruction *) this->context->current_->instr.tail)->opcode == opcode;
+
+    return false;
+}
+
+
 Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
     return this->CreateInstruction<UnaryImmInstr>(OPCode::ALLOCA, (U8) flags, slots);
 }

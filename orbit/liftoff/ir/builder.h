@@ -121,6 +121,8 @@ namespace liftoff::ir {
             return this->CreateObject<BasicBlock>();
         }
 
+        [[nodiscard]] bool CheckIfLastInstructionIs(orbiter::OPCode opcode) const;
+
         Instruction *AllocStackSlots(U16 slots, orbiter::AllocaFlags flags);
 
         Instruction *CreateBinaryOp(orbiter::OPCode opcode, Instruction *left, Instruction *right);

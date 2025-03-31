@@ -446,6 +446,11 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
 
     this->visit(node->body);
 
+    if (!this->builder_.CheckIfLastInstructionIs(orbiter::OPCode::RET)) {
+        const auto nil = this->builder_.LoadNilValue();
+        this->builder_.CreateReturn(nil, false);
+    }
+
     this->builder_.LeaveContext();
 
     this->sym_t_->LeaveScope();
@@ -628,10 +633,13 @@ Instruction *IRBuilder::visitTryBlock(parser::TryBlock *node) {
 }
 
 Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
+    Instruction *value = nullptr;
+
     // TODO: Implement Unary visitation
-    auto *value = this->visit(node->value);
 
     if (node->node_type == parser::NodeType::UNARY) {
+        value = this->visit(node->value);
+
         switch (node->token_type) {
             case scanner::TokenType::EXCLAMATION:
                 return this->builder_.CreateUnaryOp(orbiter::OPCode::NOT, value);
@@ -646,8 +654,13 @@ Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
         }
     }
 
-    if (node->node_type == parser::NodeType::PANIC)
+    if (node->node_type == parser::NodeType::PANIC) {
+        value = this->visit(node->value);
+
         return this->builder_.CreateUnaryOp(orbiter::OPCode::PANIC, value);
+    }
+
+    value = node->value != nullptr ? this->visit(node->value) : this->builder_.LoadNilValue();
 
     if (node->node_type == parser::NodeType::RETURN)
         return this->builder_.CreateReturn(value, false);
