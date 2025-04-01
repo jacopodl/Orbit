@@ -134,8 +134,8 @@ CGOTO
 
                 const auto func = (Function *) REG_N(src);
 
-                // FIXME: check space allocation before call, avoid check on ALLOCA!
-                if (!stack->Check(fiber->isolate, regs->SP.reg, sizeof(FiberContext))) {
+                if (!stack->Check(fiber->isolate, regs->SP.reg,
+                                  sizeof(FiberContext) + (func->shared->code->stack_size * sizeof(void *)))) {
                     // TODO: ERROR;
                 }
 
