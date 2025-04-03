@@ -41,7 +41,10 @@ bool orbiter::datatype::ContextDefine(Context *context, ORString *name, OObject 
 bool orbiter::datatype::ContextDefine(Context *context, const char *name, OObject *value, PropertyFlag flags) {
     auto oname = ORStringNew(O_GET_ISOLATE(context), name);
 
-    return ContextDefine(context, oname.get(), value, flags);
+    if (oname)
+        return ContextDefine(context, oname.get(), value, flags);
+
+    return false;
 }
 
 bool orbiter::datatype::ContextLookup(const Context *context, ORString *name, HOObject &out_value,
