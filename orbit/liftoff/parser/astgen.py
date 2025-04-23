@@ -67,6 +67,8 @@ NODES = {
         "fields": {
             "left": "ASTNode*",
             "args": "std::vector<ASTHandle<ASTNode*>>",
+            "nargs": "std::vector<ASTHandle<ASTNode*>>",
+            "rest": "ASTNode*",
             "kwargs": "ASTNode*"
         }
     },

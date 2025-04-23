@@ -63,10 +63,11 @@ CGOTO
 
 #define REG_IP                  (regs->IP.reg)
 
-#define FETCH_R_DST(instr)      ((instr >> 20) & 0xFu)
-#define FETCH_R_SRC(instr)      ((instr >> 16) & 0xFu)
-#define FETCH_R_RSRC(instr)     ((instr >> 12) & 0xFu)
-#define FETCH_IMM(instr)        ((instr) & 0xFFFFu)
+#define FETCH_R_DST(instr)          ((instr >> 20) & 0xFu)
+#define FETCH_F_DST(target, instr)  ((target) FETCH_R_DST(instr))
+#define FETCH_R_SRC(instr)          ((instr >> 16) & 0xFu)
+#define FETCH_R_RSRC(instr)         ((instr >> 12) & 0xFu)
+#define FETCH_IMM(instr)            ((instr) & 0xFFFFu)
 
 #define ACCESS_STACK_BP(offset) ((PtrSize *)(stack->stack + (regs->BP.reg + (offset))))
 #define ACCESS_STACK_SP(offset) ((PtrSize *)(stack->stack + (regs->SP.reg + (offset))))
@@ -131,9 +132,14 @@ CGOTO
 
                 continue;
             }
+            TARGET_OP(CHK_PARTIAL) {
+                // TODO: IMPL
+                DISPATCH;
+            }
             TARGET_OP(CALL) {
+                const auto flags = FETCH_F_DST(CallMode, instr);
                 const auto src = FETCH_R_SRC(instr);
-                const auto arity = FETCH_IMM(instr);
+                const auto p_count = FETCH_IMM(instr);
 
                 const auto func = (Function *) REG_N(src);
 
@@ -454,6 +460,7 @@ CGOTO
                 continue;
             }
             default:
+            assert(false);
                 DISPATCH;
         }
 

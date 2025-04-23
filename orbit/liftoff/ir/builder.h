@@ -134,7 +134,7 @@ namespace liftoff::ir {
         Instruction *CreateBranch(orbiter::OPCode opcode, Instruction *value, BasicBlock *continuation,
                                   BasicBlock *destination);
 
-        Instruction *CreateCall(Instruction *src, U16 arguments);
+        Instruction *CreateCall(Instruction *src, U16 arguments, orbiter::CallMode mode);
 
         Instruction *CreateJump(BasicBlock *destination);
 

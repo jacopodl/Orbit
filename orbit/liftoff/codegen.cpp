@@ -142,9 +142,10 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                            0);
                 break;
             case orbiter::OPCode::CALL:
-                *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
-                                                           ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                           ((ir::CallInstr*)instr)->arguments);
+                *(orbiter::MachineWord *) m_code = EMIT_FSO(instr->opcode,
+                                                            (U8)((ir::CallInstr*)instr)->mode,
+                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                            ((ir::CallInstr*)instr)->arguments);
                 break;
             case orbiter::OPCode::LDCODE:
                 *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode,
@@ -258,6 +259,7 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                             jmp->offset);
                 break;
             }
+            case orbiter::OPCode::CHK_PARTIAL:
             case orbiter::OPCode::SYNC_ENTER:
             case orbiter::OPCode::SYNC_EXIT:
                 *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,

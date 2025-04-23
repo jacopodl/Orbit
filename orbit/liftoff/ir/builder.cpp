@@ -103,8 +103,8 @@ Instruction *Builder::CreateBranch(const OPCode opcode, Instruction *value, Basi
     return branch;
 }
 
-Instruction *Builder::CreateCall(Instruction *src, U16 arguments) {
-    auto *call = this->CreateInstruction<CallInstr>(src, arguments);
+Instruction *Builder::CreateCall(Instruction *src, U16 arguments, CallMode mode) {
+    auto *call = this->CreateInstruction<CallInstr>(src, arguments, mode);
 
     this->StackDiscard(arguments);
 
@@ -120,11 +120,11 @@ Instruction *Builder::CreateJump(BasicBlock *destination) {
 }
 
 Instruction *Builder::CreateManip(const OPCode opcode, Instruction *target, Instruction *src, Instruction *src1) {
-    return  this->CreateInstruction<ManipInstruction>(opcode, target, src, src1);
+    return this->CreateInstruction<ManipInstruction>(opcode, target, src, src1);
 }
 
 Instruction *Builder::CreateManip(const OPCode opcode, Instruction *target, Instruction *src) {
-    return  this->CreateInstruction<ManipInstruction>(opcode, target, src);
+    return this->CreateInstruction<ManipInstruction>(opcode, target, src);
 }
 
 Instruction *Builder::CreateStoreVariable(const OPCode opcode, I16 offset, U8 flags, Instruction *value) {

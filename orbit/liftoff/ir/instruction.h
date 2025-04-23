@@ -114,10 +114,11 @@ namespace liftoff::ir {
 
     public:
         U16 arguments = 0;
+        orbiter::CallMode mode;
 
     protected:
-        explicit CallInstr(Instruction *src, U16 arguments) noexcept: PhysInstruction(orbiter::OPCode::CALL, 1),
-                                                                      arguments(arguments) {
+        explicit CallInstr(Instruction *src, U16 arguments, orbiter::CallMode mode) noexcept: PhysInstruction(orbiter::OPCode::CALL, 1),
+                                                                      arguments(arguments), mode(mode) {
             this->SetOperand(0, src);
         }
     };

@@ -28,6 +28,14 @@ namespace orbiter {
         // NONE = DIV (integer division)
     };
 
+    enum class CallMode : U8 {
+        FASTCALL = 0,
+
+        KW_ARG = 1,
+        NARGS = 1 << 1,
+        REST_ARG = 1 << 2
+    };
+
     enum class ClosureLSMode : U8 {
         FUNC_SLOT = 0,
         STACK
@@ -115,7 +123,8 @@ namespace orbiter {
         RET, // Return instruction
         YLD, // Yield instruction
 
-        CALL, // Call function: OPCODE | 4 RESERVED | 4 SRC | 16 ARITY
+        CHK_PARTIAL, // Check if partial function before call: OPCODE | 4 RESERVED | 4 SRC (func) | 16 RESERVED
+        CALL, // Call function: OPCODE | 4 FLAGS(CallMode) | 4 SRC | 16 ARITY
 
         // Load/Store Operations
         LDCODE, // Load Code from Code object:      OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
@@ -167,6 +176,8 @@ namespace orbiter {
 }
 
 ENUMBITMASK_ENABLE(orbiter::ArithFlags);
+
+ENUMBITMASK_ENABLE(orbiter::CallMode);
 
 ENUMBITMASK_ENABLE(orbiter::ComparisonMode);
 

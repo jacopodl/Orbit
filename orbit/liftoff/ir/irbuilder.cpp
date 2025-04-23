@@ -388,14 +388,64 @@ Instruction *IRBuilder::visitBranch(const parser::Branch *node) {
 }
 
 Instruction *IRBuilder::visitCall(parser::Call *node) {
-    for (const auto &arg: node->args) {
-        auto *arg_value = this->visit(arg.get());
-        this->builder_.StackPush(arg_value);
-    }
+    auto mode = orbiter::CallMode::FASTCALL;
 
     auto *func = this->visit(node->left);
 
-    return this->builder_.CreateCall(func, node->args.size());
+    Instruction *arg_value = nullptr;
+
+    // Check partial apply (Currying evaluation)
+    this->builder_.CreateUnaryOp(orbiter::OPCode::CHK_PARTIAL, func);
+
+    // Args
+    for (const auto &arg: node->args) {
+        arg_value = this->visit(arg.get());
+
+        this->builder_.StackPush(arg_value);
+    }
+
+    // NArgs
+    Instruction *nargs = nullptr;
+    for (const auto &narg : node->nargs) {
+        if (nargs == nullptr)
+            nargs = this->builder_.CreateUnaryOp(orbiter::OPCode::NLIST, node->nargs.size());
+
+        const auto key = this->visit(((parser::Binary*)narg.get())->left);
+
+        this->builder_.CreateManip(orbiter::OPCode::ADDELEM, nargs, key);
+
+        const auto value = this->visit(((parser::Binary*)narg.get())->right);
+
+        this->builder_.CreateManip(orbiter::OPCode::ADDELEM, nargs, value);
+    }
+
+    if (nargs != nullptr) {
+        this->builder_.StackPush(nargs);
+
+        mode |= orbiter::CallMode::NARGS;
+    }
+
+    if (node->rest!=nullptr) {
+        auto *rest = this->visit(((parser::Unary*)node->rest)->value);
+
+        this->builder_.StackPush(rest);
+
+        mode |= orbiter::CallMode::REST_ARG;
+    }
+
+    if (node->kwargs != nullptr) {
+        auto *kwargs = this->visit(((parser::Unary*)node->kwargs)->value);
+
+        this->builder_.StackPush(kwargs);
+
+        mode |= orbiter::CallMode::KW_ARG;
+    }
+
+    // Cleanup flags
+    if ((int)mode > 1)
+        mode &= ~orbiter::CallMode::FASTCALL;
+
+    return this->builder_.CreateCall(func, node->args.size(), mode);
 }
 
 Instruction *IRBuilder::visitCatchBlock(parser::CatchBlock *node) {
@@ -412,7 +462,6 @@ Instruction *IRBuilder::visitDecorator(parser::Decorator *node) {
     // TODO: Implement Decorator visitation
     return nullptr;
 }
-
 
 Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     // -> params -> EBP -> RET ADDR -> [locals] -> [closure_ptr]

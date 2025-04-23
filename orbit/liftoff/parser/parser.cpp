@@ -1145,7 +1145,7 @@ ASTHandle<ASTNode *> Parser::ParseFuncCall(ASTHandle<ASTNode *> &left) {
                 unary->value = arg.release();
 
                 end = unary->loc.end;
-                call->args.emplace_back(std::move(unary));
+                call->rest = unary.release();
 
                 mode = 2;
 
@@ -1177,7 +1177,7 @@ ASTHandle<ASTNode *> Parser::ParseFuncCall(ASTHandle<ASTNode *> &left) {
 
                 end = binary->loc.end;
 
-                call->args.emplace_back(std::move(binary));
+                call->nargs.emplace_back(std::move(binary));
             } else {
                 if (mode > 0)
                     throw ParserException(21);
