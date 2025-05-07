@@ -311,7 +311,7 @@ orbiter::datatype::HCode Codegen::Generate() noexcept {
             m_cursor = EmitOpcodes(b_cursor, m_cursor);
 
         auto code = CodeNew(this->allocator_.GetIsolate(), m_code, ir->unknown_names.get(), ir->static_values.get(),
-                            ir->program_size, ir->local_slots, ir->stack_slots);
+                            ir->program_size, ir->local_slots, ir->GetStackCount());
         if (!code)
             throw std::bad_alloc();
 

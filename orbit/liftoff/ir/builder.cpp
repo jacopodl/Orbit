@@ -191,14 +191,26 @@ Instruction *Builder::LoadFromOffset(const OPCode opcode, const I16 offset, U8 f
 }
 
 Instruction *Builder::StackDiscard(U16 slots) {
+    if (slots == 0)
+        return nullptr;
+
+    this->context->stack_push_count -= slots;
+
     return this->CreateInstruction<UnaryImmInstr>(OPCode::POPN, 0, slots);
 }
 
 Instruction *Builder::StackPop() {
+    this->context->stack_push_count -= 1;
+
     return this->CreateInstruction<UnaryOpInstr>(OPCode::POP);
 }
 
 Instruction *Builder::StackPush(Instruction *s_reg) {
+    this->context->stack_push_count += 1;
+
+    if (this->context->stack_push_count > this->context->stack_push_max)
+        this->context->stack_push_max = this->context->stack_push_count;
+
     return this->CreateInstruction<UnaryOpInstr>(OPCode::PUSH, s_reg);
 }
 
@@ -278,6 +290,8 @@ void Builder::LeaveContext() {
     while (changed)
         changed = this->context->ComputeLiveness();
     */
+
+    assert(this->context->stack_push_count ==0);
 
     if (this->context->back != nullptr)
         this->context = this->context->back;

@@ -858,7 +858,7 @@ IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module)
     assert(this->isolate_ == module->isolate); // Security check.
 
     try {
-        // Set symbol table
+        // Set a symbol table
         this->sym_t_ = module->sym_t;
 
         // Create first context
@@ -866,11 +866,13 @@ IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module)
 
         auto *context = this->builder_.context;
 
-        for (auto &statement: module->statements) {
+        for (auto &statement: module->statements)
             this->visit(statement.get());
-        }
 
         assert(this->builder_.context == context);
+
+        // This call ensures any checks performed by LeaveContext are honored
+        this->builder_.LeaveContext();
 
         this->builder_.context = nullptr;
 

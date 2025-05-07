@@ -212,6 +212,10 @@ namespace liftoff::ir {
 
         U16 stack_slots = 0;
 
+        U16 stack_push_count = 0;
+
+        U16 stack_push_max = 0;
+
         U32 program_size = 0;
 
         /// Represents the type of the intermediate representation (IR) context.
@@ -279,6 +283,18 @@ namespace liftoff::ir {
          * @return The size of the exported_names collection before the addition.
          */
         U16 ExportSymbol(const Symbol *symbol, orbiter::VariableFlags flags);
+
+        /**
+         * Retrieves the total stack count for this context.
+         *
+         * The stack count is computed as the sum of the allocated stack slots and the maximum
+         * number of stack pushes. This provides the total stack space required for the context.
+         *
+         * @return The total stack count as an unsigned 16-bit integer.
+         */
+        [[nodiscard]] U16 GetStackCount() const noexcept {
+            return this->stack_slots + this->stack_push_max;
+        }
 
         /**
          * @brief Retrieves the number of subcontexts currently managed within this IRContext.
