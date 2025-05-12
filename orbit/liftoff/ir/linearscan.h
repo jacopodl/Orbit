@@ -5,6 +5,7 @@
 #ifndef ORBIT_LIFTOFF_IR_LINEARSCAN_H_
 #define ORBIT_LIFTOFF_IR_LINEARSCAN_H_
 
+#include <set>
 #include <vector>
 
 #include <orbit/liftoff/ir/builder.h>
@@ -12,7 +13,14 @@
 
 namespace liftoff::ir {
     class LinearScan {
-        std::vector<LiveInterval *> active_;
+        struct IntervalEndComparator {
+            bool operator()(const LiveInterval* a, const LiveInterval* b) const {
+                return a->end < b->end;
+            }
+        };
+
+        std::set<LiveInterval*,IntervalEndComparator> active_;
+        std::set<LiveInterval *> active_stack_;
 
         std::vector<U16> free_registers_;
         std::vector<U16> free_stack_slot_;
@@ -27,11 +35,13 @@ namespace liftoff::ir {
 
         U16 GetFreeStackSlot();
 
-        void EmitStackLoad(Instruction *instruction);
+        void AllocateSpecificRegister(LiveInterval &interval);
 
         void ExpireOldIntervals(U32 position);
 
-        void HandleSpill(LiveInterval *interval);
+        void SpillAndAssignRegister(LiveInterval *interval);
+
+        void SpillToStackAndReloadUses(Instruction *instruction);
 
     public:
         explicit LinearScan(IRContext *ir, U16 total_regs) noexcept;

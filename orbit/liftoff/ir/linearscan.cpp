@@ -1,6 +1,7 @@
 // This source file is part of the Orbit project.
 //
 // Licensed under the Apache License v2.0
+// M.G :)
 
 #include <orbit/liftoff/ir/linearscan.h>
 
@@ -12,7 +13,7 @@ LinearScan::LinearScan(IRContext *ir, U16 total_regs) noexcept : builder_(ir),
     assert(total_regs >= 2);
 
     for (auto i = total_regs - 1; i >= 0; --i)
-        this->free_registers_.push_back(i);
+        this->free_registers_.push_back(static_cast<U16>(i));
 
     this->stack_offset_ = ir->stack_slots;
 }
@@ -28,8 +29,109 @@ U16 LinearScan::GetFreeStackSlot() {
     return this->stack_offset_++;
 }
 
-void LinearScan::EmitStackLoad(Instruction *instruction) {
-    // 1) Iterate through the use-list of the instruction to load the value back from the stack
+void LinearScan::AllocateSpecificRegister(LiveInterval &interval) {
+    const auto find = std::find(this->free_registers_.begin(),
+                                this->free_registers_.end(),
+                                interval.instr->assigned_reg);
+
+    if (find != this->free_registers_.end()) {
+        this->free_registers_.erase(find);
+
+        this->active_.insert(&interval);
+
+        return;
+    }
+
+    auto it = active_.begin();
+    while (it != active_.end()) {
+        if ((*it)->instr->assigned_reg == interval.instr->assigned_reg) {
+            LiveInterval *found = *it;
+
+            this->SpillToStackAndReloadUses(found->instr);
+
+            this->active_.erase(it);
+
+            this->active_stack_.insert(found);
+
+            this->SpillToStackAndReloadUses(interval.instr);
+
+            this->active_.insert(&interval);
+
+            return;
+        }
+
+        ++it;
+    }
+
+    throw std::runtime_error("Unable to allocate specific register: logic error");
+}
+
+void LinearScan::ExpireOldIntervals(const U32 position) {
+    auto it = this->active_.begin();
+    while (it != this->active_.end()) {
+        const LiveInterval *interval = *it;
+
+        if (interval->end < position) {
+            this->free_registers_.push_back(interval->instr->assigned_reg);
+
+            it = this->active_.erase(it);
+
+            continue;
+        }
+
+        ++it;
+    }
+
+    it = this->active_stack_.begin();
+    while (it != this->active_stack_.end()) {
+        const LiveInterval *interval = *it;
+
+        if (interval->end < position) {
+            if (interval->instr->stack_slot > -1)
+                this->free_stack_slot_.push_back(interval->instr->stack_slot);
+
+            it = this->active_stack_.erase(it);
+
+            continue;
+        }
+
+        ++it;
+    }
+}
+
+void LinearScan::SpillAndAssignRegister(LiveInterval *interval) {
+    const auto longest = *this->active_.rbegin();
+
+    const auto spilled_instr = longest->instr;
+
+    bool is_spilled = false;
+
+    // Assign the register of the spilled instruction to the new interval
+    interval->instr->SetRegister(spilled_instr->assigned_reg);
+
+    // Emit instructions to store the spilled value to the stack and update references
+    this->SpillToStackAndReloadUses(spilled_instr);
+
+    // If the new interval ends after the longest, spill it to another stack slot
+    if (interval->end > longest->end) {
+        this->SpillToStackAndReloadUses(interval->instr);
+
+        is_spilled = true;
+    }
+
+    this->active_stack_.insert(longest);
+
+    this->active_.erase(longest);
+
+    if (is_spilled)
+        this->active_.insert(interval);
+}
+
+void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
+    // 1) Assign a free stack slot to the spilled instruction
+    instruction->stack_slot = (I16) this->GetFreeStackSlot();
+
+    // 2) Iterate through the use-list of the instruction to load the value back from the stack
     for (auto use = instruction->use_list; use != nullptr; use = use->next) {
         auto *target = (Instruction *) use->user;
 
@@ -47,63 +149,11 @@ void LinearScan::EmitStackLoad(Instruction *instruction) {
         target->ReplaceOperand(instruction, load);
     }
 
-    // 2) Generate a store instruction to save the value to the specified stack slot
+    // 3) Generate a store instruction to save the value to the specified stack slot
     auto *store = this->builder_.GetStoreToStackOffset(instruction, instruction->stack_slot);
 
     // Insert the store instruction immediately after the current instruction
     IRContext::InsertInstructionAfter(instruction, store);
-}
-
-void LinearScan::ExpireOldIntervals(U32 position) {
-    auto cond_func = [&](const LiveInterval *interval) {
-        // Check if the interval's end has passed the current position.
-        if (interval->end < position) {
-            // Reclaim the assigned register and add it back to the list of free registers.
-            this->free_registers_.push_back(interval->instr->assigned_reg);
-
-            // If the instruction has a valid stack slot, reclaim it by adding it back to the list of free stack slots.
-            if (interval->instr->stack_slot > -1)
-                this->free_stack_slot_.push_back(interval->instr->stack_slot);
-
-            return true;
-        }
-
-        // If the interval has not expired, keep it in the active list.
-        return false;
-    };
-
-    this->active_.erase(std::remove_if(this->active_.begin(), this->active_.end(), cond_func), this->active_.end());
-}
-
-void LinearScan::HandleSpill(LiveInterval *interval) {
-    auto longest = this->active_.begin();
-    for (auto iter = this->active_.begin(); iter != this->active_.end(); ++iter) {
-        // Find the interval with the farthest end position in the active list
-        if ((*longest)->end < (*iter)->end)
-            longest = iter;
-    }
-
-    const auto spilled_instr = (*longest)->instr;
-
-    // Assign the register of the spilled instruction to the new interval
-    interval->instr->SetRegister(spilled_instr->assigned_reg);
-
-    // Assign a free stack slot to the spilled instruction
-    spilled_instr->stack_slot = (I16) this->GetFreeStackSlot();
-
-    // Emit instructions to store the spilled value to the stack and update references
-    this->EmitStackLoad(spilled_instr);
-
-    if ((*longest)->end > interval->end) {
-        // Replace the longest interval with the new interval in the active list
-        this->active_.erase(longest);
-        this->active_.push_back(interval);
-        return;
-    }
-
-    // If the new interval ends after the longest, spill it to another stack slot
-    interval->instr->stack_slot = (I16) this->GetFreeStackSlot();
-    this->EmitStackLoad(interval->instr);
 }
 
 // *********************************************************************************************************************
@@ -117,17 +167,25 @@ void LinearScan::Allocate() {
 
         this->ExpireOldIntervals(interval.start);
 
+        if (interval.instr->assigned_reg > kUninitializedReg) {
+            this->AllocateSpecificRegister(interval);
+
+            continue;
+        }
+
         if (this->active_.size() == this->total_regs_) {
-            this->HandleSpill(&interval);
+            this->SpillAndAssignRegister(&interval);
+
             continue;
         }
 
         interval.instr->SetRegister((I16) this->free_registers_.back());
         this->free_registers_.pop_back();
 
-        this->active_.push_back(&interval);
+        this->active_.insert(&interval);
     }
 
     // Update the stack slot of the IR context to the current stack size
-    this->ir_->stack_slots = this->stack_offset_;
+    if (this->stack_offset_ > this->ir_->stack_slots)
+        this->builder_.AllocStackSlots(this->stack_offset_ - this->ir_->stack_slots, orbiter::AllocaFlags::DEFAULT);
 }
