@@ -205,8 +205,8 @@ Instruction *Builder::LoadFromStackOffset(I16 offset) {
     return this->LoadFromOffset(OPCode::SKLDR, offset, 0);
 }
 
-Instruction *Builder::LoadFunction(Instruction *src, LoadFuncFlags flags) {
-    return this->CreateInstruction<UnaryOpInstr>(OPCode::LDFUNC, (U8) flags, src);
+Instruction *Builder::LoadFunction(Instruction *src, Instruction* def_args, LoadFuncFlags flags) {
+    return this->CreateInstruction<LoadFunc>(src, def_args, flags);
 }
 
 Instruction *Builder::LoadImmediate(const MachineSize value) {

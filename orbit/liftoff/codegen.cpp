@@ -73,6 +73,10 @@ using namespace liftoff::ir;
 #define EMIT_DSSF(opcode, dst, src_l, src_r, flags) \
     (((U32)(opcode) << 24) | ((dst) << 20) | ((src_l) << 16) | ((src_r) << 12) | ((flags) << 8))
 
+// Emit macro with opcode, destination register, left and right source registers, and extended flags
+#define EMIT_DSSFE(opcode, dst, src_l, src_r, flags) \
+(((U32)(opcode) << 24) | ((dst) << 20) | ((src_l) << 16) | ((src_r) << 12) | ((flags) << 4))
+
 // Simplified Emit macro with opcode, destination register, left and right source registers (flags set to 0)
 #define EMIT_DSS(opcode, dst, src_l, src_r) \
     EMIT_DSSF(opcode, dst, src_l, src_r, 0)
@@ -225,10 +229,11 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                            ((ir::UnaryImmInstr*)instr)->imm);
                 break;
             case orbiter::OPCode::LDFUNC:
-                *(orbiter::MachineWord *) m_code = EMIT_DSF(instr->opcode,
+                *(orbiter::MachineWord *) m_code = EMIT_DSSFE(instr->opcode,
                                                             instr->assigned_reg,
                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                            ((ir::UnaryOpInstr*)instr)->flags);
+                                                            ((Instruction*)instr->operands[1].value)->assigned_reg,
+                                                            ((ir::LoadFunc*)instr)->flags);
                 break;
             case orbiter::OPCode::ADDELEM:
                 *(orbiter::MachineWord *) m_code = EMIT_DSS(instr->opcode,

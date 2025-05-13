@@ -457,7 +457,7 @@ CGOTO
             TARGET_OP(LDFUNC) {
                 const auto dst = FETCH_R_DST(instr);
                 const auto src = FETCH_R_SRC(instr);
-                const auto flags = (LoadFuncFlags) ((instr >> 12) & 0x3F);
+                const auto flags = (LoadFuncFlags) ((instr >> 4) & 0xFF);
 
                 auto fn_kind = (FunctionKind) 0;
                 Tuple *defs = nullptr;
@@ -469,7 +469,7 @@ CGOTO
                     fn_kind = FunctionKind::REST;
 
                 if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::NPARAMS))
-                    defs = (Tuple *) *LOAD_FROM_STACK;
+                    defs = (Tuple *) REG_N(FETCH_R_RSRC(instr));
 
                 auto func = FunctionNew((Code *) REG_N(src), defs, fn_kind);
                 if (!func) {

@@ -169,7 +169,7 @@ namespace liftoff::ir {
 
         Instruction *LoadFromStackOffset(I16 offset);
 
-        Instruction *LoadFunction(Instruction *src, orbiter::LoadFuncFlags flags);
+        Instruction *LoadFunction(Instruction *src, Instruction *def_args, orbiter::LoadFuncFlags flags);
 
         Instruction *LoadImmediate(MachineSize value);
 

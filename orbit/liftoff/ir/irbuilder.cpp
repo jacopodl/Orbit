@@ -473,11 +473,13 @@ Instruction *IRBuilder::visitDecorator(parser::Decorator *node) {
 Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     // -> params -> EBP -> RET ADDR -> [locals] -> [closure_ptr]
 
+    Instruction *def_args = nullptr;
+
     auto f_flags = orbiter::LoadFuncFlags::SIMPLE;
     if (node->async)
         f_flags |= orbiter::LoadFuncFlags::ASYNC;
 
-    const auto params_count = this->ProcessFunctionParams(node, f_flags);
+    const auto params_count = this->ProcessFunctionParams(node, def_args, f_flags);
 
     if (!this->sym_t_->EnterScope(node->name))
         throw SymbolTableException();
@@ -513,10 +515,7 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
 
     auto *res = this->builder_.LoadCodeObject(this->builder_.context->GetSubcontextCount() - 1);
 
-    auto *func = this->builder_.LoadFunction(res, f_flags);
-
-    if (ENUMBITMASK_ISTRUE(f_flags, orbiter::LoadFuncFlags::NPARAMS))
-        this->builder_.StackDiscard(1);
+    auto *func = this->builder_.LoadFunction(res, def_args, f_flags);
 
     if (node->anon)
         return func;
@@ -761,8 +760,9 @@ Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
     return nullptr;
 }
 
-unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, orbiter::LoadFuncFlags &f_flags) {
-    Instruction *def_params = nullptr;
+unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,
+                                              orbiter::LoadFuncFlags &f_flags) {
+    def_args = nullptr;
 
     int def_params_count = 0;
     short remove_count = 0;
@@ -772,8 +772,8 @@ unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, orbi
             continue;
 
         if (param->node_type == parser::NodeType::NAMED_PARAM) {
-            if (def_params == nullptr)
-                def_params = this->builder_.CreateUnaryOp(orbiter::OPCode::NTUPLE, (U16) 0);
+            if (def_args == nullptr)
+                def_args = this->builder_.CreateUnaryOp(orbiter::OPCode::NTUPLE, (U16) 0);
 
             const auto *named = (parser::Parameter *) param.get();
 
@@ -782,8 +782,8 @@ unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, orbi
 
             auto *value = named->value != nullptr ? this->visit(named->value) : this->builder_.LoadNilValue();
 
-            this->builder_.CreateManip(orbiter::OPCode::ADDELEM, def_params, ld_const);
-            this->builder_.CreateManip(orbiter::OPCode::ADDELEM, def_params, value);
+            this->builder_.CreateManip(orbiter::OPCode::ADDELEM, def_args, ld_const);
+            this->builder_.CreateManip(orbiter::OPCode::ADDELEM, def_args, value);
 
             def_params_count += 1;
         }
@@ -801,12 +801,10 @@ unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, orbi
         }
     }
 
-    if (def_params != nullptr) {
-        ((UnaryImmInstr *) def_params)->imm = def_params_count * 2; // *2 because each param is composed by key/value
+    if (def_args != nullptr) {
+        ((UnaryImmInstr *) def_args)->imm = def_params_count * 2; // *2 because each param is composed by key/value
 
         f_flags |= orbiter::LoadFuncFlags::NPARAMS;
-
-        this->builder_.StackPush(def_params);
     }
 
     return (node->params.size() - def_params_count) - remove_count;
