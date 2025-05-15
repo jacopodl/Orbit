@@ -185,9 +185,8 @@ void IRContext::InsertInstructionAfter(Instruction *instruction, Instruction *af
     after->next = instruction->next;
     after->prev = instruction;
 
-    assert(instruction->next!=nullptr);
-
-    instruction->next->prev = after;
+    if (instruction->next != nullptr)
+        instruction->next->prev = after;
 
     instruction->next = after;
 }

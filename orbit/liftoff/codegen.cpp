@@ -185,13 +185,18 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
             case orbiter::OPCode::LDGBL:
             case orbiter::OPCode::LDGOFF:
             case orbiter::OPCode::SKLDR:
+                *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode,
+                                                           instr->assigned_reg,
+                                                           ((ir::OffsetInstruction *) instr)->offset & 0xFFFF);
+                break;
+            case orbiter::OPCode::CLONEW:
             case orbiter::OPCode::NDICT:
             case orbiter::OPCode::NLIST:
             case orbiter::OPCode::NSET:
             case orbiter::OPCode::NTUPLE:
                 *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode,
                                                            instr->assigned_reg,
-                                                           ((ir::OffsetInstruction *) instr)->offset & 0xFFFF);
+                                                           ((ir::UnaryImmInstr *) instr)->imm);
                 break;
             case orbiter::OPCode::SKSTR:
                 *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
@@ -205,10 +210,6 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                 break;
             case orbiter::OPCode::POP:
                 *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode, 0, 0);
-                break;
-            case orbiter::OPCode::CLONEW:
-                *(orbiter::MachineWord *) m_code = EMIT_IMMEDIATE(instr->opcode,
-                                                                  ((ir::UnaryImmInstr *) instr)->imm);
                 break;
             case orbiter::OPCode::CLOLDR:
                 *(orbiter::MachineWord *) m_code = EMIT_DFI(instr->opcode,

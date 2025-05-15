@@ -144,9 +144,9 @@ namespace orbiter {
         POP, // Pop value from stack:               OPCODE | 4 DST | 20 RESERVED
         POPN, // Pop N values from stack:           OPCODE | 8 RESERVED | 16 UNSIGNED OFFSET
 
-        CLONEW, // Create new closure object:       OPCODE | 8 RESERVED | 16 UNSIGNED SLOTS
+        CLONEW, // Create new closure object:       OPCODE | 4 DST      | 4 RESERVED             | 16 UNSIGNED SLOTS
         CLOLDR, // Load from closure object:        OPCODE | 4 DST      | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
-        CLOSTR, // Store to closure object:         OPCODE | 4 FLAGS(ClosureLSMode) | 4 SRC      | 16 UNSIGNED OFFSET
+        CLOSTR, // Store to closure object:         OPCODE | 4 SRC      | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
 
         // Allocate space for N variable on stack
         // Format: OPCODE | 4 RESERVED | 4 FLAGS(AllocaFlags) | 16 UNSIGNED SLOTS

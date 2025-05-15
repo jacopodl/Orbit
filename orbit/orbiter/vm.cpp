@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/datatype/closure.h>
 #include <orbit/orbiter/datatype/dict.h>
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/number.h>
@@ -233,6 +234,7 @@ CGOTO
 #define FETCH_R_DST(instr)          ((instr >> 20) & 0xFu)
 #define FETCH_F_DST(target, instr)  ((target) FETCH_R_DST(instr))
 #define FETCH_R_SRC(instr)          ((instr >> 16) & 0xFu)
+#define FETCH_F_SRC(target, instr)  ((target) FETCH_R_SRC(instr))
 #define FETCH_R_RSRC(instr)         ((instr >> 12) & 0xFu)
 #define FETCH_IMM(instr)            ((instr) & 0xFFFFu)
 
@@ -463,6 +465,36 @@ CGOTO
                     cursor++;
                 }
 
+                DISPATCH;
+            }
+            TARGET_OP(CLONEW) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto slots = instr & 0xFFFF;
+
+                auto closure = ClosureNew(fiber->isolate, slots);
+                if (!closure) {
+                    // FIXME: Error!
+                }
+
+                REG_N(dst) = (PtrSize) closure.get();
+
+                DISPATCH;
+            }
+            TARGET_OP(CLOLDR) {
+                auto dst = FETCH_R_DST(instr);
+                auto flags = FETCH_F_SRC(ClosureLSMode, instr);
+                auto slot = FETCH_IMM(instr);
+
+
+                assert(false);
+                DISPATCH;
+            }
+            TARGET_OP(CLOSTR) {
+                auto src = FETCH_R_DST(instr);
+                auto flags = FETCH_F_SRC(ClosureLSMode, instr);
+                auto slot = FETCH_IMM(instr);
+
+                assert(false);
                 DISPATCH;
             }
             TARGET_OP(ALLOCA) {
