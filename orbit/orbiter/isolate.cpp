@@ -3,6 +3,7 @@
 // Licensed under the Apache License v2.0
 
 #include <orbit/orbiter/datatype/atom.h>
+#include <orbit/orbiter/datatype/closure.h>
 #include <orbit/orbiter/datatype/code.h>
 #include <orbit/orbiter/datatype/context.h>
 #include <orbit/orbiter/datatype/decimal.h>
@@ -59,6 +60,7 @@ Isolate *Isolate::New() {
     INIT_TYPE(InstanceType::TYPE, TypeInit);
 
     INIT_TYPE(InstanceType::ATOM, AtomTypeInit);
+    INIT_TYPE(InstanceType::CLOSURE, ClosureTypeInit);
     INIT_TYPE(InstanceType::CODE, CodeTypeInit);
     INIT_TYPE(InstanceType::CONTEXT, ContextInit);
     INIT_TYPE(InstanceType::DECIMAL, DecimalTypeInit);
@@ -75,6 +77,7 @@ Isolate *Isolate::New() {
     SETUP_TYPE(InstanceType::TYPE, TypeSetup);
 
     SETUP_TYPE(InstanceType::ATOM, AtomTypeSetup);
+    SETUP_TYPE(InstanceType::CLOSURE, ClosureTypeSetup);
     SETUP_TYPE(InstanceType::CODE, CodeTypeSetup);
     SETUP_TYPE(InstanceType::CONTEXT, ContextSetup);
     SETUP_TYPE(InstanceType::DECIMAL, DecimalTypeSetup);

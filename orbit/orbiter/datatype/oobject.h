@@ -16,7 +16,8 @@ namespace orbiter::datatype {
     class Handle {
         T *object_;
 
-        template<typename U> friend class Handle;
+        template<typename U>
+        friend class Handle;
 
     public:
         Handle() noexcept: object_(nullptr) {
@@ -233,25 +234,39 @@ namespace orbiter::datatype {
     PropertyDescriptor *TIFindProperty(const TypeInfo *type, const char *name);
 
     /**
-     * @brief Create a new object of a specific type
+     * @brief Creates and allocates a new object of the specified type with optional overallocation.
      *
-     * @tparam T Type of the object to create
+     * @tparam T The type of the object to be created.
+     * @param type Pointer to the TypeInfo describing the type of object to allocate.
+     * @param overalloc Amount of additional memory to allocate beyond the size of the object.
      *
-     * @param type Pointer to the TypeInfo for the object
-     *
-     * @return Pointer to the newly created object, or nullptr if allocation failed
+     * @return Pointer to the newly created object, or nullptr if allocation failed.
      */
     template<typename T>
-    T *MakeObject(TypeInfo *type) {
-        auto *isolate = O_GET_ISOLATE(type);
+    T *MakeObject(TypeInfo *type, U16 overalloc) {
+        auto *isolate = type->isolate;
 
-        auto *ret = isolate->gc->AllocObject(type->i_size);
+        auto *ret = isolate->gc->AllocObject(type->i_size + overalloc);
         if (ret == nullptr)
             return nullptr;
 
         O_GET_TYPE(ret) = O_INCREF(type);
 
         return (T *) ret;
+    }
+
+    /**
+     * @brief Create a new object of a specific type
+     *
+     * @tparam T Type of the object to create
+     *
+     * @param type Pointer to the TypeInfo for the object
+     *
+     * @return Pointer to the newly created object, or nullptr if allocation failed.
+     */
+    template<typename T>
+    T *MakeObject(TypeInfo *type) {
+        return MakeObject<T>(type, 0);
     }
 
     /**
@@ -262,11 +277,25 @@ namespace orbiter::datatype {
      * @param isolate Pointer to the Isolate
      * @param type Instance type of the object to create
      *
-     * @return Pointer to the newly created object, or nullptr if allocation failed
+     * @return Pointer to the newly created object, or nullptr if allocation failed.
      */
     template<typename T>
     T *MakeObject(Isolate *isolate, InstanceType type) {
         return MakeObject<T>(isolate->primitive[(int) type]);
+    }
+
+    /**
+     * @brief Create a new object of a specific type using the isolate's primitive type
+     *
+     * @param isolate Pointer to the Isolate instance
+     * @param type Instance type specifying the desired object's type
+     * @param overalloc Additional memory allocation size
+     *
+     * @return Pointer to the newly created object, or nullptr if allocation failed.
+     */
+    template<typename T>
+    T *MakeObject(Isolate *isolate, InstanceType type, U16 overalloc) {
+        return MakeObject<T>(isolate->primitive[(int) type], overalloc);
     }
 
     /**
