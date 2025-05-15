@@ -228,13 +228,15 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                            ((ir::UnaryImmInstr*)instr)->flags,
                                                            ((ir::UnaryImmInstr*)instr)->imm);
                 break;
-            case orbiter::OPCode::LDFUNC:
+            case orbiter::OPCode::LDFUNC: {
+                const auto *def_args = ((Instruction *) instr->operands[1].value);
                 *(orbiter::MachineWord *) m_code = EMIT_DSSFE(instr->opcode,
-                                                            instr->assigned_reg,
-                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                            ((Instruction*)instr->operands[1].value)->assigned_reg,
-                                                            ((ir::LoadFunc*)instr)->flags);
+                                                              instr->assigned_reg,
+                                                              ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                              def_args!=nullptr ? def_args->assigned_reg:0,
+                                                              ((ir::LoadFunc*)instr)->flags);
                 break;
+            }
             case orbiter::OPCode::ADDELEM:
                 *(orbiter::MachineWord *) m_code = EMIT_DSS(instr->opcode,
                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
