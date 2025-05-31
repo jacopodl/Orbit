@@ -21,6 +21,18 @@ BasicBlock *Builder::AddInstruction(Instruction *instruction) {
     return bb;
 }
 
+const PhysInstruction *Builder::GetLastInstructionMatch(OPCode opcode) const noexcept {
+    if (this->context->current_ == nullptr)
+        return nullptr;
+
+    const auto *instr = (PhysInstruction *) this->context->current_->instr.tail;
+
+    if (instr == nullptr || instr->type() != ObjectType::INSTRUCTION || instr->opcode != opcode)
+        return nullptr;
+
+    return instr;
+}
+
 void Builder::RemoveFromObjsList(Object *obj) const noexcept {
     auto *next = obj->memory_.next;
     auto *prev = obj->memory_.prev;
@@ -106,8 +118,7 @@ Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
             bb_entry->AddInstructionFirst(alloca);
 
             this->context->program_size += 4;
-        }
-        else
+        } else
             this->AddInstruction(alloca);
     } else
         IRContext::InsertInstructionAfter(last_alloca, alloca);
@@ -202,6 +213,11 @@ Instruction *Builder::LoadConstant(U16 offset) {
 }
 
 Instruction *Builder::LoadFromClosureAtOffset(I16 offset, ClosureLSMode mode) {
+    const auto *last = (LoadStoreClosureWithOffsetInstr *) this->GetLastInstructionMatch(OPCode::CLOSTR);
+
+    if (last != nullptr)
+        return (Instruction *) last->operands->value;
+
     return this->CreateInstruction<LoadStoreClosureWithOffsetInstr>(OPCode::CLOLDR, offset, mode, nullptr);
 }
 
@@ -221,6 +237,27 @@ Instruction *Builder::LoadImmediate(const MachineSize value) {
 }
 
 Instruction *Builder::LoadFromOffset(const OPCode opcode, const I16 offset, U8 flags) {
+    const OffsetInstruction *last = nullptr;
+
+    switch (opcode) {
+        case OPCode::LDGBL:
+            last = (OffsetInstruction *) this->GetLastInstructionMatch(OPCode::STGBL);
+            break;
+        case OPCode::LDGOFF:
+            last = (OffsetInstruction *) this->GetLastInstructionMatch(OPCode::STGOFF);
+            break;
+        case OPCode::SKLDR:
+            last = (OffsetInstruction *) this->GetLastInstructionMatch(OPCode::SKSTR);
+            break;
+        default:
+            break;
+    }
+
+    if (last != nullptr
+        && last->offset == offset
+        && last->flags == flags)
+        return (Instruction *) last->operands->value;
+
     auto *instr = this->CreateInstruction<OffsetInstruction>(opcode, offset);
 
     instr->flags = flags;

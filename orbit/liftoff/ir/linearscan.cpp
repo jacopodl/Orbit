@@ -47,6 +47,14 @@ void LinearScan::AllocateSpecificRegister(LiveInterval &interval) {
         if ((*it)->instr->assigned_reg == interval.instr->assigned_reg) {
             LiveInterval *found = *it;
 
+            if(found->end == interval.start) {
+                this->active_.erase(it);
+
+                this->active_.insert(&interval);
+
+                return;
+            }
+
             this->SpillToStackAndReloadUses(found->instr);
 
             this->active_.erase(it);
@@ -128,8 +136,7 @@ void LinearScan::SpillAndAssignRegister(LiveInterval *interval) {
 }
 
 void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
-    // 1) Assign a free stack slot to the spilled instruction
-    instruction->stack_slot = (I16) this->GetFreeStackSlot();
+    int inserted = 0;
 
     // 2) Iterate through the use-list of the instruction to load the value back from the stack
     for (auto use = instruction->use_list; use != nullptr; use = use->next) {
@@ -139,15 +146,28 @@ void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
         if (target->type() != ObjectType::INSTRUCTION)
             continue;
 
+        if (target->prev == instruction)
+            continue;
+
+        // Assign a free stack slot to the spilled instruction
+        if (inserted == 0)
+            instruction->stack_slot = (I16) this->GetFreeStackSlot();
+
         // Generate a load instruction to fetch the value from the stack slot
         auto *load = this->builder_.GetLoadFromStackOffset(instruction->stack_slot);
+        load->assigned_reg = instruction->assigned_reg;
 
         // Insert the load instruction immediately before the target instruction
         IRContext::InsertInstructionBefore(target, load);
 
         // Update the operand in the target instruction to reference the load instead of the original instruction
         target->ReplaceOperand(instruction, load);
+
+        inserted++;
     }
+
+    if (inserted == 0)
+        return;
 
     // 3) Generate a store instruction to save the value to the specified stack slot
     auto *store = this->builder_.GetStoreToStackOffset(instruction, instruction->stack_slot);

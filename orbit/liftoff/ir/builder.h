@@ -23,7 +23,6 @@ namespace liftoff::ir {
 
         bool delete_context_ = true;
 
-        template<typename T, typename... Args>
         /** @brief Creates an object of a specified type and adds it to the object list.
          *
          * @tparam T Type of the object to create. Must be derived from Object.
@@ -33,6 +32,7 @@ namespace liftoff::ir {
          * @return Pointer to the created object.
          * @throws std::bad_alloc If memory allocation fails.
          */
+        template<typename T, typename... Args>
         std::enable_if_t<std::is_base_of_v<Object, T>, T *> CreateObject(Args... args) {
             auto *obj = this->allocator_.alloc<T>(sizeof(T));
             if (obj == nullptr)
@@ -45,7 +45,6 @@ namespace liftoff::ir {
             return obj;
         }
 
-        template<typename T, typename... Args>
         /**
          * @brief Creates an instruction of a specified type and adds it to the current basic block.
          *
@@ -57,6 +56,7 @@ namespace liftoff::ir {
          *
          * @return A pointer to the created instruction of type T.
          */
+        template<typename T, typename... Args>
         std::enable_if_t<std::is_base_of_v<Instruction, T>, T *> CreateInstruction(Args... args) {
             auto *instr = this->CreateObject<T>(args...);
 
@@ -73,6 +73,19 @@ namespace liftoff::ir {
          * @return Pointer to the basic block.
          */
         BasicBlock *AddInstruction(Instruction *instruction);
+
+        /**
+         * @brief Retrieves the last instruction with the specified opcode.
+         *
+         * This method searches the current basic block for the last instruction that matches
+         * the given opcode and returns it if found. If no matching instruction exists or
+         * the current context is null, it returns a null pointer.
+         *
+         * @param opcode The opcode to match while searching for the instruction.
+         * @return A pointer to the last instruction matching the specified opcode,
+         *         or null if no such instruction exists.
+         */
+        [[nodiscard]] const PhysInstruction *GetLastInstructionMatch(orbiter::OPCode opcode) const noexcept;
 
         /**
          * @brief Removes an object from the object list.
@@ -193,10 +206,14 @@ namespace liftoff::ir {
         }
 
         Instruction *GetLoadFromStackOffset(I16 offset) {
+            this->context->program_size += 4;
+
             return this->CreateObject<OffsetInstruction>(orbiter::OPCode::SKLDR, offset);
         }
 
         Instruction *GetStoreToStackOffset(Instruction *src, I16 offset) {
+            this->context->program_size += 4;
+
             return this->CreateObject<OffsetInstruction>(orbiter::OPCode::SKSTR, offset, src);
         }
 
