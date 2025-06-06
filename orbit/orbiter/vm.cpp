@@ -364,6 +364,27 @@ CGOTO
 
                 DISPATCH;
             }
+            TARGET_OP(NGBLV) {
+                const auto flags = FETCH_F_DST(VariableFlags, instr);
+                const auto value = REG_N(FETCH_R_SRC(instr));
+                const auto k_index = FETCH_IMM(instr);
+                auto gbl_flags = (PropertyFlag) 0;
+
+                if (ENUMBITMASK_ISTRUE(flags, VariableFlags::CONSTANT))
+                    gbl_flags |= PropertyFlag::IS_CONSTANT;
+
+                if (ENUMBITMASK_ISTRUE(flags, VariableFlags::PUBLIC))
+                    gbl_flags |= PropertyFlag::IS_PUBLIC;
+
+                if (!ContextDefine(fiber->context.context,
+                              (ORString *) code->unknown_symbols->objects[k_index],
+                              (OObject *) value,
+                              gbl_flags)) {
+                    // TODO: Error!
+                }
+
+                DISPATCH;
+            }
             TARGET_OP(STGBL) {
                 const auto value = REG_N(FETCH_R_SRC(instr));
                 const auto k_index = FETCH_IMM(instr);
