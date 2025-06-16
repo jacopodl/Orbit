@@ -206,6 +206,8 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
 
     if (symbol->defining_scope->type == ScopeType::MODULE) {
         if (decl && this->level_ == OptimizationLevel::OFF) {
+            offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
+
             this->builder_.CreateStoreVariable(orbiter::OPCode::NGBLV, offset, (U8) v_flags, value);
 
             goto EXIT;
