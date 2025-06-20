@@ -14,6 +14,7 @@
 
 namespace liftoff::ir {
     enum class IRContextType {
+        CLASS,
         CLOSURE,
         FUNCTION,
         METHOD,

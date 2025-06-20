@@ -149,6 +149,18 @@ namespace liftoff::ir {
         }
     };
 
+    class ExecSubInstr : public PhysInstruction {
+        friend Builder;
+
+    protected:
+        explicit ExecSubInstr(Instruction *src) noexcept: PhysInstruction(
+            orbiter::OPCode::EXECSUB, 1) {
+            this->SetOperand(0, src);
+
+            this->assigned_reg = kReturnRegisterReg;
+        }
+    };
+
     class LoadFunc : public PhysInstruction {
         friend Builder;
 
@@ -241,12 +253,21 @@ namespace liftoff::ir {
 
     protected:
         explicit ReturnInstruction(Instruction *instr, U16 slots) : PhysInstruction(orbiter::OPCode::RET, 1),
-                                                                     slots(slots) {
+                                                                    slots(slots) {
             this->SetOperand(0, instr);
         }
 
     public:
         U16 slots = 0;
+    };
+
+    class ReturnSubInstruction : PhysInstruction {
+        friend Builder;
+
+    protected:
+        explicit ReturnSubInstruction(Instruction *instr) : PhysInstruction(orbiter::OPCode::RETSUB, 1) {
+            this->SetOperand(0, instr);
+        }
     };
 
     // UnaryOp immediate

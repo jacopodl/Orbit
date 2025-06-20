@@ -36,6 +36,10 @@ namespace orbiter {
         REST_ARG = 1 << 2
     };
 
+    enum class ClassFlags : U8 {
+        EXTEND = 0x1
+    };
+
     enum class ClosureLSMode : U8 {
         LOCALS_SLOT = 0,
         PARAM_SLOT
@@ -119,11 +123,13 @@ namespace orbiter {
         NEG, // Arithmetic negation (-value)
         NOT, // Logical NOT (!value)
 
-        PANIC, // Start panic           OPCODE | 4 RESERVED | 4 SRC | 16 RESERVED
-        RET, // Return instruction      OPCODE | 4 RESERVED | 4 SRC | 16 POP VALUES
-        YLD, // Yield instruction       OPCODE | 4 RESERVED | 4 SRC | 16 RESERVED
+        PANIC, // Start panic               OPCODE | 4 RESERVED | 4 SRC | 16 RESERVED
+        RET, // Return instruction          OPCODE | 4 RESERVED | 4 SRC | 16 POP VALUES
+        RETSUB, // Return from code object   OPCODE | 4 RESERVED | 4 SRC | 16 RESERVED
+        YLD, // Yield instruction           OPCODE | 4 RESERVED | 4 SRC | 16 RESERVED
 
-        CALL, // Call function: OPCODE | 4 FLAGS(CallMode) | 4 SRC | 16 ARITY
+        CALL, // Call function:                     OPCODE | 4 FLAGS(CallMode) | 4 SRC | 16 ARITY
+        EXECSUB, // Execute code object directly:    OPCODE | 4 RESERVED        | 4 SRC | 16 RESERVED
 
         // Load/Store Operations
         LDCODE, // Load Code from Code object:      OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
@@ -160,6 +166,10 @@ namespace orbiter {
         NSET, // Create new set                         OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
         NTUPLE, // Create new tuple                     OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
         ADDELEM, // Push value to container             OPCODE | 4 DST (Container) | 4 SRC | 4 V_SRC | 12 RESERVED
+
+        // Class/Trait
+        MKCLZ,
+        // Create new class                      OPCODE | 4 DST | 4 Flags(ClassFlags) | 8 RESERVED | 8 IMPLs COUNT
 
         // Jump Instructions
         JEN, // Jump if nil:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET

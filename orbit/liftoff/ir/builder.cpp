@@ -196,6 +196,10 @@ Instruction *Builder::CreateReturn(U16 slots) {
     return this->CreateInstruction<ReturnInstruction>(this->LoadNilValue(), slots);
 }
 
+Instruction *Builder::CreateReturnSub(Instruction *s_reg) {
+    return this->CreateInstruction<ReturnSubInstruction>(s_reg);
+}
+
 Instruction *Builder::CreateUnaryOp(const OPCode opcode, Instruction *s_reg) {
     return this->CreateInstruction<UnaryOpInstr>(opcode, s_reg);
 }
@@ -210,6 +214,18 @@ Instruction *Builder::LoadCodeObject(U16 offset) {
 
 Instruction *Builder::LoadConstant(U16 offset) {
     return this->LoadFromOffset(OPCode::LDCST, (I16) offset, 0);
+}
+
+Instruction *Builder::LoadConstant(datatype::OObject *object) {
+    const auto offset = this->context->PushStaticValue(object);
+
+    return this->LoadConstant(offset);
+}
+
+Instruction *Builder::LoadExecCodeObject(U16 offset) {
+    auto const co = this->LoadCodeObject(offset);
+
+    return this->CreateInstruction<ExecSubInstr>(co);
 }
 
 Instruction *Builder::LoadFromClosureAtOffset(I16 offset, ClosureLSMode mode) {

@@ -161,6 +161,8 @@ namespace liftoff::ir {
 
         Instruction *CreateReturn(U16 slots);
 
+        Instruction *CreateReturnSub(Instruction *s_reg);
+
         Instruction *CreateUnaryOp(orbiter::OPCode opcode, Instruction *s_reg);
 
         Instruction *CreateUnaryOp(orbiter::OPCode opcode, U16 imm, U8 flags);
@@ -172,6 +174,14 @@ namespace liftoff::ir {
         Instruction *LoadCodeObject(U16 offset);
 
         Instruction *LoadConstant(U16 offset);
+
+        Instruction *LoadConstant(orbiter::datatype::OObject *object);
+
+        Instruction *LoadExecCodeObject(U16 offset);
+
+        Instruction *LoadExecLastCodeObject() {
+            return this->LoadExecCodeObject(this->context->GetSubcontextCount() - 1);
+        }
 
         Instruction *LoadFalseValue() {
             return this->CreateInstruction<

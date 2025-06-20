@@ -315,6 +315,33 @@ CGOTO
 
                 continue;
             }
+            TARGET_OP(RETSUB) {
+                const auto src = FETCH_R_SRC(instr);
+
+                // Cleanup local variables
+                for (auto i = regs->BP.reg; i != regs->SP.reg; i += sizeof(void *))
+                    O_DECREF(*(OObject**)(stack->stack + i));
+
+                REG_RR = REG_N(src);
+
+                REG_BP -= sizeof(void *);
+                REG_IP = *ACCESS_STACK_BP(0) + sizeof(MachineWord);
+
+                REG_BP -= sizeof(void *);
+                REG_SP = REG_BP;
+
+                REG_BP = *ACCESS_STACK_SP(0);
+
+                REG_SP -= sizeof(void *);
+
+                O_FAST_DECREF(fiber->context.code);
+
+                fiber->context.code = (Code *) *ACCESS_STACK_SP(0);
+
+                code = fiber->context.code;
+
+                continue;
+            }
             TARGET_OP(CALL) {
                 const auto flags = FETCH_F_DST(CallMode, instr);
                 const auto src = FETCH_R_SRC(instr);
@@ -330,6 +357,28 @@ CGOTO
                 }
 
                 DISPATCH;
+            }
+            TARGET_OP(EXECSUB) {
+                const auto src = FETCH_R_SRC(instr);
+
+                const auto sproc = (Code *) REG_N(src);
+
+                if (!stack->Check(fiber->isolate, regs->SP.reg, sproc->stack_size + (3 * sizeof(void *)))) {
+                    // TODO: out of memory
+                }
+
+                fiber->vm.Push((OObject *) code);
+                fiber->vm.Push(regs->BP.reg);
+                fiber->vm.Push(regs->IP.reg);
+
+                regs->BP.reg = regs->SP.reg;
+
+                fiber->context.code = O_FAST_INCREF(sproc);
+                code = sproc;
+
+                regs->IP.reg = (PtrSize) sproc->m_code;
+
+                continue;
             }
             TARGET_OP(LDCODE) {
                 const auto dst = FETCH_R_DST(instr);
@@ -377,9 +426,9 @@ CGOTO
                     gbl_flags |= PropertyFlag::IS_PUBLIC;
 
                 if (!ContextDefine(fiber->context.context,
-                              (ORString *) code->unknown_symbols->objects[k_index],
-                              (OObject *) value,
-                              gbl_flags)) {
+                                   (ORString *) code->unknown_symbols->objects[k_index],
+                                   (OObject *) value,
+                                   gbl_flags)) {
                     // TODO: Error!
                 }
 
@@ -666,6 +715,14 @@ CGOTO
                     TupleAppend((Tuple *) obj, (OObject *) REG_N(src));
                 else
                     assert(false);
+
+                DISPATCH;
+            }
+            TARGET_OP(MKCLZ) {
+                const auto dst = FETCH_R_DST(instr);
+
+                // FIXME: impl this
+                assert(false);
 
                 DISPATCH;
             }
