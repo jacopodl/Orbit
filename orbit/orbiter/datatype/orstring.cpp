@@ -86,14 +86,18 @@ int orbiter::datatype::ORStringCompare(const ORString *left, const char *right, 
     return strncmp((const char *) STR_BUF(left), right, std::min(STR_LEN(left), length));
 }
 
+int orbiter::datatype::ORStringCompare(const char *left, const ORString *right, MSize length) {
+    return strncmp(left, (const char *) STR_BUF(right), std::min(STR_LEN(right), length));
+}
+
 HORString orbiter::datatype::ORStringIntern(Isolate *isolate, const unsigned char *string, MSize length) {
     // TODO: IMPL THIS!
     return ORStringNew(isolate, string, length);
 }
 
 HORString orbiter::datatype::ORStringNew(Isolate *isolate, unsigned char *buffer, MSize length,
-                                                MSize cp_length,
-                                                StringKind kind) {
+                                         MSize cp_length,
+                                         StringKind kind) {
     assert(buffer[length] == '\0');
 
     auto *str = MkStringContainer(isolate, length, false);

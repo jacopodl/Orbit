@@ -65,8 +65,8 @@ namespace orbiter::datatype {
     /**
      * @brief Compares two strings lexicographically.
      *
-     * @param left Left Argon string.
-     * @param right Right Argon string.
+     * @param left Left Orbit string.
+     * @param right Right Orbit string.
      * @return An int value:
      * 0 if the string is equal to the other string.
      * < 0 if the string is lexicographically less than the other string.
@@ -77,8 +77,8 @@ namespace orbiter::datatype {
     /**
     * @brief Compares two strings lexicographically.
     *
-    * @param left Left Argon string.
-    * @param right Right Argon string.
+    * @param left Left Orbit string.
+    * @param right Right C-string.
     * @return An int value:
     * 0 if the string is equal to the other string.
     * < 0 if the string is lexicographically less than the other string.
@@ -86,10 +86,67 @@ namespace orbiter::datatype {
     */
     int ORStringCompare(const ORString *left, const char *right, MSize length);
 
+    /**
+    * @brief Compares two strings lexicographically.
+    *
+    * @param left Left C-string.
+    * @param right Right Orbit string.
+    * @return An int value:
+    * 0 if the string is equal to the other string.
+    * < 0 if the string is lexicographically less than the other string.
+    * > 0 if the string is lexicographically greater than the other string (more characters).
+    */
+    int ORStringCompare(const char *left, const ORString *right, MSize length);
+
+    /**
+     * @brief Compare an ORString instance with a C-style string
+     *
+     * This function compares the given ORString object with the provided
+     * null-terminated C-style string. The comparison checks for equality
+     * and handles the required length calculation for the right-hand string.
+     *
+     * @param left Pointer to the ORString object
+     * @param right Pointer to the null-terminated C-style string
+     *
+     * @return An integer indicating the result of the comparison:
+     *         - 0 if the strings are equal
+     *         - Negative value if the left string is less than the right
+     *         - Positive value if the left string is greater than the right
+     */
     inline int ORStringCompare(const ORString *left, const char *right) {
         return ORStringCompare(left, right, strlen(right));
     }
 
+    /**
+     * @brief Compare an ORString instance with a C-style string
+     *
+     * This function compares the given ORString object with the provided
+     * null-terminated C-style string. The comparison checks for equality
+     * and handles the required length calculation for the right-hand string.
+     *
+     * @param left Pointer to the null-terminated C-style string
+     * @param right Pointer to the ORString object
+     *
+     * @return An integer indicating the result of the comparison:
+     *         - 0 if the strings are equal
+     *         - Negative value if the left string is less than the right
+     *         - Positive value if the left string is greater than the right
+     */
+    inline int ORStringCompare(const char *left, const ORString *right) {
+        return ORStringCompare(left, right, strlen(left));
+    }
+
+    /**
+     * @brief Compares two ORString objects for equality.
+     *
+     * This function determines whether two ORString objects are equal
+     * by comparing their contents using the ORStringCompare function.
+     *
+     * @param left Pointer to the first ORString object.
+     * @param right Pointer to the second ORString object.
+     *
+     * @return true if the strings are equal, false otherwise.
+     */
     inline bool ORStringEqual(const ORString *left, const ORString *right) {
         return ORStringCompare(left, right) == 0;
     }
@@ -135,7 +192,7 @@ namespace orbiter::datatype {
      * @return Handle to ORString object
      */
     HORString ORStringNew(Isolate *isolate, unsigned char *string, MSize length, MSize cp_length,
-                                 StringKind kind);
+                          StringKind kind);
 
     /**
      * @brief Create new string
