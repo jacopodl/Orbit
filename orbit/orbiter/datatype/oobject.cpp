@@ -42,7 +42,10 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *va
 
             property->name = O_FAST_INCREF(orname);
 
-            property->value = O_INCREF(value);
+            if (ENUMBITMASK_ISTRUE(flags, PropertyFlag::IN_OBJECT))
+                property->value = value;
+            else
+                property->value = O_INCREF(value);
 
             property->detail = flags;
 
@@ -114,18 +117,19 @@ PropertyDescriptor *orbiter::datatype::TIFindLocalProperty(const TypeInfo *type,
     auto *property = type->properties.p_array;
 
     int low = 0;
-    int high = type->properties.count;
-    while (low < high) {
+    int high = type->properties.count - 1;
+
+    while (low <= high) {
         const auto mid = low + (high - low) / 2;
 
-        const auto cmp = ORStringCompare(property[mid].name, name);
+        const auto cmp = ORStringCompare(name, property[mid].name);
         if (cmp == 0)
             return property + mid;
 
         if (cmp < 0)
-            low = mid + 1;
-        else
             high = mid - 1;
+        else
+            low = mid + 1;
     }
 
     return nullptr;
