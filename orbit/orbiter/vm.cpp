@@ -5,6 +5,7 @@
 #include <cassert>
 
 #include <orbit/orbiter/datatype/closure.h>
+#include <orbit/orbiter/datatype/ctbuilder.h>
 #include <orbit/orbiter/datatype/dict.h>
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/number.h>
@@ -413,6 +414,27 @@ CGOTO
 
                 DISPATCH;
             }
+            TARGET_OP(STPROP) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src = FETCH_R_SRC(instr);
+                const auto offset = FETCH_IMM(instr);
+
+                const auto *tp = (TypeInfo *) REG_N(dst);
+                const auto *key = (ORString *) code->unknown_symbols->objects[offset];
+                auto *value = (OObject *) REG_N(src);
+
+                auto prop = TIFindLocalProperty(tp, (const char *) key->buffer);
+                if (prop == nullptr) {
+                    // FIXME: error
+                    assert(false);
+                }
+
+                assert(prop->value==nullptr);
+
+                prop->value = O_INCREF(value);
+
+                DISPATCH;
+            }
             TARGET_OP(NGBLV) {
                 const auto flags = FETCH_F_DST(VariableFlags, instr);
                 const auto value = REG_N(FETCH_R_SRC(instr));
@@ -720,9 +742,22 @@ CGOTO
             }
             TARGET_OP(MKCLZ) {
                 const auto dst = FETCH_R_DST(instr);
+                const auto flags = FETCH_F_SRC(ClassFlags, instr);
+                const auto impls = FETCH_IMM(instr);
 
-                // FIXME: impl this
-                assert(false);
+                auto sk_start = impls;
+
+                auto clazz = ClassTypeNew(code,
+                                          flags == ClassFlags::EXTEND
+                                              ? (TypeInfo *) *ACCESS_STACK_SP(-((sk_start+1) * sizeof(void*)))
+                                              : nullptr,
+                                          (TypeInfo **) ACCESS_STACK_SP(-(sk_start * sizeof(void*))),
+                                          sk_start);
+                if (!clazz) {
+                    // FIXME: Error!
+                }
+
+                REG_N(dst) = (PtrSize) clazz.get();
 
                 DISPATCH;
             }

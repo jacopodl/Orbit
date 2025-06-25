@@ -187,6 +187,19 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
     if (symbol->access == AccessModifier::PUBLIC)
         v_flags |= orbiter::VariableFlags::PUBLIC;
 
+    if (symbol->defining_scope->type == ScopeType::CLASS || symbol->defining_scope->type == ScopeType::TRAIT) {
+        this->builder_.context->ExportSymbol(symbol, symbol->access == AccessModifier::PUBLIC
+                                                         ? (orbiter::VariableFlags::CONSTANT |
+                                                            orbiter::VariableFlags::PUBLIC)
+                                                         : orbiter::VariableFlags::CONSTANT);
+
+        offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
+
+        this->builder_.CreateManipType(orbiter::OPCode::STPROP, this->ct_active_->tp_ptr, value, offset);
+
+        return value;
+    }
+
     if (symbol->upvalue) {
         this->builder_.StoreToClosureAtOffset(value, offset,
                                               symbol->defining_scope == this->sym_t_->scope
@@ -250,15 +263,43 @@ Instruction *IRBuilder::visitASTNode(parser::ASTNode *node) {
 }
 
 Instruction *IRBuilder::visitAssignment(parser::Assignment *node) {
+    const Symbol *sym = ((parser::Identifier *) node->name)->symbol;
     Instruction *value = nullptr;
-    const Symbol *sym;
 
     if (node->name->node_type == parser::NodeType::TUPLE) {
-        //assert(false);
+        assert(false);
+
         return nullptr;
     }
 
-    sym = ((parser::Identifier *) node->name)->symbol;
+    if (sym->defining_scope->type == ScopeType::CLASS || sym->defining_scope->type == ScopeType::TRAIT) {
+        if (sym->type == SymbolType::CONSTANT) {
+            value = this->visit(node->value);
+
+            this->builder_.context->ExportSymbol(sym, sym->access == AccessModifier::PUBLIC
+                                                          ? (orbiter::VariableFlags::CONSTANT |
+                                                             orbiter::VariableFlags::PUBLIC)
+                                                          : orbiter::VariableFlags::CONSTANT);
+
+            const auto offset = (I16) this->builder_.context->PushUnknownProps(sym->name);
+            this->builder_.CreateManipType(orbiter::OPCode::STPROP, this->ct_active_->tp_ptr, value, offset);
+
+            return value;
+        }
+
+        if (sym->type == SymbolType::VARIABLE && sym->defining_scope->type != ScopeType::TRAIT) {
+            this->builder_.context->ExportSymbol(sym, sym->access == AccessModifier::PUBLIC
+                                                          ? (orbiter::VariableFlags::VARIABLE |
+                                                             orbiter::VariableFlags::PUBLIC)
+                                                          : orbiter::VariableFlags::VARIABLE);
+
+            this->ct_active_->properties.emplace_back(node);
+
+            return value;
+        }
+
+        assert(false);
+    }
 
     if (node->value != nullptr)
         value = this->visit(node->value);
@@ -459,9 +500,54 @@ Instruction *IRBuilder::visitCatchBlock(parser::CatchBlock *node) {
     return nullptr;
 }
 
-Instruction *IRBuilder::visitConstruct(parser::Construct *node) {
-    // TODO: Implement Construct visitation
-    return nullptr;
+Instruction *IRBuilder::visitConstruct(const parser::Construct *node) {
+    if (!this->sym_t_->EnterScope(node->name))
+        throw SymbolTableException();
+
+    const auto ctx = this->sym_t_->scope->type == ScopeType::CLASS ? IRContextType::CLASS : IRContextType::TRAIT;
+
+    this->builder_.IRContextNew(ctx, 0);
+
+    if (node->ext)
+        this->builder_.StackPush(this->visit(node->ext));
+
+    if (!node->impl.empty()) {
+        for (auto &impl: node->impl)
+            this->builder_.StackPush(this->visit(impl.get()));
+    }
+
+    if (ctx == IRContextType::CLASS) {
+        const auto clazz = this->builder_.CreateUnaryOp(orbiter::OPCode::MKCLZ,
+                                                        node->impl.size(),
+                                                        node->ext != nullptr
+                                                            ? (U16) orbiter::ClassFlags::EXTEND
+                                                            : 0);
+
+        this->builder_.StackDiscard((node->ext == nullptr ? 0 : 1) + node->impl.size());
+
+        CTContext _(this, clazz);
+
+        this->visit(node->body);
+
+        this->builder_.CreateReturnSub(clazz);
+    } else {
+        assert(false);
+    }
+
+    this->builder_.context->name = orbiter::datatype::HORString(node->name);
+    this->builder_.context->doc = orbiter::datatype::HORString(node->doc);
+
+    this->builder_.LeaveContext();
+
+    this->sym_t_->LeaveScope();
+
+    auto *value = this->builder_.LoadExecLastCodeObject();
+
+    const auto *sym = this->sym_t_->Lookup(node->name, node->loc.start.offset);
+    if (sym == nullptr)
+        throw SymbolTableException();
+
+    return this->StoreVariable(sym, value, true);
 }
 
 Instruction *IRBuilder::visitDecorator(parser::Decorator *node) {
@@ -477,6 +563,9 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     auto f_flags = orbiter::LoadFuncFlags::SIMPLE;
     if (node->async)
         f_flags |= orbiter::LoadFuncFlags::ASYNC;
+
+    if (node->method)
+        f_flags |= orbiter::LoadFuncFlags::METHOD;
 
     const auto params_count = this->ProcessFunctionParams(node, def_args, f_flags);
 
@@ -523,9 +612,7 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
 
     this->sym_t_->LeaveScope();
 
-    auto *res = this->builder_.LoadCodeObject(this->builder_.context->GetSubcontextCount() - 1);
-
-    auto *func = this->builder_.LoadFunction(res, def_args, f_flags);
+    auto *func = this->builder_.LoadFunction(this->builder_.LoadLastCodeObject(), def_args, f_flags);
 
     if (node->anon)
         return func;
@@ -621,8 +708,7 @@ Instruction *IRBuilder::visitLiteral(parser::Literal *node) {
         return this->builder_.LoadImmediate((MachineSize) node->literal);
     }
 
-    const auto offset = this->builder_.context->PushStaticValue(node->literal);
-    return this->builder_.LoadConstant(offset);
+    return this->builder_.LoadConstant(node->literal);
 }
 
 Instruction *IRBuilder::visitLoop(const parser::Loop *node) {
@@ -787,8 +873,7 @@ unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, Inst
 
             const auto *named = (parser::Parameter *) param.get();
 
-            const auto offset = this->builder_.context->PushStaticValue((orbiter::datatype::OObject *) named->id);
-            const auto ld_const = this->builder_.LoadConstant(offset);
+            const auto ld_const = this->builder_.LoadConstant((orbiter::datatype::OObject *) named->id);
 
             auto *value = named->value != nullptr ? this->visit(named->value) : this->builder_.LoadNilValue();
 
