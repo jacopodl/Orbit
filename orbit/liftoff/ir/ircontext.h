@@ -18,7 +18,8 @@ namespace liftoff::ir {
         CLOSURE,
         FUNCTION,
         METHOD,
-        MODULE
+        MODULE,
+        TRAIT
     };
 
     /**
@@ -200,6 +201,10 @@ namespace liftoff::ir {
         orbiter::datatype::HList unknown_names;
 
         orbiter::datatype::HList static_values;
+
+        orbiter::datatype::HORString name;
+
+        orbiter::datatype::HORString doc;
 
         /// A pointer to the entry `BasicBlock` of the current intermediate representation (IR) context.
         BasicBlock *entry_ = nullptr;
@@ -402,7 +407,6 @@ namespace liftoff::ir {
          */
         static void Delete(IRContext *context);
     };
-
 
     class IRCHandle {
         IRContext *ir_;

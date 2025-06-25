@@ -180,6 +180,10 @@ Instruction *Builder::CreateManip(const OPCode opcode, Instruction *target, Inst
     return this->CreateInstruction<ManipInstruction>(opcode, target, src);
 }
 
+Instruction *Builder::CreateManipType(const OPCode opcode, Instruction *target, Instruction *src, U16 offset) {
+    return this->CreateInstruction<ManipTypeInstruction>(opcode, target, src, offset);
+}
+
 Instruction *Builder::CreateStoreVariable(const OPCode opcode, I16 offset, U8 flags, Instruction *value) {
     auto *instr = this->CreateInstruction<OffsetInstruction>(opcode, offset, value);
 

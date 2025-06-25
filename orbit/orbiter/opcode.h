@@ -62,10 +62,11 @@ namespace orbiter {
         ASYNC = 0x1,
         A_CLOSURE = 1 << 1,
         P_CLOSURE = 1 << 2,
-        NPARAMS = 1 << 3,
-        KW_PARAMS = 1 << 4,
-        REST_PARAMS = 1 << 5,
-        GENERATOR = 1 << 6
+        METHOD = 1 << 3,
+        NPARAMS = 1 << 4,
+        KW_PARAMS = 1 << 5,
+        REST_PARAMS = 1 << 6,
+        GENERATOR = 1 << 7
     };
 
     enum class LoadConstantMode : U8 {
@@ -137,6 +138,8 @@ namespace orbiter {
         LDIMM, // Load immediate into register:     OPCODE | 4 DST | 4 SHIFT     | 16 IMM
         MOV, // Copy value between registers:       OPCODE | 4 DST | 4 SRC       | 16 RESERVED
         MOWN, // Move value between registers:      OPCODE | 4 DST | 4 SRC       | 16 RESERVED (Move ownership)
+
+        STPROP, // Set type property:               OPCODE | 4 DST (TypeInfo) | 4 SRC | 4 V_SRC | 12 OFFSET
 
         NGBLV, // Create new module variable:                       OPCODE | 4 FLAGS    | 4 SRC   | 16 UNSIGNED OFFSET
         STGBL, // Store value into global variable using key:       OPCODE | 4 RESERVED | 4 SRC   | 16 UNSIGNED OFFSET

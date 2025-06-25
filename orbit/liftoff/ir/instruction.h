@@ -248,6 +248,20 @@ namespace liftoff::ir {
         }
     };
 
+    class ManipTypeInstruction final : public PhysInstruction {
+        friend Builder;
+
+    public:
+        U16 offset = 0;
+
+        ManipTypeInstruction(orbiter::OPCode opcode, Instruction *target, Instruction *src,
+                             U16 offset) noexcept: PhysInstruction(opcode, 2),
+                                                   offset(offset) {
+            this->SetOperand(0, target);
+            this->SetOperand(1, src);
+        }
+    };
+
     class ReturnInstruction : PhysInstruction {
         friend Builder;
 

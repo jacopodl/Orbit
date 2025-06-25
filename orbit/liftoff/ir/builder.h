@@ -155,6 +155,8 @@ namespace liftoff::ir {
 
         Instruction *CreateManip(orbiter::OPCode opcode, Instruction *target, Instruction *src);
 
+        Instruction *CreateManipType(orbiter::OPCode opcode, Instruction *target, Instruction *src, U16 offset);
+
         Instruction *CreateStoreVariable(orbiter::OPCode opcode, I16 offset, U8 flags, Instruction *value);
 
         Instruction *CreateReturn(Instruction *s_reg, U16 slots);
@@ -173,6 +175,10 @@ namespace liftoff::ir {
 
         Instruction *LoadCodeObject(U16 offset);
 
+        Instruction *LoadLastCodeObject() {
+            return this->LoadCodeObject(this->context->GetSubcontextCount() - 1);
+        }
+
         Instruction *LoadConstant(U16 offset);
 
         Instruction *LoadConstant(orbiter::datatype::OObject *object);
@@ -180,7 +186,7 @@ namespace liftoff::ir {
         Instruction *LoadExecCodeObject(U16 offset);
 
         Instruction *LoadExecLastCodeObject() {
-            return this->LoadExecCodeObject(this->context->GetSubcontextCount() - 1);
+            return this->LoadLastCodeObject();
         }
 
         Instruction *LoadFalseValue() {

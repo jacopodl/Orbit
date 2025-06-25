@@ -61,6 +61,10 @@ using namespace liftoff::ir;
 #define EMIT_DSF(opcode, dst, src, flags) \
     (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | ((flags) << 12) & 0xF)
 
+// Emit macro with opcode, destination register, source register, and flags
+#define EMIT_DSO(opcode, dst, src, offset) \
+    (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | (offset & 0xFFFF))
+
 // Emit macro with opcode, destination register, source register
 #define EMIT_DS(opcode, dst, src) \
 (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | 0)
@@ -75,7 +79,7 @@ using namespace liftoff::ir;
 
 // Emit macro with opcode, destination register, left and right source registers, and extended flags
 #define EMIT_DSSFE(opcode, dst, src_l, src_r, flags) \
-(((U32)(opcode) << 24) | ((dst) << 20) | ((src_l) << 16) | ((src_r) << 12) | ((flags) << 4))
+    (((U32)(opcode) << 24) | ((dst) << 20) | ((src_l) << 16) | ((src_r) << 12) | ((flags) << 4))
 
 // Simplified Emit macro with opcode, destination register, left and right source registers (flags set to 0)
 #define EMIT_DSS(opcode, dst, src_l, src_r) \
@@ -180,6 +184,14 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                             instr->assigned_reg,
                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                             0);
+                break;
+            case orbiter::OPCode::STPROP:
+                *(orbiter::MachineWord *) m_code = EMIT_DSO(instr->opcode,
+                                                            ((ManipTypeInstruction*)instr->operands[0].value)->
+                                                            assigned_reg,
+                                                            ((ManipTypeInstruction*)instr->operands[1].value)->
+                                                            assigned_reg,
+                                                            ((ManipTypeInstruction*)instr)->offset);
                 break;
             case orbiter::OPCode::NGBLV:
                 *(orbiter::MachineWord *) m_code = EMIT_FSO(instr->opcode,
@@ -334,6 +346,8 @@ orbiter::datatype::HCode Codegen::Generate() noexcept {
             throw std::bad_alloc();
 
         this->ExportSymbols(code);
+
+        code->SetProps(ir->name.get(), ir->doc.get());
 
         return code;
     } catch (...) {
