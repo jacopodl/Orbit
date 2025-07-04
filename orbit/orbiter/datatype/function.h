@@ -18,12 +18,14 @@
 
 namespace orbiter::datatype {
     enum class FunctionKind : U8 {
+        SIMPLE = 0x0,
         ASYNC = 0x1,
 
-        METHOD = 0x1 << 1,
-        NATIVE = 0x1 << 2,
-        REST = 0x1 << 3,
-        KWARGS = 0x1 << 4
+        INIT = 0x1 << 1,
+        METHOD = 0x1 << 2,
+        NATIVE = 0x1 << 3,
+        REST = 0x1 << 4,
+        KWARGS = 0x1 << 5
     };
 }
 
@@ -73,6 +75,16 @@ namespace orbiter::datatype {
          */
         [[nodiscard]] bool HasDefaultArgs() const {
             return this->defaults != nullptr;
+        }
+
+        /**
+         * @brief Check if the function is a class constructor
+         *
+         * @return true if the function is a constructor, false otherwise
+         */
+        [[nodiscard]] bool IsInit() const {
+            return ENUMBITMASK_ISTRUE(this->kind, FunctionKind::INIT)
+                   && ENUMBITMASK_ISTRUE(this->kind, FunctionKind::METHOD);
         }
 
         /**
@@ -157,10 +169,10 @@ namespace orbiter::datatype {
      * @param code A pointer to the Code object representing the code for the function.
      * @param closure A pointer to the Closure object containing the captured variables.
      * @param defaults A pointer to the Tuple object containing default argument values.
-     * @param kind The type of function, defined by the FunctionKind enumeration.
+     * @param flags The type of function, defined by the LoadFuncFlags enumeration.
      * @return An HFunction handle representing the created Function object.
      */
-    HFunction FunctionNew(Code *code, Closure *closure, Tuple *defaults, FunctionKind kind);
+    HFunction FunctionNew(Code *code, Closure *closure, Tuple *defaults, LoadFuncFlags flags);
 
     /**
      * @brief Creates a new function object with provided arguments and curried values.

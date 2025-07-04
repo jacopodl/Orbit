@@ -83,6 +83,10 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, CallMode mode) 
         const auto args_diff = arity - total_args;
 
         if (!call_mode_is_rest || rest->length < args_diff) {
+            if (func->shared->IsInit()) {
+                assert(false); // FIXME
+            }
+
             const auto args = (OObject **) ((fiber->vm.stack.stack + fiber->vm.regs.SP.reg)
                                             - (total_args * sizeof(void *)));
 
@@ -639,27 +643,20 @@ CGOTO
             TARGET_OP(LDFUNC) {
                 const auto dst = FETCH_R_DST(instr);
                 const auto src = FETCH_R_SRC(instr);
-                const auto flags = (LoadFuncFlags) ((instr >> 4) & 0xFF);
+                const auto flags = (LoadFuncFlags) (instr & 0xFFF);
 
-                auto fn_kind = (FunctionKind) 0;
                 Closure *closure = nullptr;
                 Tuple *defs = nullptr;
-
-                if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::ASYNC))
-                    fn_kind = FunctionKind::ASYNC;
 
                 if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::A_CLOSURE))
                     closure = *(Closure **) (stack->stack + regs->BP.reg + (code->slots_count * sizeof(void *)));
                 else if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::P_CLOSURE))
                     closure = *(Closure **) (stack->stack + (regs->BP.reg - (kStackPrologueOffset + sizeof(void *))));
 
-                if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::REST_PARAMS))
-                    fn_kind = FunctionKind::REST;
-
                 if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::NPARAMS))
                     defs = (Tuple *) REG_N(FETCH_R_RSRC(instr));
 
-                auto func = FunctionNew((Code *) REG_N(src), closure, defs, fn_kind);
+                auto func = FunctionNew((Code *) REG_N(src), closure, defs, flags);
                 if (!func) {
                     // TODO: error!
                 }
@@ -736,6 +733,21 @@ CGOTO
 
                 DISPATCH;
             }
+            TARGET_OP(LDINIT) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src = FETCH_R_SRC(instr);
+
+                const auto *tp = (TypeInfo *) REG_N(src);
+                const auto *init = TIFindLocalProperty(tp, "init");
+                if (init == nullptr) {
+                    // FIXME: error
+                    assert(false);
+                }
+
+                REG_N(dst) = (PtrSize) init->value;
+
+                DISPATCH;
+            }
             TARGET_OP(MKCLZ) {
                 const auto dst = FETCH_R_DST(instr);
                 const auto flags = FETCH_F_SRC(ClassFlags, instr);
@@ -754,6 +766,16 @@ CGOTO
                 }
 
                 REG_N(dst) = (PtrSize) clazz.get();
+
+                DISPATCH;
+            }
+            TARGET_OP(NOBJ) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src = FETCH_R_SRC(instr);
+
+                auto *tp = (TypeInfo *) REG_N(src);
+
+                REG_N(dst) = (PtrSize) ClassNew(tp).get();
 
                 DISPATCH;
             }

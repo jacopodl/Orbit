@@ -90,10 +90,23 @@ HFunction orbiter::datatype::FunctionNew(Isolate *isolate, const FunctionDef *de
     return {};
 }
 
-HFunction orbiter::datatype::FunctionNew(Code *code, Closure *closure, Tuple *defaults, FunctionKind kind) {
+HFunction orbiter::datatype::FunctionNew(Code *code, Closure *closure, Tuple *defaults, LoadFuncFlags flags) {
     auto *isolate = O_GET_ISOLATE(code);
+    auto fn_kind = FunctionKind::SIMPLE;
 
-    auto *f_shared = FunSharedNew(isolate, nullptr, nullptr, code->slots_count, nullptr, kind);
+    if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::ASYNC))
+        fn_kind = FunctionKind::ASYNC;
+
+    if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::INIT))
+        fn_kind |= FunctionKind::INIT;
+
+    if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::METHOD))
+        fn_kind |= FunctionKind::METHOD;
+
+    if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::REST_PARAMS))
+        fn_kind |= FunctionKind::REST;
+
+    auto *f_shared = FunSharedNew(isolate, nullptr, nullptr, code->slots_count, nullptr, fn_kind);
     if (f_shared != nullptr) {
         f_shared->doc = O_FAST_INCREF(code->doc);
         f_shared->code = O_FAST_INCREF(code);

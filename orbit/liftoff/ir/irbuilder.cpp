@@ -577,6 +577,9 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     if (node->method)
         f_flags |= orbiter::LoadFuncFlags::METHOD;
 
+    if (node->node_type == parser::NodeType::INIT)
+        f_flags |= orbiter::LoadFuncFlags::INIT;
+
     const auto params_count = this->ProcessFunctionParams(node, def_args, f_flags);
 
     if (!this->sym_t_->EnterScope(node->name))
@@ -807,13 +810,15 @@ Instruction *IRBuilder::visitNew(const parser::Unary *node) {
     auto *clazz = this->visit(func->left);
 
     auto *ctor = this->builder_.CreateUnaryOp(orbiter::OPCode::LDINIT, clazz);
-    auto *call = this->CreateCall(func, ctor);
+    auto *call = (CallInstr *) this->CreateCall(func, ctor);
 
     this->builder_.StackPush(this->builder_.LoadNilValue()); // Reserve stack space
 
     auto *self = this->builder_.CreateUnaryOp(orbiter::OPCode::NOBJ, clazz);
 
     this->builder_.StoreToStackOffset(self, kStackPointerReg, (I16) -self_idx);
+
+    call->arguments += 1;
 
     this->builder_.AddInstruction(call);
 

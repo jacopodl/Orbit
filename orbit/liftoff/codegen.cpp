@@ -79,7 +79,7 @@ using namespace liftoff::ir;
 
 // Emit macro with opcode, destination register, left and right source registers, and extended flags
 #define EMIT_DSSFE(opcode, dst, src_l, src_r, flags) \
-    (((U32)(opcode) << 24) | ((dst) << 20) | ((src_l) << 16) | ((src_r) << 12) | ((flags) << 4))
+    (((U32)(opcode) << 24) | ((dst) << 20) | ((src_l) << 16) | ((src_r) << 12) | ((flags) & 0xFFF))
 
 // Simplified Emit macro with opcode, destination register, left and right source registers (flags set to 0)
 #define EMIT_DSS(opcode, dst, src_l, src_r) \

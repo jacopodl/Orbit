@@ -169,13 +169,13 @@ namespace liftoff::ir {
     protected:
         explicit LoadFunc(Instruction *src, Instruction *def_args,
                           orbiter::LoadFuncFlags flags) noexcept: PhysInstruction(orbiter::OPCode::LDFUNC, 2),
-                                                                  flags((U8) flags) {
+                                                                  flags((U16) flags) {
             this->SetOperand(0, src);
             this->SetOperand(1, def_args);
         }
 
     public:
-        U8 flags = 0;
+        U16 flags = 0;
     };
 
     class LoadStoreClosureWithOffsetInstr : public PhysInstruction {

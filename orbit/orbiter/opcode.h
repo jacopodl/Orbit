@@ -56,17 +56,18 @@ namespace orbiter {
         STRICT
     };
 
-    enum class LoadFuncFlags : U8 {
+    enum class LoadFuncFlags : U16 {
         SIMPLE = 0,
 
         ASYNC = 0x1,
         A_CLOSURE = 1 << 1,
         P_CLOSURE = 1 << 2,
-        METHOD = 1 << 3,
-        NPARAMS = 1 << 4,
-        KW_PARAMS = 1 << 5,
-        REST_PARAMS = 1 << 6,
-        GENERATOR = 1 << 7
+        INIT = 1<<3,
+        METHOD = 1 << 4,
+        NPARAMS = 1 << 5,
+        KW_PARAMS = 1 << 6,
+        REST_PARAMS = 1 << 7,
+        GENERATOR = 1 << 8
     };
 
     enum class LoadConstantMode : U8 {

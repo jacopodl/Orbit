@@ -21,6 +21,8 @@ namespace orbiter::datatype {
 
     using HTrait = Handle<Trait>;
 
+    HClass ClassNew(TypeInfo *type);
+
     /**
      * @brief Initialize and create the specified type
      *

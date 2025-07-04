@@ -14,6 +14,18 @@ bool orbiter::datatype::TraitTypeSetup(TypeInfo *self) {
     return true;
 }
 
+HClass orbiter::datatype::ClassNew(TypeInfo *type) {
+    const auto *isolate = O_GET_ISOLATE(type);
+
+    auto *clazz = MakeObject<Class>(type);
+
+    if (clazz != nullptr) {
+        // TODO ...
+    }
+
+    O_GC_TRACK_RETURN(isolate, clazz, true);
+}
+
 HOType orbiter::datatype::ClassTypeInit(Isolate *isolate) {
     auto clazz = MakeType(isolate, InstanceType::CLASS, 0, 0, 0);
     return clazz;
