@@ -180,6 +180,25 @@ Instruction *IRBuilder::CreateJumpForElvisOrNil(const parser::Binary *binary, or
     return phi->AddTarget(left)->AddTarget(right);
 }
 
+Instruction *IRBuilder::LoadParameter(const Symbol *symbol) {
+    assert(symbol->type == SymbolType::PARAMETER);
+
+    const auto params_count = (I16) this->sym_t_->scope->GetParameterCount();
+    const auto p_offset = (params_count - symbol->stack_offset) + kStackPrologueOffset;
+
+    assert(p_offset > 0);
+
+    return this->builder_.LoadFromStackOffset(kBaseStackPointerReg, (I16) -p_offset);
+}
+
+Instruction *IRBuilder::LoadSelfParam(MSize offset) {
+    const auto *self = this->sym_t_->Lookup("self", offset);
+    if (self == nullptr)
+        throw SymbolTableException();
+
+    return this->LoadParameter(self);
+}
+
 Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
     Instruction *ret = this->builder_.context->GetLastActiveVariableLoad(symbol);
     auto offset = (I16) symbol->offset;
@@ -187,7 +206,7 @@ Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
     if (ret != nullptr)
         return ret;
 
-    if (symbol->upvalue) {
+    if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::UPVALUE)) {
         ret = this->builder_.LoadFromClosureAtOffset(offset, symbol->defining_scope == this->sym_t_->scope
                                                                  ? orbiter::ClosureLSMode::LOCALS_SLOT
                                                                  : orbiter::ClosureLSMode::PARAM_SLOT);
@@ -251,10 +270,16 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
         v_flags |= orbiter::VariableFlags::PUBLIC;
 
     if (symbol->defining_scope->type == ScopeType::CLASS || symbol->defining_scope->type == ScopeType::TRAIT) {
-        this->builder_.context->ExportSymbol(symbol, symbol->access == AccessModifier::PUBLIC
-                                                         ? (orbiter::VariableFlags::CONSTANT |
-                                                            orbiter::VariableFlags::PUBLIC)
-                                                         : orbiter::VariableFlags::CONSTANT);
+        v_flags |= orbiter::VariableFlags::CONSTANT;
+
+        // FIXME: check constant store here (Class only)
+        if (symbol->type != SymbolType::CONSTANT) {
+            v_flags |= orbiter::VariableFlags::CP_INLINE;
+
+            this->builder_.context->local_slots += 1;
+        }
+
+        this->builder_.context->ExportSymbol(symbol, v_flags);
 
         offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
 
@@ -263,7 +288,7 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
         return value;
     }
 
-    if (symbol->upvalue) {
+    if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::UPVALUE)) {
         this->builder_.StoreToClosureAtOffset(value, offset,
                                               symbol->defining_scope == this->sym_t_->scope
                                                   ? orbiter::ClosureLSMode::LOCALS_SLOT
@@ -326,8 +351,29 @@ Instruction *IRBuilder::visitASTNode(parser::ASTNode *node) {
 }
 
 Instruction *IRBuilder::visitAssignment(parser::Assignment *node) {
-    const Symbol *sym = ((parser::Identifier *) node->name)->symbol;
     Instruction *value = nullptr;
+
+    if (node->name->node_type == parser::NodeType::SELECTOR) {
+        this->visit(node->name);
+
+        value = this->visit(node->value);
+
+        // Replace last LDOBJP with STOBJP
+        auto *ld = (LSObjectProp *) this->builder_.context->RFindFirstInstruction(orbiter::OPCode::LDOBJP);
+
+        auto *obj = (Instruction *) ld->operands[0].value;
+
+        assert(ld!=nullptr);
+
+        auto *st = this->builder_.GetStoreObjectProp(obj, value, ld->offset,
+                                                     ld->flags == orbiter::LoadObjectPropFlags::KEY);
+
+        this->builder_.context->DeleteInstruction(ld);
+
+        this->builder_.AddInstruction(st);
+
+        return st;
+    }
 
     if (node->name->node_type == parser::NodeType::TUPLE) {
         assert(false);
@@ -335,19 +381,13 @@ Instruction *IRBuilder::visitAssignment(parser::Assignment *node) {
         return nullptr;
     }
 
+    const Symbol *sym = ((parser::Identifier *) node->name)->symbol;
+
     if (sym->defining_scope->type == ScopeType::CLASS || sym->defining_scope->type == ScopeType::TRAIT) {
         if (sym->type == SymbolType::CONSTANT) {
             value = this->visit(node->value);
 
-            this->builder_.context->ExportSymbol(sym, sym->access == AccessModifier::PUBLIC
-                                                          ? (orbiter::VariableFlags::CONSTANT |
-                                                             orbiter::VariableFlags::PUBLIC)
-                                                          : orbiter::VariableFlags::CONSTANT);
-
-            const auto offset = (I16) this->builder_.context->PushUnknownProps(sym->name);
-            this->builder_.CreateManipType(orbiter::OPCode::SETPROP, this->ct_active_->tp_ptr, value, offset);
-
-            return value;
+            return this->StoreVariable(sym, value, node->node_type == parser::NodeType::VAR_DECLARATION);
         }
 
         if (sym->type == SymbolType::VARIABLE && sym->defining_scope->type != ScopeType::TRAIT) {
@@ -357,6 +397,8 @@ Instruction *IRBuilder::visitAssignment(parser::Assignment *node) {
                                                           : orbiter::VariableFlags::VARIABLE);
 
             this->ct_active_->properties.emplace_back(node);
+
+            this->builder_.context->local_slots += 1;
 
             return value;
         }
@@ -588,7 +630,21 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     this->builder_.IRContextNew(IRContextType::FUNCTION, params_count);
 
     // Alloc stack space for local variables
-    this->builder_.AllocStackSlots(this->sym_t_->scope->GetLocalVariableCount(), orbiter::AllocaFlags::DEFAULT);
+    const auto local_vars_count = this->sym_t_->scope->GetLocalVariableCount();
+    if (local_vars_count > 0)
+        this->builder_.AllocStackSlots(local_vars_count, orbiter::AllocaFlags::DEFAULT);
+
+    // Load default value for constructor
+    if (node->node_type == parser::NodeType::INIT) {
+        auto *self = this->LoadSelfParam(node->loc.end.offset);
+
+        for (const auto &var: this->ct_active_->properties) {
+            const auto *sym = ((parser::Identifier *) var->name)->symbol;
+            auto *value = this->visit(var->value);
+
+            this->builder_.StoreObjectProp(self, value, sym->offset, false);
+        }
+    }
 
     // Check if this function can create a lexical environment, if yes, allocate another slot in stack
     if (this->sym_t_->scope->ShouldCreateClosure()) {
@@ -832,6 +888,30 @@ Instruction *IRBuilder::visitParameter(parser::Parameter *node) {
     return nullptr;
 }
 
+Instruction *IRBuilder::visitSelector(parser::Selector *node) {
+    auto *base = this->visit(node->left);
+
+    const auto *key = (parser::Identifier *) node->right;
+
+    assert(key->node_type == parser::NodeType::IDENTIFIER);
+
+    if (node->left->node_type == parser::NodeType::IDENTIFIER) {
+        const auto *obj_base = (parser::Identifier *) node->left;
+
+        if (ENUMBITMASK_ISTRUE(obj_base->symbol->flags, SymbolFlags::SELF)) {
+            const auto *sym = this->sym_t_->Lookup(key->value, key->loc.start.offset, true);
+            if (sym == nullptr)
+                throw SymbolTableException();
+
+            return this->builder_.LoadObjectProp(base, sym->offset, false);
+        }
+    }
+
+    const auto offset = (I16) this->builder_.context->PushUnknownProps(key->value);
+
+    return this->builder_.LoadObjectProp(base, offset, true);
+}
+
 Instruction *IRBuilder::visitSubscript(parser::Subscript *node) {
     // TODO: Implement Subscript visitation
     return nullptr;
@@ -954,13 +1034,9 @@ void IRBuilder::CaptureParametersIntoClosure(const parser::Function *node) {
 
         assert(sym != nullptr);
 
-        if (sym->type == SymbolType::PARAMETER && sym->upvalue) {
-            const auto params_count = (I16) this->sym_t_->scope->GetParameterCount();
-            const auto p_offset = (params_count - sym->stack_offset) + kStackPrologueOffset;
+        if (sym->type == SymbolType::PARAMETER && ENUMBITMASK_ISTRUE(sym->flags, SymbolFlags::UPVALUE)) {
+            const auto value = this->LoadParameter(sym);
 
-            assert(p_offset > 0);
-
-            const auto value = this->builder_.LoadFromStackOffset(kBaseStackPointerReg, (I16) -p_offset);
             this->StoreVariable(sym, value, false);
         }
     }

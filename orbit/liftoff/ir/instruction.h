@@ -207,6 +207,27 @@ namespace liftoff::ir {
     };
 
     // Load/Store
+    class LSObjectProp final : public PhysInstruction {
+        friend Builder;
+
+    public:
+        orbiter::LoadObjectPropFlags flags;
+        U16 offset;
+
+        LSObjectProp(orbiter::OPCode opcode, Instruction *object, U16 offset,
+                     orbiter::LoadObjectPropFlags flags) noexcept: PhysInstruction(opcode, 1), flags(flags),
+                                                                   offset(offset) {
+            this->SetOperand(0, object);
+        }
+
+        LSObjectProp(orbiter::OPCode opcode, Instruction *object, Instruction *value, U16 offset,
+                     orbiter::LoadObjectPropFlags flags) noexcept: PhysInstruction(opcode, 2), flags(flags),
+                                                                   offset(offset) {
+            this->SetOperand(0, object);
+            this->SetOperand(1, value);
+        }
+    };
+
     class OffsetInstruction : public PhysInstruction {
         friend Builder;
 

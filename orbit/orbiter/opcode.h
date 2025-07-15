@@ -56,13 +56,20 @@ namespace orbiter {
         STRICT
     };
 
+    enum class LoadConstantMode : U8 {
+        OFFSET = 0,
+        FALSE,
+        TRUE,
+        NIL
+    };
+
     enum class LoadFuncFlags : U16 {
         SIMPLE = 0,
 
         ASYNC = 0x1,
         A_CLOSURE = 1 << 1,
         P_CLOSURE = 1 << 2,
-        INIT = 1<<3,
+        INIT = 1 << 3,
         METHOD = 1 << 4,
         NPARAMS = 1 << 5,
         KW_PARAMS = 1 << 6,
@@ -70,11 +77,9 @@ namespace orbiter {
         GENERATOR = 1 << 8
     };
 
-    enum class LoadConstantMode : U8 {
-        OFFSET = 0,
-        FALSE,
-        TRUE,
-        NIL
+    enum class LoadObjectPropFlags : U8 {
+        INLINE = 0,
+        KEY = 1
     };
 
     enum class MembershipFlags : U8 {
@@ -85,8 +90,9 @@ namespace orbiter {
     enum class VariableFlags : U8 {
         VARIABLE = 0x0,
         CONSTANT = 0x1,
-        PUBLIC = 0x2,
-        WEAK = 0x4
+        PUBLIC = 1 << 1,
+        WEAK = 1 << 2,
+        CP_INLINE = 1 << 3,
     };
 
     // Single instruction format:
@@ -174,6 +180,10 @@ namespace orbiter {
 
         // Class/Trait
         LDINIT, // Load class initializer           OPCODE | 4 DST | 4 SRC | 16 UNSIGNED OFFSET
+        LDOBJP,
+        // Load object property             OPCODE | 4 DST | 4 SRC_R(object) | 4 SRC_L(LoadObjectPropFlags) | 12 UNSIGNED OFFSET
+        STOBJP,
+        // Store object property    OPCODE | 4 DST(Object) | 4 SRC_R(value) | 4 SRC_L(LoadObjectPropFlags) | 12 UNSIGNED OFFSET
         MKCLZ, // Create new class                  OPCODE | 4 DST | 4 Flags(ClassFlags) | 8 RESERVED | 8 IMPLs COUNT
         NOBJ, // Create new object                  OPCODE | 4 DST | 4 SRC(Class type)   | 16 UNSIGNED OFFSET
 

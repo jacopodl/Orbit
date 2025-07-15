@@ -45,7 +45,7 @@ using namespace liftoff::ir;
 #define EMIT_FSO(opcode, flags, src, offset) \
     (((U32)(opcode) << 24) | ((flags) << 20) | ((src) << 16) | (offset))
 
-// Emit macro with opcode, source register, and offset (flags set to 0)
+// Emit macro with opcode, source register, and offset (destination set to 0)
 #define EMIT_SO(opcode, src, offset) \
     (((U32)(opcode) << 24) | ((0) << 20) | ((src) << 16) | (offset & 0xFFFF))
 
@@ -60,6 +60,10 @@ using namespace liftoff::ir;
 // Emit macro with opcode, destination register, source register, and flags
 #define EMIT_DSF(opcode, dst, src, flags) \
     (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | ((flags) << 12) & 0xF)
+
+// Emit macro with opcode, destination register, source register, flags and offset
+#define EMIT_DSFO(opcode, dst, src, flags, offset) \
+    (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | ((flags) << 12) | (offset & 0xFFF))
 
 // Emit macro with opcode, destination register, source register, and flags
 #define EMIT_DSO(opcode, dst, src, offset) \
@@ -276,6 +280,20 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                 *(orbiter::MachineWord *) m_code = EMIT_DS(instr->opcode,
                                                            instr->assigned_reg,
                                                            ((Instruction*)instr->operands[0].value)->assigned_reg);
+                break;
+            case orbiter::OPCode::LDOBJP:
+                *(orbiter::MachineWord *) m_code = EMIT_DSFO(instr->opcode,
+                                                             instr->assigned_reg,
+                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                             (U8)((LSObjectProp*)instr)->flags,
+                                                             ((LSObjectProp*)instr)->offset);
+                break;
+            case orbiter::OPCode::STOBJP:
+                *(orbiter::MachineWord *) m_code = EMIT_DSFO(instr->opcode,
+                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                             ((Instruction*)instr->operands[1].value)->assigned_reg,
+                                                             (U8)((LSObjectProp*)instr)->flags,
+                                                             ((LSObjectProp*)instr)->offset);
                 break;
             case orbiter::OPCode::JEN:
             case orbiter::OPCode::JF:

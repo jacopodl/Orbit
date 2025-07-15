@@ -35,6 +35,10 @@ namespace liftoff::ir {
 
         Instruction *LoadVariable(const Symbol *symbol);
 
+        Instruction *LoadParameter(const Symbol *symbol);
+
+        Instruction *LoadSelfParam(MSize offset);
+
         Instruction *StoreVariable(const Symbol *symbol, Instruction *value, bool decl);
 
         Instruction *visitASTNode(parser::ASTNode *node);
@@ -84,6 +88,8 @@ namespace liftoff::ir {
         Instruction *visitNew(const parser::Unary *node);
 
         Instruction *visitParameter(parser::Parameter *node);
+
+        Instruction *visitSelector(parser::Selector *node);
 
         Instruction *visitSubscript(parser::Subscript *node);
 

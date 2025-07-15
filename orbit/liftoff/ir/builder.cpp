@@ -33,25 +33,6 @@ const PhysInstruction *Builder::GetLastInstructionMatch(OPCode opcode) const noe
     return instr;
 }
 
-void Builder::RemoveFromObjsList(Object *obj) const noexcept {
-    auto *next = obj->memory_.next;
-    auto *prev = obj->memory_.prev;
-
-    obj->memory_.next = nullptr;
-    obj->memory_.prev = nullptr;
-
-    if (next != nullptr)
-        next->memory_.prev = prev;
-
-    if (prev == nullptr) {
-        this->context->objs_ = next;
-
-        return;
-    }
-
-    prev->memory_.next = next;
-}
-
 // *********************************************************************************************************************
 // PUBLIC
 // *********************************************************************************************************************
@@ -76,7 +57,7 @@ BasicBlock *Builder::CreateAppendBasicBlock() {
 }
 
 bool Builder::CheckIfLastInstructionIs(OPCode opcode) const {
-    if (this->context->current_->instr.tail->objType_ == ObjectType::INSTRUCTION)
+    if (this->context->current_ != nullptr && this->context->current_->instr.tail->objType_ == ObjectType::INSTRUCTION)
         return ((PhysInstruction *) this->context->current_->instr.tail)->opcode == opcode;
 
     return false;
@@ -261,6 +242,12 @@ Instruction *Builder::LoadImmediate(const MachineSize value) {
     return instr;
 }
 
+Instruction *Builder::LoadObjectProp(Instruction *src, U16 offset, bool as_key) {
+    return this->CreateInstruction<LSObjectProp>(OPCode::LDOBJP, src, offset, as_key
+                                                                                  ? LoadObjectPropFlags::KEY
+                                                                                  : LoadObjectPropFlags::INLINE);
+}
+
 Instruction *Builder::LoadFromOffset(const OPCode opcode, U8 r_base, const I16 offset, U8 flags) {
     const OffsetInstruction *last = nullptr;
 
@@ -313,6 +300,19 @@ Instruction *Builder::StackPush(Instruction *s_reg) {
         this->context->stack_push_max = this->context->stack_push_count;
 
     return this->CreateInstruction<UnaryOpInstr>(OPCode::PUSH, s_reg);
+}
+
+Instruction *Builder::GetStoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key) {
+    return this->CreateObject<LSObjectProp>(OPCode::STOBJP, obj, value, offset,
+                                            as_key ? LoadObjectPropFlags::KEY : LoadObjectPropFlags::INLINE);
+}
+
+Instruction *Builder::StoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key) {
+    auto *store = this->GetStoreObjectProp(obj, value, offset, as_key);
+
+    this->AddInstruction(store);
+
+    return store;
 }
 
 Instruction *Builder::StoreToClosureAtOffset(Instruction *src, I16 offset, ClosureLSMode mode) {
@@ -377,7 +377,7 @@ void Builder::AppendBasicBlock(BasicBlock *bb) const noexcept {
 }
 
 void Builder::DeleteBasicBlock(BasicBlock *bb) const noexcept {
-    this->RemoveFromObjsList(bb);
+    this->context->RemoveFromObjList(bb);
 
     bb->~BasicBlock();
 

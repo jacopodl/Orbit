@@ -84,13 +84,6 @@ namespace liftoff::ir {
          */
         [[nodiscard]] const PhysInstruction *GetLastInstructionMatch(orbiter::OPCode opcode) const noexcept;
 
-        /**
-         * @brief Removes an object from the object list.
-         *
-         * @param obj The object to remove.
-         */
-        void RemoveFromObjsList(Object *obj) const noexcept;
-
     public:
         IRContext *context = nullptr;
 
@@ -205,6 +198,8 @@ namespace liftoff::ir {
             return this->CreateInstruction<UnaryImmInstr>(orbiter::OPCode::LDCST, (U8) orbiter::LoadConstantMode::NIL);
         }
 
+        Instruction *LoadObjectProp(Instruction *src, U16 offset, bool as_key);
+
         /**
          * @brief Loads or stores using the specified opcode and offset.
          *
@@ -241,6 +236,10 @@ namespace liftoff::ir {
         Instruction *StackPop();
 
         Instruction *StackPush(Instruction *s_reg);
+
+        Instruction *GetStoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key);
+
+        Instruction *StoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key);
 
         Instruction *StoreToClosureAtOffset(Instruction *src, I16 offset, orbiter::ClosureLSMode mode);
 
