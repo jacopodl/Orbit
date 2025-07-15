@@ -114,6 +114,37 @@ namespace liftoff::ir {
         }
 
         /**
+         * @brief Removes an instruction from the instruction list within the basic block.
+         *
+         * This method detaches the specified instruction from the doubly linked list
+         * of instructions in the basic block. It updates relevant pointers to maintain
+         * the linked list structure and adjusts the size of the basic block accordingly.
+         *
+         * @param instr Pointer to the `Instruction` object to be removed.
+         */
+        void DeleteInstruction(Instruction *instr) noexcept {
+            auto *next = instr->next;
+            auto *prev = instr->prev;
+
+            instr->next = nullptr;
+            instr->prev = nullptr;
+
+            if (next != nullptr)
+                next->prev = prev;
+
+            if (prev != nullptr)
+                prev->next = next;
+
+            if (this->instr.head == instr)
+                this->instr.head = next;
+
+            if (this->instr.tail == instr)
+                this->instr.tail = prev;
+
+            this->size -= 4;
+        }
+
+        /**
          * @brief Marks a variable as defined in the basic block.
          *
          * @param sym Pointer to the `Symbol` representing the variable.

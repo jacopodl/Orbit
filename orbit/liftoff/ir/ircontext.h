@@ -181,8 +181,19 @@ namespace liftoff::ir {
          */
         void Add2ObjList(Object *obj) noexcept {
             obj->memory_.prev = this->objs_;
+
+            if (this->objs_ != nullptr)
+                this->objs_->memory_.next = obj;
+
             this->objs_ = obj;
         }
+
+        /**
+         * @brief Removes an object from the object list.
+         *
+         * @param obj The object to remove.
+         */
+        void RemoveFromObjList(Object *obj) noexcept;
 
     public:
         std::vector<ExportedName> exported_names;
@@ -252,6 +263,20 @@ namespace liftoff::ir {
          *         or nullptr if no such instruction is found.
          */
         Instruction *GetLastActiveVariableLoad(const Symbol *symbol);
+
+        /**
+         * @brief Searches the instruction list in reverse order to find the first instruction
+         * that matches the specified opcode.
+         *
+         * The method begins from the tail of the instruction list and traverses it
+         * backward, checking if the instruction matches the given opcode. The search
+         * skips virtual instructions and only considers physical instructions.
+         *
+         * @param opcode The opcode of the instruction to search for.
+         * @return A pointer to the first matching instruction found, or nullptr if
+         *         no matching instruction exists.
+         */
+        [[nodiscard]] Instruction *RFindFirstInstruction(orbiter::OPCode opcode) const noexcept;
 
         [[nodiscard]] orbiter::Isolate *GetIsolate() const noexcept {
             return this->isolate_;
@@ -406,6 +431,8 @@ namespace liftoff::ir {
          *                is null, the method will return without performing any operation.
          */
         static void Delete(IRContext *context);
+
+        void DeleteInstruction(Instruction *instruction) noexcept;
     };
 
     class IRCHandle {

@@ -89,6 +89,33 @@ int PeekPrecedence(TokenType token) {
     }
 }
 
+ASTHandle<ASTNode *> Parser::InjectInit(Loc loc) const {
+    loc.end.offset += 1;
+
+    auto func = MakeFunction(this->isolate_, TKCUR_LOC, NodeType::INIT);
+
+    func->loc.start = loc.start;
+
+    func->name = ORStringNew(this->isolate_, "init").release();
+    func->body = MakeBlock(this->isolate_, loc).release();
+
+    func->method = true;
+
+    auto *sym = this->sym_t_->DeclareSymbolScope(func->name, SymbolType::METHOD, func->loc.start.offset,
+                                                 func->loc.start.line);
+    if (sym == nullptr)
+        throw SymbolTableException();
+
+    sym->access = AccessModifier::PUBLIC;
+    sym->flags = SymbolFlags::SYNTETIC;
+
+    func->params.emplace_back(std::move(this->PushSelfParam(loc)));
+
+    this->sym_t_->LeaveScope(loc.end.offset, loc.end.line);
+
+    return func;
+}
+
 ASTHandle<ASTNode *> Parser::ParseClassTrait() {
     Context isolate(this, TKCUR_TYPE == TokenType::KW_CLASS ? ContextType::CLASS : ContextType::TRAIT);
 
@@ -137,10 +164,16 @@ ASTHandle<ASTNode *> Parser::ParseClassTrait() {
 
     try {
         ct->body = this->ParseBlock(false).release();
+
+        ct->loc.end = ct->body->loc.end;
+
+        if (ct->node_type == NodeType::CLASS && this->sym_t_->Lookup("init", ct->loc.end.offset) == nullptr) {
+            auto *ct_block = (Block *) ct->body;
+
+            ct_block->statements.emplace_back(std::move(this->InjectInit(ct->loc)));
+        }
     } catch (...) {
         this->exports = old_pub;
-
-        //this->sym_t_->LeaveScope();
 
         throw;
     }
@@ -1493,7 +1526,7 @@ ASTHandle<ASTNode *> Parser::ParseLiteral() {
 }
 
 ASTHandle<ASTNode *> Parser::ParseMemberAccess(ASTHandle<ASTNode *> &left) {
-    auto selector = MakeBinary(this->isolate_, TKCUR_LOC, NodeType::SELECTOR);
+    auto selector = MakeSelector(this->isolate_, TKCUR_LOC);
 
     selector->token_type = TKCUR_TYPE;
     selector->loc.start = left->loc.start;
@@ -1878,7 +1911,9 @@ ASTHandle<liftoff::parser::Function *> Parser::ParseFunction(const Position &sta
     if (sym == nullptr)
         throw SymbolTableException();
 
-    sym->anon = inl;
+    if (inl)
+        sym->flags |= SymbolFlags::ANON;
+
     sym->access = pub ? AccessModifier::PUBLIC : AccessModifier::PRIVATE;
 
     Loc last_param{};
@@ -1968,8 +2003,11 @@ ASTHandle<Parameter *> Parser::PushSelfParam(const Loc &loc) const {
     if (!id_name)
         throw DatatypeException();
 
-    if (this->sym_t_->Declare(id_name.get(), SymbolType::PARAMETER, loc.start.offset) == nullptr)
+    auto *sym = this->sym_t_->Declare(id_name.get(), SymbolType::PARAMETER, loc.start.offset);
+    if (sym == nullptr)
         throw SymbolTableException();
+
+    sym->flags = SymbolFlags::SELF | SymbolFlags::SYNTETIC;
 
     auto param = MakeParameter(this->isolate_, loc, NodeType::PARAM);
 

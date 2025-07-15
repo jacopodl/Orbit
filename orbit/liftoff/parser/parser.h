@@ -208,6 +208,8 @@ namespace liftoff::parser {
             return this->tkcur_.type > begin && this->tkcur_.type < end;
         }
 
+        [[nodiscard]] ASTHandle<ASTNode *> InjectInit(scanner::Loc loc) const;
+
         [[nodiscard]] ASTHandle<ASTNode *> ParseClassTrait();
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseDecorator();

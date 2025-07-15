@@ -34,7 +34,7 @@ bool IRContext::ComputeLiveness() const {
     // live_in = use ∪ (live_out - def)    (variables that are "live in" are those used within
     //                                     the current block or required by successor blocks,
     //                                     excluding those redefined in the current block)
-    // live_out = union of live_in sets of all successor blocks
+    // live_out = union live_in sets of all successor blocks
 
     bool changed = false;
 
@@ -77,6 +77,15 @@ Instruction *IRContext::GetLastActiveVariableLoad(const Symbol *symbol) {
 
     if (instr != this->active_regs_.end())
         return instr->second;
+
+    return nullptr;
+}
+
+Instruction *IRContext::RFindFirstInstruction(const orbiter::OPCode opcode) const noexcept {
+    for (auto *cursor = this->current_->instr.tail; cursor != nullptr; cursor = cursor->prev) {
+        if (cursor->type() != ObjectType::VIRT_INSTRUCTION && ((PhysInstruction *) cursor)->opcode == opcode)
+            return cursor;
+    }
 
     return nullptr;
 }
@@ -150,20 +159,39 @@ U16 IRContext::PushSubContext(IRContext *context) {
     return this->sub.count++;
 }
 
+void IRContext::RemoveFromObjList(Object *obj) noexcept {
+    auto *next = obj->memory_.next;
+    auto *prev = obj->memory_.prev;
+
+    obj->memory_.next = nullptr;
+    obj->memory_.prev = nullptr;
+
+    if (next != nullptr)
+        next->memory_.prev = prev;
+
+    if (prev == nullptr) {
+        this->objs_ = next;
+
+        return;
+    }
+
+    prev->memory_.next = next;
+}
+
 void IRContext::AddActiveVar(const Symbol *symbol, Instruction *instr) {
-    if (symbol->upvalue)
+    if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::UPVALUE))
         return;
 
     this->active_regs_.insert({symbol, instr});
 }
 
 std::vector<LiveInterval> &IRContext::ComputeLiveIntervals() {
-    for (auto *block = this->entry_; block != nullptr; block = block->next) {
+    for (const auto *block = this->entry_; block != nullptr; block = block->next) {
         for (auto *instr = block->instr.head; instr != nullptr; instr = instr->next)
             instr->instr_offset = this->logical_counter_++;
     }
 
-    for (auto *block = this->entry_; block != nullptr; block = block->next) {
+    for (const auto *block = this->entry_; block != nullptr; block = block->next) {
         for (auto *instr = block->instr.head; instr != nullptr; instr = instr->next) {
             if (instr->use_list != nullptr) {
                 U32 end = 0;
@@ -227,4 +255,19 @@ void IRContext::Delete(IRContext *context) {
     context->~IRContext();
 
     allocator.free(context);
+}
+
+void IRContext::DeleteInstruction(Instruction *instruction) noexcept {
+    if (instruction == nullptr)
+        return;
+
+    this->current_->DeleteInstruction(instruction);
+
+    this->RemoveFromObjList(instruction);
+
+    instruction->~Instruction();
+
+    const orbiter::memory::IsolateAllocator allocator(this->isolate_);
+
+    allocator.free(instruction);
 }

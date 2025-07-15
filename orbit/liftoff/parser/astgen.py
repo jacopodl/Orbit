@@ -48,8 +48,7 @@ NODES = {
             "left": "ASTNode*",
             "right": "ASTNode*"
         },
-        "node_type": ["BINARY", "CHAN_SEND", "CMPEQ", "ELVIS", "IN", "NOT_IN", "NULL_COALESCING", "SELECTOR",
-                      "SYNC_BLOCK"]
+        "node_type": ["BINARY", "CHAN_SEND", "CMPEQ", "ELVIS", "IN", "NOT_IN", "NULL_COALESCING", "SYNC_BLOCK"]
     },
     "Block": {
         "fields": {
@@ -204,6 +203,13 @@ NODES = {
             "value": "ASTNode*"
         },
         "node_type": ["NAMED_ARG", "NAMED_PARAM", "KW_PARAM", "PARAM", "REST_PARAM"]
+    },
+    "Selector": {
+        "fields": {
+            "token_type": "scanner::TokenType",
+            "left": "ASTNode*",
+            "right": "ASTNode*"
+        }
     },
     "Subscript": {
         "fields": {

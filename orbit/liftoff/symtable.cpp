@@ -160,9 +160,7 @@ Symbol *SymbolTable::SymbolNew(ORString *name, SymbolType type, MSize offset) no
     symbol->offset = 0;
     symbol->stack_offset = 0;
 
-    symbol->anon = false;
     symbol->tdz = false;
-    symbol->upvalue = false;
 
     if (type != SymbolType::UNKNOWN) {
         if (type == SymbolType::PARAMETER)
@@ -299,7 +297,7 @@ Symbol *SymbolTable::DeclareSymbolScope(const char *name, SymbolType type, MSize
     return this->DeclareSymbolScope(o_name.get(), type, offset, line_start);
 }
 
-Symbol *SymbolTable::Lookup(ORString *name, MSize offset) noexcept {
+Symbol *SymbolTable::Lookup(ORString *name, MSize offset, bool class_prop) noexcept {
     STHEntry *entry;
 
     const auto *scope = this->scope;
@@ -309,10 +307,14 @@ Symbol *SymbolTable::Lookup(ORString *name, MSize offset) noexcept {
      * Search in class/trait scope only if the current scope is a class/trait,
      * otherwise skip class/trait scopes while climbing the hierarchy.
      */
-    const auto from_clazz = scope->type == ScopeType::CLASS || scope->type == ScopeType::TRAIT;
+    const auto from_clazz = scope->type == ScopeType::CLASS || scope->type == ScopeType::TRAIT || class_prop;
+
+    while (class_prop && scope != nullptr && (scope->type != ScopeType::CLASS && scope->type != ScopeType::TRAIT))
+        scope = scope->back;
 
     while (scope != nullptr) {
         const auto *s_scope = scope->active;
+
         while (s_scope != nullptr) {
             if ((from_clazz || (scope->type != ScopeType::CLASS
                                 && scope->type != ScopeType::TRAIT))
@@ -358,7 +360,7 @@ Symbol *SymbolTable::LookupInsert(ORString *name, MSize offset) noexcept {
         if (sym->type == SymbolType::PARAMETER)
             sym->stack_offset = sym->offset;
 
-        sym->upvalue = true;
+        sym->flags |= SymbolFlags::UPVALUE;
 
         if (this->c_offset == nullptr)
             this->c_offset = &sym->defining_scope->closure_offset;
@@ -427,7 +429,7 @@ void SymbolTable::ComputeLocalVarOffset(const SubScope *s_scope) const noexcept 
             while (value != nullptr) {
                 if ((value->type == SymbolType::VARIABLE
                      || value->type == SymbolType::FUNC
-                     || value->type == SymbolType::METHOD) && !value->anon)
+                     || value->type == SymbolType::METHOD) && ENUMBITMASK_ISFALSE(value->flags, SymbolFlags::ANON))
                     value->offset = this->scope->local_variables++;
                 else if (value->type == SymbolType::UNKNOWN)
                     value->offset = this->scope->unknown_variables++;

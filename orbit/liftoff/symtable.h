@@ -59,6 +59,13 @@ namespace liftoff {
         PUBLIC
     };
 
+    enum class SymbolFlags : U8 {
+        ANON = 1,
+        SELF = 1 << 1,
+        SYNTETIC = 1 << 2,
+        UPVALUE = 1 << 3,
+    };
+
     class SubScope {
         STHMap symbols;
 
@@ -145,6 +152,8 @@ namespace liftoff {
 
         AccessModifier access;
 
+        SymbolFlags flags;
+
         SymbolType type;
 
         unsigned short offset;
@@ -153,11 +162,7 @@ namespace liftoff {
 
         unsigned short nesting;
 
-        bool anon;
-
         bool tdz;
-
-        bool upvalue;
     };
 
     class SymbolTable {
@@ -286,13 +291,30 @@ namespace liftoff {
         Symbol *DeclareSymbolScope(const char *name, SymbolType type, MSize offset, MSize line_start) noexcept;
 
         /**
+         * @brief Looks up a symbol by its name in the symbol table, starting from the current scope.
+         *
+         * This method searches for a symbol with the given name, starting in the active scope and
+         * climbing up through the hierarchy of scopes until it is found or the global scope is reached.
+         * If the `class_prop` parameter is true, it adjusts the search behavior to include class or trait
+         * scopes.
+         *
+         * @param name The name of the symbol to look for.
+         * @param offset The current instruction offset, used to resolve scoped definitions based on execution order.
+         * @param class_prop A flag indicating whether the lookup should include class/trait scopes.
+         * @return A pointer to the discovered Symbol if found, or `nullptr` otherwise.
+         */
+        Symbol *Lookup(orbiter::datatype::ORString *name, MSize offset, bool class_prop) noexcept;
+
+        /**
          * @brief Looks up a symbol with the specified name and offset.
          *
          * @param name The name of the symbol.
          * @param offset The offset of the symbol in source code.
          * @return A pointer to the found symbol or nullptr if not found.
          */
-        Symbol *Lookup(orbiter::datatype::ORString *name, MSize offset) noexcept;
+        Symbol *Lookup(orbiter::datatype::ORString *name, MSize offset) noexcept {
+            return this->Lookup(name, offset, false);
+        }
 
         /**
          * @brief Looks up a symbol with the specified name and offset.
@@ -357,5 +379,7 @@ namespace liftoff {
         void LeaveScope() noexcept;
     };
 }
+
+ENUMBITMASK_ENABLE(liftoff::SymbolFlags);
 
 #endif // !ORBIT_LIFTOFF_SYMTABLE_H_
