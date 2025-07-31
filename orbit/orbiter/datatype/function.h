@@ -106,6 +106,15 @@ namespace orbiter::datatype {
         }
 
         /**
+         * @brief Checks whether the function is categorized as a method.
+         *
+         * @return true if the function is a method, false otherwise.
+         */
+        [[nodiscard]] bool IsMethod() const {
+            return ENUMBITMASK_ISTRUE(this->kind, FunctionKind::METHOD);
+        }
+
+        /**
          * @brief Determines if the function is variadic.
          *
          * @return true if the function is variadic, false otherwise.

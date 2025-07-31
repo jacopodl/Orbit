@@ -557,6 +557,28 @@ Instruction *IRBuilder::visitBranch(const parser::Branch *node) {
 Instruction *IRBuilder::visitCall(parser::Call *node) {
     auto *func = this->visit(node->left);
 
+    if (node->left->node_type == parser::NodeType::SELECTOR) {
+        auto *obj = (Instruction *) func->operands[0].value;
+
+        assert(obj->type() == ObjectType::INSTRUCTION);
+
+        this->builder_.StackPush(obj);
+
+        auto *call = (CallInstr *) this->CreateCall(node, func);
+
+        call->mode |= orbiter::CallMode::METHOD;
+
+        this->builder_.AddInstruction(call);
+
+        this->builder_.context->stack_push_count -= call->arguments;
+
+        call->arguments += 1;
+
+        this->builder_.StackDiscard(1);
+
+        return call;
+    }
+
     auto *call = this->CreateCall(node, func);
 
     this->builder_.AddInstruction(call);
@@ -699,6 +721,9 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     }
 
     this->visit(node->body);
+
+    if (ENUMBITMASK_ISTRUE(f_flags, orbiter::LoadFuncFlags::METHOD))
+        cleanup_count -= 1;
 
     if (this->builder_.CheckIfLastInstructionIs(orbiter::OPCode::RET))
         ((ReturnInstruction *) this->builder_.context->current_->instr.tail)->slots = cleanup_count;
@@ -889,7 +914,7 @@ Instruction *IRBuilder::visitNativeVariable(parser::NativeVariable *node) {
 
 Instruction *IRBuilder::visitNew(const parser::Unary *node) {
     const auto *func = (parser::Call *) node->value;
-    const auto self_idx = func->args.size() + 1;
+    const auto self_idx = func->args.size();
 
     auto *clazz = this->visit(func->left);
 
@@ -904,6 +929,8 @@ Instruction *IRBuilder::visitNew(const parser::Unary *node) {
     call->arguments += 1;
 
     this->builder_.AddInstruction(call);
+
+    this->builder_.StackDiscard(1);
 
     this->builder_.context->stack_push_count -= self_idx;
 

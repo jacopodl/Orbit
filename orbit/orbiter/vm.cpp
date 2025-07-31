@@ -56,6 +56,9 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, CallMode mode) 
     bool call_mode_is_rest = ENUMBITMASK_ISTRUE(mode, CallMode::REST_ARG);
     const bool call_mode_is_kwarg = ENUMBITMASK_ISTRUE(mode, CallMode::KW_ARG);
 
+    if (ENUMBITMASK_ISTRUE(mode, CallMode::METHOD) && !func->shared->IsMethod())
+        total_args -= 1;
+
     if (func->currying != nullptr)
         total_args += func->currying->length;
 
@@ -745,6 +748,55 @@ CGOTO
                 }
 
                 REG_N(dst) = (PtrSize) init->value;
+
+                DISPATCH;
+            }
+            TARGET_OP(LDOBJP) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src = (OObject *) REG_N(FETCH_R_SRC(instr));
+                const auto flags = (LoadObjectPropFlags) FETCH_R_RSRC(instr);
+                const auto offset = instr & 0xFFF;
+
+                const auto *slot = O_SLOT(src, O_GET_TYPE(src));
+
+                if (flags == LoadObjectPropFlags::INLINE) {
+                    REG_N(dst) = (PtrSize) slot[offset];
+
+                    DISPATCH;
+                }
+
+                const auto *key = (ORString *) code->unknown_symbols->objects[offset];
+
+                auto prop = TIFindProperty(O_GET_TYPE(src), (const char *) key->buffer);
+                if (prop == nullptr) {
+                    // FIXME ERROR
+                    assert(false);
+                }
+
+                // FIXME: Check security permission
+
+                if (ENUMBITMASK_ISFALSE(prop->detail, PropertyFlag::IN_OBJECT))
+                    REG_N(dst) = (PtrSize) prop->value;
+                else
+                    REG_N(dst) = (PtrSize) slot[(PtrSize) prop->value];
+
+                DISPATCH;
+            }
+            TARGET_OP(STOBJP) {
+                const auto obj = (OObject *) REG_N(FETCH_R_DST(instr));
+                const auto value = (OObject *) REG_N(FETCH_R_SRC(instr));
+                const auto flags = (LoadObjectPropFlags) FETCH_R_RSRC(instr);
+                const auto offset = instr & 0xFFF;
+
+                auto *slot = O_SLOT(obj, O_GET_TYPE(obj));
+
+                if (flags == LoadObjectPropFlags::INLINE) {
+                    slot[offset] = value;
+
+                    DISPATCH;
+                }
+
+                assert(false);
 
                 DISPATCH;
             }
