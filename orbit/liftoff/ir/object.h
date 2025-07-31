@@ -57,15 +57,11 @@ namespace liftoff::ir {
 
             for (auto cur = this->use_list; cur != nullptr; cur = cur->next) {
                 if (cur == u) {
-                    if (prev == nullptr) {
-                        cur->next = nullptr;
+                    if (prev == nullptr)
+                        this->use_list = cur->next;
+                    else
+                        prev->next = cur->next;
 
-                        this->use_list = nullptr;
-
-                        return;
-                    }
-
-                    prev->next = cur->next;
                     cur->next = nullptr;
 
                     break;
