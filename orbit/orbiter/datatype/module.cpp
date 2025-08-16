@@ -31,10 +31,10 @@ HOType orbiter::datatype::ModuleTypeNew(Isolate *isolate, ORString *name, ORStri
 
     auto module = MakeTypeExtended(isolate, InstanceType::MODULE, 0, total_props, slots);
     if (module) {
-        if (!TIPropertyAdd(module.get(), "__name__", (OObject *) name, PropertyFlag::IS_CONSTANT))
+        if (!TIPropertyAdd(module.get(), "__name__", (OObject *) name, 0,PropertyFlag::IS_CONSTANT))
             return {};
 
-        if (!TIPropertyAdd(module.get(), "__doc__", (OObject *) doc, PropertyFlag::IS_CONSTANT))
+        if (!TIPropertyAdd(module.get(), "__doc__", (OObject *) doc, 0, PropertyFlag::IS_CONSTANT))
             return {};
     }
 
@@ -53,7 +53,7 @@ HOType orbiter::datatype::ModuleTypeNew(Code *code, ORString *name) {
             if (ENUMBITMASK_ISTRUE(symbol->flags, VariableFlags::CONSTANT))
                 pd = PropertyFlag::IS_CONSTANT;
 
-            if (!TIPropertyAdd(module.get(), (OObject *) symbol->name, symbol->slot, pd))
+            if (!TIPropertyAddInline(module.get(), (OObject *) symbol->name, symbol->slot, pd))
                 return {};
         }
     }

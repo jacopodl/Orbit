@@ -17,15 +17,15 @@ bool orbiter::datatype::EqualStrict(const OObject *left, const OObject *right) {
     return false;
 }
 
-bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, PropertyFlag flags) {
+bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, U16 slot, PropertyFlag flags) {
     auto orname = ORStringIntern(type->isolate, name);
     if (!orname)
         return false;
 
-    return TIPropertyAdd(type, (OObject *) orname.get(), value, flags);
+    return TIPropertyAdd(type, (OObject *) orname.get(), value, slot, flags);
 }
 
-bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *value, PropertyFlag flags) {
+bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *value, U16 slot, PropertyFlag flags) {
     PropertyDescriptor tmp{};
 
     auto *orname = (ORString *) name;
@@ -41,10 +41,9 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *va
                 tmp = *property;
 
             property->name = O_FAST_INCREF(orname);
+            property->slot = slot;
 
-            if (ENUMBITMASK_ISTRUE(flags, PropertyFlag::IN_OBJECT))
-                property->value = value;
-            else
+            if (ENUMBITMASK_ISFALSE(flags, PropertyFlag::IN_OBJECT))
                 property->value = O_INCREF(value);
 
             property->detail = flags;
@@ -80,7 +79,7 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const FunctionDef *bulk) {
         if (!fn)
             return false;
 
-        if (!TIPropertyAdd(type, cursor->name, (OObject *) fn.get(), {}))
+        if (!TIPropertyAdd(type, cursor->name, (OObject *) fn.get(), 0, {}))
             return false;
     }
 

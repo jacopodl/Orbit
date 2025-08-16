@@ -94,9 +94,9 @@ namespace orbiter {
     enum class VariableFlags : U8 {
         VARIABLE = 0x0,
         CONSTANT = 0x1,
-        PUBLIC = 1 << 1,
-        WEAK = 1 << 2,
-        CP_INLINE = 1 << 3,
+        PUBLIC = 0x1 << 1,
+        WEAK = 0x1 << 2,
+        CP_INLINE = 0x1 << 3,
     };
 
     // Single instruction format:

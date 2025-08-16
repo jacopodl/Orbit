@@ -54,18 +54,23 @@ namespace orbiter::datatype {
     enum class PropertyFlag:U8 {
         IN_OBJECT = 0x01,
 
-        IS_PUBLIC = 0x01 << 1,
-        IS_CONSTANT = 0x01 << 2,
-        IS_WEAK = 0x01 << 3
+        IS_CONSTANT = 0x01 << 1,
+        IS_WEAK = 0x01 << 2,
+        IS_PUBLIC = 0x01 << 3,
+
+        DUP_INLINE = 0x01 << 4
     };
 
     struct PropertyDescriptor {
         struct ORString *name; // from: orstring.h
 
-        /* Pointer to the OObject representing the property's value */
+        /// Pointer to the OObject representing the property's value
         OObject *value;
 
-        /* Additional details about the property */
+        /// Represents the index for a specific property within an object
+        U16 slot;
+
+        /// Additional details about the property
         PropertyFlag detail;
     };
 

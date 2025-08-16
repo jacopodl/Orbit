@@ -790,7 +790,7 @@ CGOTO
                 if (ENUMBITMASK_ISTRUE(prop->detail, PropertyFlag::IN_OBJECT)) {
                     auto *slot = O_SLOT(src, this_func->shared->owner_type);
 
-                    REG_N(dst) = (PtrSize) slot[(PtrSize) prop->value];
+                    REG_N(dst) = (PtrSize) slot[prop->slot];
                 } else
                     REG_N(dst) = (PtrSize) prop->value;
 

@@ -20,14 +20,14 @@ namespace orbiter::datatype {
         friend class Handle;
 
     public:
-        Handle() noexcept: object_(nullptr) {
+        Handle() noexcept : object_(nullptr) {
         }
 
-        explicit Handle(T *object) noexcept: object_(O_INCREF(object)) {
+        explicit Handle(T *object) noexcept : object_(O_INCREF(object)) {
         }
 
         template<typename U>
-        explicit Handle(Handle<U> &&other) noexcept: object_((T *) other.object_) {
+        explicit Handle(Handle<U> &&other) noexcept : object_((T *) other.object_) {
             other.object_ = nullptr;
         }
 
@@ -121,27 +121,13 @@ namespace orbiter::datatype {
      *
      * @param type Pointer to the TypeInfo
      * @param name Name of the property
-     * @param value Pointer to the OObject representing the property's value
+     * @param value Pointer to the OObject representing the property's value 
+     * @param slot Index position for the property in the object's slot array
      * @param flags Additional flags about the property
      *
      * @return true if property was added successfully, false otherwise
      */
-    bool TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, PropertyFlag flags);
-
-    /**
-     * @brief Add an inline property to a TypeInfo using an offset
-     *
-     * @param type Pointer to the TypeInfo
-     * @param name Name of the property
-     * @param offset Offset of the property(expected 0,1,2,3... not an offset in bytes), adjusted relative to the TypeInfo.
-     * @param flags Additional flags about the property
-     *
-     * @return true if property was added successfully, false otherwise
-     */
-    inline bool TIPropertyAdd(TypeInfo *type, const char *name, U16 offset, PropertyFlag flags) {
-        offset = type->offset + type->headroom + (offset * sizeof(void *));
-        return TIPropertyAdd(type, name, (OObject *) offset, flags | PropertyFlag::IN_OBJECT);
-    }
+    bool TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, U16 slot, PropertyFlag flags);
 
     /**
      * @brief Add a property to a TypeInfo
@@ -149,24 +135,39 @@ namespace orbiter::datatype {
      * @param type Pointer to the TypeInfo.
      * @param name Pointer to the ORString representing the name of the property.
      * @param value Pointer to the OObject representing the property's value.
+     * @param slot Index position for the property in the object's slot array
      * @param flags Additional flags about the property.
      *
      * @return true if property was added successfully, false otherwise.
      */
-    bool TIPropertyAdd(TypeInfo *type, OObject *name, OObject *value, PropertyFlag flags);
+    bool TIPropertyAdd(TypeInfo *type, OObject *name, OObject *value, U16 slot, PropertyFlag flags);
 
     /**
      * @brief Add an inline property to a TypeInfo using an offset
      *
      * @param type Pointer to the TypeInfo where the property will be added.
      * @param name Pointer to the ORString representing the name of the property.
-     * @param offset Offset of the property(expected 0,1,2,3... not an offset in bytes), adjusted relative to the TypeInfo.
+     * @param slot Index position for the property(expected 0,1,2,3... not an offset in bytes), adjusted relative to the TypeInfo.
      * @param flags Additional flags about the property.
      *
      * @return true if the property was added successfully, false otherwise.
      */
-    inline bool TIPropertyAdd(TypeInfo *type, OObject *name, U16 offset, PropertyFlag flags) {
-        return TIPropertyAdd(type, name, (OObject *) offset, flags | PropertyFlag::IN_OBJECT);
+    inline bool TIPropertyAdd(TypeInfo *type, OObject *name, const U16 slot, const PropertyFlag flags) {
+        return TIPropertyAdd(type, name, nullptr, slot, flags);
+    }
+
+    /**
+     * @brief Adds an inline(IN_OBJECT) property to a TypeInfo
+     *
+     * @param type Pointer to the TypeInfo
+     * @param name Pointer to the OObject representing the property's name
+     * @param slot Index position for the property in the TypeInfo
+     * @param flags PropertyFlag indicating additional attributes about the property
+     *
+     * @return true if the property was added successfully, false otherwise
+     */
+    inline bool TIPropertyAddInline(TypeInfo *type, OObject *name, const U16 slot, const PropertyFlag flags) {
+        return TIPropertyAdd(type, name, nullptr, slot, flags | PropertyFlag::IN_OBJECT);
     }
 
     /**
@@ -233,6 +234,13 @@ namespace orbiter::datatype {
      */
     PropertyDescriptor *TIFindProperty(const TypeInfo *type, const char *name);
 
+    inline PropertyDescriptor *TIFindSuperProperty(const TypeInfo *type, const char *name) {
+        if (O_GET_TYPE(type) != nullptr)
+            return TIFindProperty(O_GET_TYPE(type), name);
+
+        return nullptr;
+    }
+
     /**
      * @brief Creates and allocates a new object of the specified type with optional overallocation.
      *
@@ -244,7 +252,7 @@ namespace orbiter::datatype {
      */
     template<typename T>
     T *MakeObject(TypeInfo *type, U16 overalloc) {
-        auto *isolate = type->isolate;
+        const auto *isolate = type->isolate;
 
         auto *ret = isolate->gc->AllocObject(type->i_size + overalloc);
         if (ret == nullptr)
