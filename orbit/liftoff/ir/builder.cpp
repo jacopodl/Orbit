@@ -218,13 +218,13 @@ Instruction *Builder::LoadExecCodeObject(U16 offset) {
     return this->CreateInstruction<ExecSubInstr>(co);
 }
 
-Instruction *Builder::LoadFromClosureAtOffset(I16 offset, ClosureLSMode mode) {
+Instruction *Builder::LoadFromClosureAtOffset(I16 offset) {
     const auto *last = (LoadStoreClosureWithOffsetInstr *) this->GetLastInstructionMatch(OPCode::CLOSTR);
 
     if (last != nullptr)
         return (Instruction *) last->operands->value;
 
-    return this->CreateInstruction<LoadStoreClosureWithOffsetInstr>(OPCode::CLOLDR, offset, mode, nullptr);
+    return this->CreateInstruction<LoadStoreClosureWithOffsetInstr>(OPCode::CLOLDR, offset, nullptr);
 }
 
 Instruction *Builder::LoadFromStackOffset(U8 r_base, I16 offset) {
@@ -333,8 +333,8 @@ Instruction *Builder::StoreObjectProp(Instruction *obj, Instruction *value, U16 
     return store;
 }
 
-Instruction *Builder::StoreToClosureAtOffset(Instruction *src, I16 offset, ClosureLSMode mode) {
-    return this->CreateInstruction<LoadStoreClosureWithOffsetInstr>(OPCode::CLOSTR, offset, mode, src);
+Instruction *Builder::StoreToClosureAtOffset(Instruction *src, I16 offset) {
+    return this->CreateInstruction<LoadStoreClosureWithOffsetInstr>(OPCode::CLOSTR, offset, src);
 }
 
 Instruction *Builder::StoreToStackOffset(Instruction *src, U8 r_base, I16 offset) {

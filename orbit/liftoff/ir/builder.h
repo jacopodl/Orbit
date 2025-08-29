@@ -186,7 +186,7 @@ namespace liftoff::ir {
                 UnaryImmInstr>(orbiter::OPCode::LDCST, (U8) orbiter::LoadConstantMode::FALSE);
         }
 
-        Instruction *LoadFromClosureAtOffset(I16 offset, orbiter::ClosureLSMode mode);
+        Instruction *LoadFromClosureAtOffset(I16 offset);
 
         Instruction *LoadFromStackOffset(U8 r_base, I16 offset);
 
@@ -245,7 +245,7 @@ namespace liftoff::ir {
 
         Instruction *StoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key);
 
-        Instruction *StoreToClosureAtOffset(Instruction *src, I16 offset, orbiter::ClosureLSMode mode);
+        Instruction *StoreToClosureAtOffset(Instruction *src, I16 offset);
 
         Instruction *StoreToStackOffset(Instruction *src, U8 r_base, I16 offset);
 

@@ -194,7 +194,19 @@ ASTHandle<ASTNode *> Parser::ParseDecorator() {
 
     if (!this->Match(TokenType::RIGHT_SQUARE)) {
         do {
-            deco->decorators.push_back(this->ParseExpression(TokenType::ASTERISK));
+            auto left = this->ParseExpression(TokenType::ASTERISK);
+
+            if (left->node_type != NodeType::CALL) {
+                auto call = MakeCall(this->isolate_, left->loc);
+
+                call->left = left.release();
+
+                deco->decorators.emplace_back(std::move(call));
+
+                continue;
+            }
+
+            deco->decorators.emplace_back(std::move(left));
         } while (this->MatchEat(TokenType::COMMA, true));
     }
 
@@ -1009,7 +1021,8 @@ ASTHandle<ASTNode *> Parser::ParseCleanupInit(const Position &start, bool pub) {
 
     func->loc.start = start;
 
-    func->name = ORStringNew(this->isolate_, tk_type == TokenType::KW_CLEANUP ? kCleanupMethodName : kInitMethodName).release();
+    func->name = ORStringNew(this->isolate_, tk_type == TokenType::KW_CLEANUP ? kCleanupMethodName : kInitMethodName).
+            release();
     func->doc = this->GetDocString().release();
 
     func->method = true;
@@ -2359,18 +2372,18 @@ ASTHandle<Module *> Parser::Parse() noexcept {
         return module;
     } catch (DatatypeException &) {
         this->error_.type = ParserErrorType::NOMEM;
-    }catch (ParserException &e) {
+    } catch (ParserException &e) {
         this->error_.type = ParserErrorType::SYNTAX;
         this->error_.message = kStandardError[e.err_idx];
         this->error_.token = std::move(this->tkcur_);
-    }catch (ScannerException &) {
+    } catch (ScannerException &) {
         this->error_.type = ParserErrorType::SYNTAX;
 
         if (this->scanner_.status == ScannerStatus::NOMEM)
             this->error_.type = ParserErrorType::NOMEM;
 
         this->error_.message = this->scanner_.GetStatusMessage();
-    }catch (SymbolTableException &) {
+    } catch (SymbolTableException &) {
         this->error_.type = ParserErrorType::GENERIC_ERROR;
 
         if (this->sym_t_->status == SymbolTableError::MEMORY_ERROR)

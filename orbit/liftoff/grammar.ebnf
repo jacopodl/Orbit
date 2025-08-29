@@ -3,7 +3,7 @@
     Licensed under the Apache License v2.0
 
     syntax: ISO-14977 EBNF
-    version: 2.0
+    version: 2.1
 *)
 
 (* Basic elements *)
@@ -113,7 +113,7 @@ ellipsis_arg = expression, "...";
 kwargs_arg = "*", identifier;
 
 (* Function Decorator *)
-decorator = "[#", identifier, ["(", [argument_list], ")"], "]";
+decorator = "@[", expression , ["(", [argument_list], ")"], "]";
 
 (* Inline functions *)
 inline_function = "func", "(", [parameter_list], ")", [return_type], [async_keyword], block_function;

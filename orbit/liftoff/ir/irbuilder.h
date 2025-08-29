@@ -53,7 +53,9 @@ namespace liftoff::ir {
 
         Instruction *visitBranch(const parser::Branch *node);
 
-        Instruction *visitCall(parser::Call *node);
+        Instruction *visitCall(const parser::Call *node);
+
+        Instruction *visitCallPrepend(const parser::Call *node, Instruction *p_arg);
 
         Instruction *visitCatchBlock(parser::CatchBlock *node);
 

@@ -429,10 +429,10 @@ void SymbolTable::ComputeLocalVarOffset(const SubScope *s_scope) const noexcept 
         for (auto cursor = s_cursor->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next) {
             auto *value = cursor->value;
 
-            while (value != nullptr) {
+            while (value != nullptr && ENUMBITMASK_ISFALSE(value->flags, SymbolFlags::ANON)) {
                 if ((value->type == SymbolType::VARIABLE
                      || value->type == SymbolType::FUNC
-                     || value->type == SymbolType::METHOD) && ENUMBITMASK_ISFALSE(value->flags, SymbolFlags::ANON))
+                     || value->type == SymbolType::METHOD))
                     value->offset = this->scope->local_variables++;
 
                 if (value->type != SymbolType::LABEL

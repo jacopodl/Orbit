@@ -43,7 +43,12 @@ namespace orbiter::datatype {
 
         ORString *doc;
 
-        U16 slots_count;
+        union {
+            U16 slots_count;
+            U16 params_count;
+        };
+
+        U16 vars_count;
 
         U16 stack_size;
 

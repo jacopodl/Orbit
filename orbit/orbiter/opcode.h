@@ -42,11 +42,6 @@ namespace orbiter {
         EXTEND = 0x1
     };
 
-    enum class ClosureLSMode : U8 {
-        LOCALS_SLOT = 0,
-        PARAM_SLOT
-    };
-
     enum class ComparisonMode : U8 {
         EQ = 0x1, // Equal (LE, GE)
         LT = 0x2, // Less Than (<)
@@ -69,14 +64,12 @@ namespace orbiter {
         SIMPLE = 0,
 
         ASYNC = 0x1,
-        A_CLOSURE = 1 << 1,
-        P_CLOSURE = 1 << 2,
-        INIT = 1 << 3,
-        METHOD = 1 << 4,
-        NPARAMS = 1 << 5,
-        KW_PARAMS = 1 << 6,
-        REST_PARAMS = 1 << 7,
-        GENERATOR = 1 << 8
+        INIT = 1 << 2,
+        METHOD = 1 << 3,
+        NPARAMS = 1 << 4,
+        KW_PARAMS = 1 << 5,
+        REST_PARAMS = 1 << 6,
+        GENERATOR = 1 << 7
     };
 
     enum class LoadObjectPropFlags : U8 {
@@ -165,9 +158,9 @@ namespace orbiter {
         POP, // Pop value from stack:               OPCODE | 4 DST | 20 RESERVED
         POPN, // Pop N values from stack:           OPCODE | 8 RESERVED | 16 UNSIGNED OFFSET
 
-        CLONEW, // Create new closure object:       OPCODE | 4 DST      | 4 RESERVED             | 16 UNSIGNED SLOTS
-        CLOLDR, // Load from closure object:        OPCODE | 4 DST      | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
-        CLOSTR, // Store to closure object:         OPCODE | 4 SRC      | 4 FLAGS(ClosureLSMode) | 16 UNSIGNED OFFSET
+        CLONEW, // Create new closure object:       OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED SLOTS
+        CLOLDR, // Load from closure object:        OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
+        CLOSTR, // Store to closure object:         OPCODE | 4 SRC | 4 RESERVED | 16 UNSIGNED OFFSET
 
         // Allocate space for N variable on stack
         // Format: OPCODE | 4 RESERVED | 4 FLAGS(AllocaFlags) | 16 UNSIGNED SLOTS

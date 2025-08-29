@@ -106,7 +106,7 @@ HFunction orbiter::datatype::FunctionNew(Code *code, Closure *closure, Tuple *de
     if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::REST_PARAMS))
         fn_kind |= FunctionKind::REST;
 
-    auto *f_shared = FunSharedNew(isolate, nullptr, nullptr, code->slots_count, nullptr, fn_kind);
+    auto *f_shared = FunSharedNew(isolate, nullptr, nullptr, code->params_count, nullptr, fn_kind);
     if (f_shared != nullptr) {
         f_shared->doc = O_FAST_INCREF(code->doc);
         f_shared->code = O_FAST_INCREF(code);

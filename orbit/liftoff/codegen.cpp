@@ -244,12 +244,11 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
             case orbiter::OPCode::CLOLDR:
                 *(orbiter::MachineWord *) m_code = EMIT_DFI(instr->opcode,
                                                             instr->assigned_reg,
-                                                            (U8)((ir::LoadStoreClosureWithOffsetInstr*)instr)->mode,
+                                                            0,
                                                             ((ir::LoadStoreClosureWithOffsetInstr*)instr)->offset);
                 break;
             case orbiter::OPCode::CLOSTR:
-                *(orbiter::MachineWord *) m_code = EMIT_FSO(instr->opcode,
-                                                            (U8)((ir::LoadStoreClosureWithOffsetInstr*)instr)->mode,
+                *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                             ((ir::LoadStoreClosureWithOffsetInstr*)instr)->offset);
                 break;
@@ -375,6 +374,7 @@ orbiter::datatype::HCode Codegen::Generate() noexcept {
         this->ExportSymbols(code);
 
         code->SetProps(ir->name.get(), ir->doc.get());
+        code->vars_count = ir->vars_count;
 
         return code;
     } catch (...) {

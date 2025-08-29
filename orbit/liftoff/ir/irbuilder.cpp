@@ -235,9 +235,7 @@ Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
 
     // *** CLOSURE ***
     if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::UPVALUE)) {
-        ret = this->builder_.LoadFromClosureAtOffset(offset, symbol->defining_scope == this->sym_t_->scope
-                                                                 ? orbiter::ClosureLSMode::LOCALS_SLOT
-                                                                 : orbiter::ClosureLSMode::PARAM_SLOT);
+        ret = this->builder_.LoadFromClosureAtOffset(offset);
 
         goto EXIT;
     }
@@ -327,10 +325,7 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
 
     // *** CLOSURE ***
     if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::UPVALUE)) {
-        this->builder_.StoreToClosureAtOffset(value, offset,
-                                              symbol->defining_scope == this->sym_t_->scope
-                                                  ? orbiter::ClosureLSMode::LOCALS_SLOT
-                                                  : orbiter::ClosureLSMode::PARAM_SLOT);
+        this->builder_.StoreToClosureAtOffset(value, offset);
 
         goto EXIT;
     }
@@ -556,7 +551,13 @@ Instruction *IRBuilder::visitBranch(const parser::Branch *node) {
     return nullptr;
 }
 
-Instruction *IRBuilder::visitCall(parser::Call *node) {
+Instruction *IRBuilder::visitCall(const parser::Call *node) {
+    return this->visitCallPrepend(node, nullptr);
+}
+
+Instruction *IRBuilder::visitCallPrepend(const parser::Call *node, Instruction *p_arg) {
+    const auto p_count = p_arg != nullptr ? 1 : 0;
+
     auto *func = this->visit(node->left);
 
     if (node->left->node_type == parser::NodeType::SELECTOR) {
@@ -566,26 +567,34 @@ Instruction *IRBuilder::visitCall(parser::Call *node) {
 
         this->builder_.StackPush(obj);
 
+        if (p_arg != nullptr)
+            this->builder_.StackPush(p_arg);
+
         auto *call = (CallInstr *) this->CreateCall(node, func);
 
         call->mode |= orbiter::CallMode::METHOD;
 
         this->builder_.AddInstruction(call);
 
-        this->builder_.context->stack_push_count -= call->arguments;
+        this->builder_.context->stack_push_count -= call->arguments + p_count;
 
-        call->arguments += 1;
+        call->arguments += p_count + 1;
 
         this->builder_.StackDiscard(1);
 
         return call;
     }
 
+    if (p_arg != nullptr)
+        this->builder_.StackPush(p_arg);
+
     auto *call = this->CreateCall(node, func);
+
+    ((CallInstr *) call)->arguments += p_count;
 
     this->builder_.AddInstruction(call);
 
-    this->builder_.context->stack_push_count -= node->args.size();
+    this->builder_.context->stack_push_count -= node->args.size() + p_count;
 
     return call;
 }
@@ -657,8 +666,27 @@ Instruction *IRBuilder::visitConstruct(const parser::Construct *node) {
 }
 
 Instruction *IRBuilder::visitDecorator(parser::Decorator *node) {
-    // TODO: Implement Decorator visitation
-    return nullptr;
+    auto *decorate = (parser::Function *) node->func;
+    const auto back_a_flag = decorate->anon;
+
+    decorate->anon = true;
+
+    auto *first_param = this->visitFunction(decorate);
+
+    decorate->anon = back_a_flag;
+
+    for (auto &dec: node->decorators) {
+        const auto *fdec = (parser::Call *) dec.get();
+
+        first_param = this->visitCallPrepend(fdec, first_param);
+    }
+
+    // Store value here
+    const auto *sym = this->sym_t_->Lookup(decorate->name, decorate->loc.start.offset);
+    if (sym == nullptr)
+        throw SymbolTableException();
+
+    return this->StoreVariable(sym, first_param, true);
 }
 
 Instruction *IRBuilder::visitFunction(const parser::Function *node) {
@@ -683,10 +711,24 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
 
     this->builder_.IRContextNew(IRContextType::FUNCTION, params_count);
 
-    // Alloc stack space for local variables
+    // *****************************************************************************************************************
+    // ALLOC STACK SPACE
+    // *****************************************************************************************************************
     const auto local_vars_count = this->sym_t_->scope->GetLocalVariableCount();
-    if (local_vars_count > 0)
-        this->builder_.AllocStackSlots(local_vars_count, orbiter::AllocaFlags::DEFAULT);
+
+    // Alloc extra stack space for Closure object (IF ANY)
+    auto alloc_size = local_vars_count;
+    if (this->sym_t_->scope->closure)
+        alloc_size += 1;
+
+    if (alloc_size > 0)
+        this->builder_.AllocStackSlots(alloc_size, orbiter::AllocaFlags::DEFAULT);
+
+    this->builder_.context->vars_count = local_vars_count;
+
+    // *****************************************************************************************************************
+    // EOL
+    // *****************************************************************************************************************
 
     // Load default value for constructor
     if (node->node_type == parser::NodeType::INIT) {
@@ -736,22 +778,12 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
         const auto closure = this->builder_.CreateUnaryOp(orbiter::OPCode::CLONEW,
                                                           this->sym_t_->scope->GetClosureSize());
 
-        this->builder_.StoreToStackOffset(closure, kBaseStackPointerReg, (I16) node->params.size());
+        this->builder_.StoreToStackOffset(closure, kBaseStackPointerReg, (I16) local_vars_count);
 
         this->CaptureParametersIntoClosure(node);
     }
 
     auto cleanup_count = node->params.size();
-
-    if (this->sym_t_->scope->closure) {
-        f_flags = orbiter::LoadFuncFlags::A_CLOSURE;
-
-        if (this->sym_t_->scope->back->type == ScopeType::FUNCTION
-            && this->sym_t_->scope->back->closure)
-            f_flags = orbiter::LoadFuncFlags::P_CLOSURE;
-
-        cleanup_count += 1;
-    }
 
     if (node->body == nullptr) {
         // FIXME: impl this

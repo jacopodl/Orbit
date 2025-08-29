@@ -225,7 +225,12 @@ namespace liftoff::ir {
 
         JBlock *j_chain = nullptr;
 
-        U16 local_slots = 0;
+        union {
+            U16 local_slots = 0;
+            U16 param_count;
+        };
+
+        U16 vars_count = 0;
 
         U16 stack_slots = 0;
 

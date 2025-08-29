@@ -44,7 +44,7 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, CallMode mode) 
 
     const auto *fn_shared = func->shared;
 
-    auto *nargs = (Dict *) regs->r10.reg;
+    const auto *nargs = (Dict *) regs->r10.reg;
     auto *rest = (List *) regs->r11.reg;
     auto *kwargs = (Dict *) regs->r12.reg;
 
@@ -193,13 +193,6 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, CallMode mode) 
     }
 
     // *****************************************************************************************************************
-    // * SETUP CLOSURE OBJECT (if any)
-    // *****************************************************************************************************************
-
-    if (func->closure != nullptr)
-        fiber->vm.Push((OObject *) func->closure);
-
-    // *****************************************************************************************************************
     // * ADJUST STACK AND REGISTERS
     // *****************************************************************************************************************
 
@@ -217,6 +210,18 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, CallMode mode) 
     regs->BP.reg = regs->SP.reg;
 
     regs->IP.reg = (PtrSize) func->shared->code->m_code;
+
+    // *****************************************************************************************************************
+    // * SETUP CLOSURE OBJECT (if any)
+    // *****************************************************************************************************************
+
+    if (func->closure != nullptr) {
+        const auto closure = (OObject **) (stack->stack
+                                           + regs->BP.reg
+                                           + (func->shared->code->vars_count * sizeof(void *)));
+
+        *closure = (OObject *) O_FAST_DECREF(func->closure);
+    }
 
     return 1;
 }
@@ -604,15 +609,9 @@ CGOTO
             }
             TARGET_OP(CLOLDR) {
                 auto dst = FETCH_R_DST(instr);
-                auto flags = FETCH_F_SRC(ClosureLSMode, instr);
                 auto slot = FETCH_IMM(instr);
 
-                Closure *closure = nullptr;
-
-                if (flags == ClosureLSMode::LOCALS_SLOT)
-                    closure = *(Closure **) (stack->stack + regs->BP.reg + (code->slots_count * sizeof(void *)));
-                else
-                    closure = *(Closure **) (stack->stack + (regs->BP.reg - (kStackPrologueOffset + sizeof(void *))));
+                auto *closure = *(Closure **) (stack->stack + regs->BP.reg + (code->vars_count * sizeof(void *)));
 
                 REG_N(dst) = (PtrSize) ClosureGet(closure, slot).get();
 
@@ -620,15 +619,9 @@ CGOTO
             }
             TARGET_OP(CLOSTR) {
                 auto src = FETCH_R_DST(instr);
-                auto flags = FETCH_F_SRC(ClosureLSMode, instr);
                 auto slot = FETCH_IMM(instr);
 
-                Closure *closure = nullptr;
-
-                if (flags == ClosureLSMode::LOCALS_SLOT)
-                    closure = *(Closure **) (stack->stack + regs->BP.reg + (code->slots_count * sizeof(void *)));
-                else
-                    closure = *(Closure **) (stack->stack + (regs->BP.reg - (kStackPrologueOffset + sizeof(void *))));
+                auto *closure = *(Closure **) (stack->stack + regs->BP.reg + (code->vars_count * sizeof(void *)));
 
                 ClosureSet(closure, slot, (OObject *) REG_N(src));
 
@@ -656,13 +649,8 @@ CGOTO
                 const auto src = FETCH_R_SRC(instr);
                 const auto flags = (LoadFuncFlags) (instr & 0xFFF);
 
-                Closure *closure = nullptr;
+                auto *closure = *(Closure **) (stack->stack + regs->BP.reg + (code->vars_count * sizeof(void *)));
                 Tuple *defs = nullptr;
-
-                if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::A_CLOSURE))
-                    closure = *(Closure **) (stack->stack + regs->BP.reg + (code->slots_count * sizeof(void *)));
-                else if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::P_CLOSURE))
-                    closure = *(Closure **) (stack->stack + (regs->BP.reg - (kStackPrologueOffset + sizeof(void *))));
 
                 if (ENUMBITMASK_ISTRUE(flags, LoadFuncFlags::NPARAMS))
                     defs = (Tuple *) REG_N(FETCH_R_RSRC(instr));
