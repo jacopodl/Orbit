@@ -212,6 +212,10 @@ Instruction *Builder::LoadConstant(datatype::OObject *object) {
     return this->LoadConstant(offset);
 }
 
+Instruction *Builder::LoadClosureObject(U8 r_base, I16 offset) {
+    return this->CreateInstruction<OffsetInstruction>(OPCode::LDCLO, r_base, offset);
+}
+
 Instruction *Builder::LoadExecCodeObject(U16 offset) {
     auto const co = this->LoadCodeObject(offset);
 

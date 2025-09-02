@@ -722,7 +722,7 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
         alloc_size += 1;
 
     if (alloc_size > 0)
-        this->builder_.AllocStackSlots(alloc_size, orbiter::AllocaFlags::DEFAULT);
+        this->builder_.AllocStackSlots(alloc_size, orbiter::AllocaFlags::ZERO_INIT);
 
     this->builder_.context->vars_count = local_vars_count;
 
@@ -782,6 +782,10 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
 
         this->CaptureParametersIntoClosure(node);
     }
+
+    // Load closure from Function object
+    if (this->sym_t_->scope->closure)
+        this->builder_.LoadClosureObject(kBaseStackPointerReg, (I16) local_vars_count);
 
     auto cleanup_count = node->params.size();
 

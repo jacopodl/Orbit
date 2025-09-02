@@ -175,6 +175,8 @@ namespace liftoff::ir {
 
         Instruction *LoadConstant(orbiter::datatype::OObject *object);
 
+        Instruction *LoadClosureObject(U8 r_base, I16 offset);
+
         Instruction *LoadExecCodeObject(U16 offset);
 
         Instruction *LoadExecLastCodeObject() {

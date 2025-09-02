@@ -211,18 +211,6 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, CallMode mode) 
 
     regs->IP.reg = (PtrSize) func->shared->code->m_code;
 
-    // *****************************************************************************************************************
-    // * SETUP CLOSURE OBJECT (if any)
-    // *****************************************************************************************************************
-
-    if (func->closure != nullptr) {
-        const auto closure = (OObject **) (stack->stack
-                                           + regs->BP.reg
-                                           + (func->shared->code->vars_count * sizeof(void *)));
-
-        *closure = (OObject *) O_FAST_DECREF(func->closure);
-    }
-
     return 1;
 }
 
@@ -496,6 +484,16 @@ CGOTO
                 assert(module_slots != nullptr);
 
                 *(module_slots + slot) = (OObject *) value;
+
+                DISPATCH;
+            }
+            TARGET_OP(LDCLO) {
+                const auto base = FETCH_R_DST(instr);
+                const auto slot = ((short) FETCH_IMM(instr)) * (short) sizeof(void *);
+                const auto value = (OObject *) this_func->closure;
+                const auto target = (OObject **) (stack->stack + (REG_N(base) + slot));
+
+                *target = O_INCREF(value);
 
                 DISPATCH;
             }

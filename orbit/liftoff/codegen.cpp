@@ -210,6 +210,11 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                            ((ir::OffsetInstruction *) instr)->offset);
                 break;
+            case orbiter::OPCode::LDCLO:
+                *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode,
+                                                           ((ir::OffsetInstruction *) instr)->r_base,
+                                                           (((ir::OffsetInstruction *) instr)->offset & 0xFFFF));
+                break;
             case orbiter::OPCode::LDGBL:
             case orbiter::OPCode::LDGOFF:
             case orbiter::OPCode::SKLDR:
@@ -249,8 +254,8 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                 break;
             case orbiter::OPCode::CLOSTR:
                 *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
-                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                            ((ir::LoadStoreClosureWithOffsetInstr*)instr)->offset);
+                                                           ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                           ((ir::LoadStoreClosureWithOffsetInstr*)instr)->offset);
                 break;
             case orbiter::OPCode::ALLOCA:
             case orbiter::OPCode::POPN:
