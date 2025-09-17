@@ -43,14 +43,14 @@ namespace orbiter {
             }
 
             template<typename T>
-            [[nodiscard]] T *alloc(size_type size) noexcept {
-                return static_cast<T *>(this->allocator_->Alloc(size));
+            [[nodiscard]] T *alloc(const size_type size) noexcept {
+                return static_cast<T *>(this->Alloc(size));
             }
 
             template<typename T>
             [[nodiscard]] T *calloc(size_type size) noexcept {
-                auto *tmp = static_cast<T *>(this->allocator_->Calloc(size));
-                if (!tmp)
+                auto *tmp = static_cast<T *>(this->Alloc(size));
+                if (tmp != nullptr)
                     memory::MemoryZero(tmp, size);
 
                 return tmp;
@@ -58,8 +58,10 @@ namespace orbiter {
 
             template<typename T>
             [[nodiscard]] T *realloc(T *ptr, size_type size) noexcept {
-                return static_cast<T *>(this->allocator_->Realloc(ptr, size));
+                return static_cast<T *>(this->Realloc(ptr, size));
             }
+
+            [[nodiscard]] void *Alloc(size_type size) const noexcept;
 
             void free(void *ptr) const noexcept {
                 this->allocator_->Free(ptr);
@@ -70,6 +72,8 @@ namespace orbiter {
                 obj->~T();
                 this->free(obj);
             }
+
+            [[nodiscard]] void *Realloc(void *ptr, size_type size) const noexcept;
         };
     }
 }

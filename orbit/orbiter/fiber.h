@@ -52,6 +52,8 @@ namespace orbiter {
 
         Panic *panic_cache;
 
+        Panic *oom_cache;
+
         struct {
             Fiber *next;
             Fiber **prev;
@@ -104,9 +106,41 @@ namespace orbiter {
          */
         static void Delete(Fiber *fiber) noexcept;
 
+        /**
+         * @brief Clears the panic handler chain for the current Fiber.
+         *
+         * Iterates through and safely discards all panic handlers in the Fiber's error chain.
+         * Any out-of-memory errors are handled specially by re-linking them to an out-of-memory error
+         * cache. Other errors are dereferenced and moved to the general panic cache.
+         *
+         */
         void DiscardPanic() noexcept;
 
+        /**
+         * @brief Handles a fiber-level exception by recording the provided error object.
+         *
+         * When a fiber encounters an exceptional state, this method captures the error
+         * object and pushes it onto the fiber's panic chain. If no pre-allocated panic
+         * structures are available, memory allocation is performed using the fiber's
+         * isolate allocator. The error object is safely retained by incrementing its
+         * reference count.
+         *
+         * @param error The error object representing the exceptional state to be recorded.
+         */
         void Panic(datatype::OObject *error) noexcept;
+
+        /**
+         * @brief Handles an out-of-memory (OOM) panic situation in the Fiber.
+         *
+         * This method is invoked when the Fiber encounters an OOM condition to handle
+         * the error in a controlled manner. It updates the Fiber's internal state to
+         * manage OOM recovery by preserving necessary error information and creating
+         * a special object to represent the fatal OOM error.
+         *
+         * The operation is noexcept, guaranteeing that no exceptions are thrown while
+         * handling the OOM condition.
+         */
+        void PanicOOM() noexcept;
 
         /**
          * @brief Restores the previously saved state of the Fiber from its stack.

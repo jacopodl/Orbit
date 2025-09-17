@@ -64,6 +64,16 @@ Fiber *Fiber::New(Isolate *isolate, MSize stack_size, MSize stack_limit) noexcep
 
         fiber->isolate = isolate;
         fiber->panic_cache = nullptr;
+
+        fiber->oom_cache = allocator.alloc<struct Panic>(sizeof(struct Panic));
+        if (fiber->oom_cache == nullptr) {
+            Delete(fiber);
+
+            return nullptr;
+        }
+
+        fiber->oom_cache->prev = nullptr;
+        fiber->oom_cache->error = nullptr;
     }
 
     return fiber;
@@ -83,11 +93,26 @@ void Fiber::DiscardPanic() noexcept {
 
     auto *chain = *this->panic.r_current_;
     while (chain != nullptr) {
+        orbiter::Panic *prev = nullptr;
+
+        if (chain->error == this->isolate->oom_error_) {
+            chain->error = nullptr;
+
+            prev = chain->prev;
+
+            chain->prev = nullptr;
+            this->oom_cache = chain;
+
+            chain = prev;
+
+            continue;
+        }
+
         O_FAST_DECREF(chain->error);
 
         chain->error = nullptr;
 
-        auto *prev = chain->prev;
+        prev = chain->prev;
 
         chain->prev = this->panic_cache;
         this->panic_cache = chain;
@@ -116,6 +141,19 @@ void Fiber::Panic(datatype::OObject *error) noexcept {
     p->error = O_FAST_INCREF(error);
 
     *this->panic.r_current_ = p;
+}
+
+void Fiber::PanicOOM() noexcept {
+    assert(this->oom_cache != nullptr);
+
+    this->oom_cache->prev = *this->panic.r_current_;
+    this->oom_cache->error = this->isolate->oom_error_;
+
+    // Creates a virtually immortal object
+    O_UNSAFE_GET_RC(this->isolate->oom_error_) = 0xFFFFFFA;
+
+    *this->panic.r_current_ = this->oom_cache;
+    this->oom_cache = nullptr;
 }
 
 void Fiber::PopState() noexcept {

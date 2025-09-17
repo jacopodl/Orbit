@@ -10,6 +10,7 @@
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/dict.h>
 #include <orbit/orbiter/datatype/error.h>
+#include <orbit/orbiter/datatype/errors.h>
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/list.h>
 #include <orbit/orbiter/datatype/module.h>
@@ -96,6 +97,14 @@ Isolate *Isolate::New() {
     SETUP_TYPE(InstanceType::STRING, ORStringTypeSetup);
     SETUP_TYPE(InstanceType::TRAIT, TraitTypeSetup);
     SETUP_TYPE(InstanceType::TUPLE, TupleTypeSetup);
+
+    // Build Error instance for OOMError
+    isolate->oom_error_ = (OObject *) ErrorNew(isolate,
+                                               MemoryError::Details[MemoryError::Reason::ID],
+                                               nullptr,
+                                               MemoryError::Details[MemoryError::Reason::HEAP]).release();
+    if (isolate->oom_error_ == nullptr)
+        goto ERROR;
 
     return isolate;
 

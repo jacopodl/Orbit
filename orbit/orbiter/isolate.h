@@ -23,6 +23,10 @@ namespace orbiter {
     class Isolate {
         stratum::Memory *allocator_;
 
+        datatype::OObject *oom_error_;
+
+        friend Fiber;
+
         friend class memory::IsolateAllocator;
 
     public:
