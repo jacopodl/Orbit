@@ -5,6 +5,8 @@
 #ifndef ORBIT_ORBITER_DATATYPE_ERRORS_H_
 #define ORBIT_ORBITER_DATATYPE_ERRORS_H_
 
+#include <orbit/datatype.h>
+
 namespace orbiter::datatype {
     struct MemoryError {
         enum Reason : U8 {
@@ -26,13 +28,15 @@ namespace orbiter::datatype {
         enum Reason : U8 {
             ID,
 
-            PARAMETER
+            PARAMETER,
+            PANIC
         };
 
         static constexpr const char *Details[] = {
             (const char *) "TypeError",
 
-            (const char *) "unexpected type '%s' for '%s' parameter(%d)"
+            (const char *) "unexpected type '%s' for '%s' parameter(%d)",
+            (const char *) "panic expect type '%s'",
         };
     };
 

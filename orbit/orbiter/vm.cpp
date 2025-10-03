@@ -7,6 +7,8 @@
 #include <orbit/orbiter/datatype/closure.h>
 #include <orbit/orbiter/datatype/ctbuilder.h>
 #include <orbit/orbiter/datatype/dict.h>
+#include <orbit/orbiter/datatype/error.h>
+#include <orbit/orbiter/datatype/errors.h>
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/tuple.h>
@@ -390,6 +392,24 @@ CGOTO
                 REG_N(dst) = BOOL_TO_OBOOL(res);
 
                 DISPATCH;
+            }
+            TARGET_OP(PANIC) {
+                const auto src = FETCH_R_SRC(instr);
+                const auto value = (OObject *) REG_N(src);
+
+                if (!O_IS_OBJECT(value) || !O_IS_TYPE(value, InstanceType::ERROR)) {
+                    ErrorSet(fiber->isolate,
+                             TypeError::Details[TypeError::Reason::ID],
+                             nullptr,
+                             TypeError::Details[(int) TypeError::Reason::PANIC],
+                             InstanceTypeNames[(int) InstanceType::ERROR]);
+
+                    goto ERROR;
+                }
+
+                fiber->Panic(value);
+
+                goto ERROR;
             }
             TARGET_OP(RET) {
                 const auto src = FETCH_R_SRC(instr);
@@ -979,6 +999,10 @@ CGOTO
 
         NEXT_IP;
     }
+
+ERROR:
+    if (fiber->panic.current_ != nullptr)
+        assert(false);
 
     return (OObject *) regs->RR.reg;
 }
