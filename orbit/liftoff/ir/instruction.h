@@ -32,10 +32,10 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit Instruction(ObjectType type, int operands) noexcept : Object(type, operands) {
+        explicit Instruction(const ObjectType type, const int operands) noexcept : Object(type, operands) {
         }
 
-        explicit Instruction(int operands) noexcept : Instruction(ObjectType::INSTRUCTION, operands) {
+        explicit Instruction(const int operands) noexcept : Instruction(ObjectType::INSTRUCTION, operands) {
         }
 
     public:
@@ -50,7 +50,7 @@ namespace liftoff::ir {
         I16 assigned_reg = kUninitializedReg;
         I16 stack_slot = -1;
 
-        virtual void SetRegister(I16 reg) noexcept {
+        virtual void SetRegister(const I16 reg) noexcept {
             this->assigned_reg = reg;
         }
     };
@@ -59,11 +59,11 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit PhysInstruction(orbiter::OPCode opcode) noexcept : Instruction(0), opcode(opcode) {
+        explicit PhysInstruction(const orbiter::OPCode opcode) noexcept : Instruction(0), opcode(opcode) {
         }
 
-        explicit PhysInstruction(orbiter::OPCode opcode,
-                                 int operands) noexcept : Instruction(operands), opcode(opcode) {
+        explicit PhysInstruction(const orbiter::OPCode opcode,
+                                 const int operands) noexcept : Instruction(operands), opcode(opcode) {
         }
 
     public:
@@ -75,13 +75,13 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit BinaryOpInstr(orbiter::OPCode opcode, U8 flags, Instruction *left,
+        explicit BinaryOpInstr(const orbiter::OPCode opcode, const U8 flags, Instruction *left,
                                Instruction *right) noexcept : PhysInstruction(opcode, 2), flags(flags) {
             this->SetOperand(0, left);
             this->SetOperand(1, right);
         }
 
-        explicit BinaryOpInstr(orbiter::OPCode opcode, Instruction *left, Instruction *right) noexcept : BinaryOpInstr(
+        explicit BinaryOpInstr(const orbiter::OPCode opcode, Instruction *left, Instruction *right) noexcept : BinaryOpInstr(
             opcode, 0, left, right) {
         }
 
@@ -93,8 +93,8 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit BinaryOpImmInstr(orbiter::OPCode opcode, U8 flags, Instruction *left,
-                                  U16 right) noexcept : PhysInstruction(opcode, 1), flags(flags), imm(right) {
+        explicit BinaryOpImmInstr(const orbiter::OPCode opcode, const U8 flags, Instruction *left,
+                                  const U16 right) noexcept : PhysInstruction(opcode, 1), flags(flags), imm(right) {
             this->SetOperand(0, left);
         }
 
@@ -108,14 +108,14 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit BranchInstruction(orbiter::OPCode opcode, Instruction *value,
+        explicit BranchInstruction(const orbiter::OPCode opcode, Instruction *value,
                                    BasicBlock *jmp) noexcept : PhysInstruction(opcode, 2) {
             this->SetOperand(0, value);
             this->SetOperand(1, (Object *) jmp);
         }
 
     public:
-        void SetBasicBlock(BasicBlock *jmp) {
+        void SetBasicBlock(BasicBlock *jmp) const {
             this->SetOperand(1, (Object *) jmp);
         }
     };
@@ -146,7 +146,7 @@ namespace liftoff::ir {
         }
 
     protected:
-        explicit CallInstr(orbiter::OPCode opcode, Instruction *src, const U16 arguments,
+        explicit CallInstr(const orbiter::OPCode opcode, Instruction *src, const U16 arguments,
                            const orbiter::CallMode mode) noexcept : PhysInstruction(opcode, 4),
                                                                     arguments(arguments), mode(mode) {
             this->SetOperand(0, src);
@@ -189,7 +189,7 @@ namespace liftoff::ir {
         I16 offset;
 
     protected:
-        explicit LoadStoreClosureWithOffsetInstr(orbiter::OPCode opcode, I16 offset,
+        explicit LoadStoreClosureWithOffsetInstr(const orbiter::OPCode opcode, const I16 offset,
                                                  Instruction *src) noexcept : PhysInstruction(
                                                                                   opcode, 1), offset(offset) {
             this->SetOperand(0, src);
@@ -203,7 +203,7 @@ namespace liftoff::ir {
         MachineSize value = 0;
 
     protected:
-        explicit LoadImmValueInstr(MachineSize value) noexcept : PhysInstruction(orbiter::OPCode::LDIMM), value(value) {
+        explicit LoadImmValueInstr(const MachineSize value) noexcept : PhysInstruction(orbiter::OPCode::LDIMM), value(value) {
         }
     };
 
@@ -215,14 +215,14 @@ namespace liftoff::ir {
         orbiter::LoadObjectPropFlags flags;
         U16 offset;
 
-        LSObjectProp(orbiter::OPCode opcode, Instruction *object, U16 offset,
-                     orbiter::LoadObjectPropFlags flags) noexcept : PhysInstruction(opcode, 1), flags(flags),
+        LSObjectProp(const orbiter::OPCode opcode, Instruction *object, const U16 offset,
+                     const orbiter::LoadObjectPropFlags flags) noexcept : PhysInstruction(opcode, 1), flags(flags),
                                                                     offset(offset) {
             this->SetOperand(0, object);
         }
 
-        LSObjectProp(orbiter::OPCode opcode, Instruction *object, Instruction *value, U16 offset,
-                     orbiter::LoadObjectPropFlags flags) noexcept : PhysInstruction(opcode, 2), flags(flags),
+        LSObjectProp(const orbiter::OPCode opcode, Instruction *object, Instruction *value, const U16 offset,
+                     const orbiter::LoadObjectPropFlags flags) noexcept : PhysInstruction(opcode, 2), flags(flags),
                                                                     offset(offset) {
             this->SetOperand(0, object);
             this->SetOperand(1, value);
@@ -237,14 +237,14 @@ namespace liftoff::ir {
         U8 r_base = 0;
         I16 offset = 0;
 
-        OffsetInstruction(orbiter::OPCode opcode, I16 offset) noexcept : PhysInstruction(opcode), offset(offset) {
+        OffsetInstruction(const orbiter::OPCode opcode, const I16 offset) noexcept : PhysInstruction(opcode), offset(offset) {
         }
 
-        OffsetInstruction(orbiter::OPCode opcode, U8 r_base, I16 offset) noexcept : PhysInstruction(opcode),
+        OffsetInstruction(const orbiter::OPCode opcode, const U8 r_base, const I16 offset) noexcept : PhysInstruction(opcode),
             r_base(r_base), offset(offset) {
         }
 
-        OffsetInstruction(orbiter::OPCode opcode, U8 r_base, I16 offset,
+        OffsetInstruction(const orbiter::OPCode opcode, const U8 r_base, const I16 offset,
                           Instruction *src) noexcept : PhysInstruction(opcode, 1),
                                                        r_base(r_base), offset(offset) {
             this->SetOperand(0, src);
@@ -255,7 +255,7 @@ namespace liftoff::ir {
         friend Builder;
 
     public:
-        ManipInstruction(orbiter::OPCode opcode, Instruction *target, Instruction *src,
+        ManipInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *src,
                          Instruction *src1) noexcept : PhysInstruction(opcode, 3) {
             this->SetOperand(0, target);
             this->SetOperand(1, src);
@@ -264,7 +264,7 @@ namespace liftoff::ir {
             this->assigned_reg = kDoNotAllocateReg;
         }
 
-        ManipInstruction(orbiter::OPCode opcode, Instruction *target, Instruction *src) noexcept : PhysInstruction(
+        ManipInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *src) noexcept : PhysInstruction(
             opcode, 2) {
             this->SetOperand(0, target);
             this->SetOperand(1, src);
@@ -279,8 +279,8 @@ namespace liftoff::ir {
     public:
         U16 offset = 0;
 
-        ManipTypeInstruction(orbiter::OPCode opcode, Instruction *target, Instruction *src,
-                             U16 offset) noexcept : PhysInstruction(opcode, 2),
+        ManipTypeInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *src,
+                             const U16 offset) noexcept : PhysInstruction(opcode, 2),
                                                     offset(offset) {
             this->SetOperand(0, target);
             this->SetOperand(1, src);
@@ -291,7 +291,7 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit ReturnInstruction(Instruction *instr, U16 slots) : PhysInstruction(orbiter::OPCode::RET, 1),
+        explicit ReturnInstruction(Instruction *instr, const U16 slots) : PhysInstruction(orbiter::OPCode::RET, 1),
                                                                     slots(slots) {
             this->SetOperand(0, instr);
         }
@@ -318,11 +318,11 @@ namespace liftoff::ir {
         U16 imm = 0;
 
     protected:
-        explicit UnaryImmInstr(orbiter::OPCode opcode, U8 flags, U16 imm) noexcept : PhysInstruction(opcode),
+        explicit UnaryImmInstr(const orbiter::OPCode opcode, const U8 flags, const U16 imm) noexcept : PhysInstruction(opcode),
             flags(flags), imm(imm) {
         }
 
-        explicit UnaryImmInstr(orbiter::OPCode opcode, U8 flags) noexcept : PhysInstruction(opcode), flags(flags) {
+        explicit UnaryImmInstr(const orbiter::OPCode opcode, const U8 flags) noexcept : PhysInstruction(opcode), flags(flags) {
         }
     };
 
@@ -331,14 +331,14 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit UnaryOpInstr(orbiter::OPCode opcode) noexcept : PhysInstruction(opcode) {
+        explicit UnaryOpInstr(const orbiter::OPCode opcode) noexcept : PhysInstruction(opcode) {
         }
 
-        explicit UnaryOpInstr(orbiter::OPCode opcode, Instruction *src) noexcept : UnaryOpInstr(opcode, 0, src) {
+        explicit UnaryOpInstr(const orbiter::OPCode opcode, Instruction *src) noexcept : UnaryOpInstr(opcode, 0, src) {
         }
 
-        explicit UnaryOpInstr(orbiter::OPCode opcode, U8 flags, Instruction *src) noexcept : PhysInstruction(opcode, 1),
-            flags(flags) {
+        explicit UnaryOpInstr(const orbiter::OPCode opcode, const U8 flags,
+                              Instruction *src) noexcept : PhysInstruction(opcode, 1), flags(flags) {
             this->SetOperand(0, src);
         }
 
@@ -357,7 +357,7 @@ namespace liftoff::ir {
         explicit VirtualInstruction() noexcept : Instruction(ObjectType::VIRT_INSTRUCTION, 0) {
         }
 
-        explicit VirtualInstruction(int operands) noexcept : Instruction(ObjectType::VIRT_INSTRUCTION, operands) {
+        explicit VirtualInstruction(const int operands) noexcept : Instruction(ObjectType::VIRT_INSTRUCTION, operands) {
         }
     };
 
@@ -384,7 +384,7 @@ namespace liftoff::ir {
             return this;
         }
 
-        void SetRegister(I16 reg) noexcept override {
+        void SetRegister(const I16 reg) noexcept override {
             this->assigned_reg = reg;
 
             for (auto i = 0; i < this->index; i++)
