@@ -84,6 +84,15 @@ namespace orbiter {
         NOT_IN = 0x1
     };
 
+    enum class PushIfFlags : U8 {
+        EQ = 0x0,
+        NEQ = 0x1,
+        TPEQ = 1 << 1,
+        TNEQ = 1 << 2,
+
+        METHOD = 1 << 3
+    };
+
     enum class VariableFlags : U8 {
         VARIABLE = 0x0,
         CONSTANT = 0x1,
@@ -155,10 +164,13 @@ namespace orbiter {
         LDGBL, // Load value from global variable using key:        OPCODE | 4 DST | 4 RESERVED   | 16 KEY OFFSET
         LDGOFF, // Load value from global variable using offset:    OPCODE | 4 DST | 4 RESERVED   | 16 UNSIGNED OFFSET
 
-        SKLDR, // Load from(BASE_REG + OFFSET) stack into register  OPCODE | 4 DST      | 4 BASE_REG   | 16 SIGNED OFFSET
-        SKSTR, // Store register into (BASE_REF + OFFSET)           OPCODE | 4 BASE_REG | 4 SRC        | 16 SIGNED OFFSET
+        SKLDR,
+        // Load from(BASE_REG + OFFSET) stack into register  OPCODE | 4 DST      | 4 BASE_REG   | 16 SIGNED OFFSET
+        SKSTR,
+        // Store register into (BASE_REF + OFFSET)           OPCODE | 4 BASE_REG | 4 SRC        | 16 SIGNED OFFSET
 
         PUSH, // Push value onto stack:             OPCODE | 4 RESERVED | 4 SRC | 20 RESERVED
+        PUSHIF, // Push value onto stack IF:        OPCODE | 4 SRC | 4 TEST | 4 AGAINST | 12 FLAGS(PushIfFlags)
         POP, // Pop value from stack:               OPCODE | 4 DST | 20 RESERVED
         POPN, // Pop N values from stack:           OPCODE | 8 RESERVED | 16 UNSIGNED OFFSET
 

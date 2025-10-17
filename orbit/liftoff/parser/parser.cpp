@@ -912,7 +912,7 @@ ASTHandle<ASTNode *> Parser::ParseANPST() {
     ret->loc.end = right->loc.end;
 
     if (right->node_type == NodeType::NIL_SAFE) {
-        auto &unary = (ASTHandle<Unary *> &) right;
+        const auto &unary = (ASTHandle<Unary *> &) right;
 
         ret->value = unary->value;
 

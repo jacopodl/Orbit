@@ -40,7 +40,7 @@ HOObject VMAdd(Isolate *isolate, PtrSize left, PtrSize right) {
     return {};
 }
 
-int VMCall(Fiber *fiber, Function *func, unsigned short p_count, const CallMode mode) {
+int VMCall(Fiber *fiber, Function *func, unsigned short p_count, const CallMode mode, bool setup_only) {
     auto *regs = &fiber->vm.regs;
     auto *stack = &fiber->vm.stack;
 
@@ -234,17 +234,19 @@ int VMCall(Fiber *fiber, Function *func, unsigned short p_count, const CallMode 
     stratum::util::MemoryCopy(stack->stack + regs->SP.reg, &fiber->context.context, sizeof(FiberContext));
     regs->SP.reg += sizeof(FiberContext);
 
+    fiber->vm.Push(regs->BP.reg);
+    fiber->vm.Push(regs->IP.reg);
+
+    if (setup_only)
+        return 1;
+
+    regs->BP.reg = regs->SP.reg;
+    regs->IP.reg = (PtrSize) func->shared->code->m_code;
+
     fiber->context.context = O_FAST_INCREF(func->shared->context);
     fiber->context.module = O_INCREF(func->shared->module);
     fiber->context.code = O_FAST_INCREF(func->shared->code);
     fiber->context.func = O_FAST_INCREF(func);
-
-    fiber->vm.Push(regs->BP.reg);
-    fiber->vm.Push(regs->IP.reg);
-
-    regs->BP.reg = regs->SP.reg;
-
-    regs->IP.reg = (PtrSize) func->shared->code->m_code;
 
     return 1;
 }
@@ -429,6 +431,8 @@ CGOTO
 
                 REG_BP = *ACCESS_STACK_SP(0);
 
+                // FIXME: check and free current context!
+
                 REG_SP -= sizeof(FiberContext);
                 stratum::util::MemoryCopy(&fiber->context.context, stack->stack + regs->SP.reg, sizeof(FiberContext));
 
@@ -477,7 +481,7 @@ CGOTO
 
                 const auto func = (Function *) REG_N(src);
 
-                const auto res = VMCall(fiber, func, p_count, flags);
+                const auto res = VMCall(fiber, func, p_count, flags, false);
                 if (res == 1) {
                     code = func->shared->code;
                     this_func = fiber->context.func;
@@ -492,9 +496,8 @@ CGOTO
 
                 const auto sproc = (Code *) REG_N(src);
 
-                if (!stack->Check(fiber->isolate, regs->SP.reg, sproc->stack_size + (3 * sizeof(void *)))) {
-                    // TODO: out of memory
-                }
+                if (!stack->Check(fiber->isolate, regs->SP.reg, sproc->stack_size + (3 * sizeof(void *))))
+                    goto ERROR;
 
                 fiber->vm.Push((OObject *) code);
                 fiber->vm.Push(regs->BP.reg);
@@ -675,9 +678,41 @@ CGOTO
                 const auto src = FETCH_R_SRC(instr);
                 auto value = (OObject *) REG_N(src);
 
-                if (stack->Check(fiber->isolate, regs->SP.reg, sizeof(void *))) {
-                    // TODO: Error!
+                if (!stack->Check(fiber->isolate, regs->SP.reg, sizeof(void *)))
+                    goto ERROR;
+
+                *ACCESS_STACK_SP(0) = (PtrSize) value;
+                REG_SP += sizeof(void *);
+
+                if (O_IS_OBJECT(value))
+                    O_GET_RC(value).IncStrong();
+
+                DISPATCH;
+            }
+            TARGET_OP(PUSHIF) {
+                const auto value = (OObject *) REG_N(FETCH_R_DST(instr));
+                const auto target = (OObject *) REG_N(FETCH_R_SRC(instr));
+                // const auto against = FETCH_R_RSRC(instr);
+                const auto flags = (PushIfFlags) (instr & 0xFu);
+
+                // auto aobj = (OObject *) REG_N(against);
+
+                if (flags == PushIfFlags::METHOD) {
+                    if (!O_IS_OBJECT(target) || !O_IS_TYPE(target, InstanceType::FUNCTION)) {
+                        // FIXME: Error!
+                        assert(false);
+                    }
+
+                    if (!((Function *) target)->shared->IsMethod()) {
+                        DISPATCH;
+                    }
+                } else {
+                    // TODO: other flags
+                    assert(false);
                 }
+
+                if (!stack->Check(fiber->isolate, regs->SP.reg, sizeof(void *)))
+                    goto ERROR;
 
                 *ACCESS_STACK_SP(0) = (PtrSize) value;
                 REG_SP += sizeof(void *);

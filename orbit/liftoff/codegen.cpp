@@ -251,6 +251,19 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                            0);
                 break;
+            case orbiter::OPCode::PUSHIF: {
+                const auto *test = (const Instruction *) instr->operands[1].value;
+                const auto *against = (const Instruction *) instr->operands[2].value;
+
+                assert(test!=nullptr);
+
+                *(orbiter::MachineWord *) m_code = EMIT_DSSFE(instr->opcode,
+                                                              ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                              test->assigned_reg,
+                                                              against!=nullptr ? against->assigned_reg:0,
+                                                              ((TernaryOpImmInstr*)instr)->flags);
+                break;
+            }
             case orbiter::OPCode::POP:
                 *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode, 0, 0);
                 break;

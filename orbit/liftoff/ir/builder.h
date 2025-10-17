@@ -84,6 +84,17 @@ namespace liftoff::ir {
          */
         [[nodiscard]] const PhysInstruction *GetLastInstructionMatch(orbiter::OPCode opcode) const noexcept;
 
+        void UpdateStackSize(const U16 size) const noexcept {
+            this->context->stack_push_count += size;
+
+            if (this->context->stack_push_count > this->context->stack_push_max)
+                this->context->stack_push_max = this->context->stack_push_count;
+        }
+
+        void UpdateStackSize() const noexcept {
+            this->UpdateStackSize(1);
+        }
+
     public:
         IRContext *context = nullptr;
 
@@ -92,12 +103,12 @@ namespace liftoff::ir {
          *
          * @param isolate Pointer to isolate.
          */
-        explicit Builder(orbiter::Isolate *isolate) noexcept: allocator_(isolate) {
+        explicit Builder(orbiter::Isolate *isolate) noexcept : allocator_(isolate) {
         }
 
-        explicit Builder(IRContext *ir) noexcept: allocator_(ir->GetIsolate()),
-                                                  delete_context_(false),
-                                                  context(ir) {
+        explicit Builder(IRContext *ir) noexcept : allocator_(ir->GetIsolate()),
+                                                   delete_context_(false),
+                                                   context(ir) {
         }
 
         ~Builder() noexcept;
@@ -139,7 +150,8 @@ namespace liftoff::ir {
 
         Instruction *CreateCall(Instruction *src, U16 arguments, orbiter::CallMode mode);
 
-        Instruction *CreateCallDetached(orbiter::OPCode opcode, Instruction *src, U16 arguments, orbiter::CallMode mode);
+        Instruction *CreateCallDetached(orbiter::OPCode opcode, Instruction *src, U16 arguments,
+                                        orbiter::CallMode mode);
 
         Instruction *CreateJump(BasicBlock *destination);
 
@@ -246,6 +258,9 @@ namespace liftoff::ir {
         Instruction *GetStackPush(Instruction *s_reg);
 
         Instruction *StackPush(Instruction *s_reg);
+
+        Instruction *StackPushIF(Instruction *s_reg, Instruction *target, Instruction *against,
+                                 orbiter::PushIfFlags flags);
 
         Instruction *GetStoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key);
 

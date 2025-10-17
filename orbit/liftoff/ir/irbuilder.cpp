@@ -582,12 +582,14 @@ Instruction *IRBuilder::visitCallPrepend(const parser::Call *node, Instruction *
 
         assert(obj->type() == ObjectType::INSTRUCTION);
 
-        this->builder_.StackPush(obj);
+        this->builder_.StackPushIF(obj, func, nullptr, orbiter::PushIfFlags::METHOD);
 
         if (p_arg != nullptr)
             this->builder_.StackPush(p_arg);
 
         auto *call = (CallInstr *) this->CreateCall(node, func);
+
+        call->arguments += p_count + 1;
 
         call->mode |= orbiter::CallMode::METHOD;
 
@@ -595,26 +597,19 @@ Instruction *IRBuilder::visitCallPrepend(const parser::Call *node, Instruction *
 
         this->builder_.context->stack_push_count -= call->arguments + p_count;
 
-        call->arguments += p_count + 1;
-
-        // In case of defer, the stack must not be cleaned up but maintained since function execution
-        // is postponed. Therefore, the stack needs to remain intact until the function is fully executed
-        if (node->node_type != parser::NodeType::DEFER)
-            this->builder_.StackDiscard(1);
-
         return call;
     }
 
     if (p_arg != nullptr)
         this->builder_.StackPush(p_arg);
 
-    auto *call = this->CreateCall(node, func);
+    auto *call = (CallInstr *) this->CreateCall(node, func);
 
-    ((CallInstr *) call)->arguments += p_count;
+    call->arguments += p_count;
 
     this->builder_.AddInstruction(call);
 
-    this->builder_.context->stack_push_count -= node->args.size() + p_count;
+    this->builder_.context->stack_push_count -= call->arguments;
 
     return call;
 }
@@ -769,8 +764,6 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
             auto *call = this->builder_.CreateCallDetached(orbiter::OPCode::CALL, s_init, 1, orbiter::CallMode::METHOD);
 
             this->builder_.AddInstruction(call);
-
-            this->builder_.StackDiscard(1);
         }
 
         for (const auto &var: this->ct_active_->properties) {
@@ -807,16 +800,13 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     if (this->sym_t_->scope->closure)
         this->builder_.LoadClosureObject(kBaseStackPointerReg, (I16) local_vars_count);
 
-    auto cleanup_count = node->params.size();
+    const auto cleanup_count = node->params.size();
 
     if (node->body == nullptr) {
         // FIXME: impl this
         assert(false);
     } else
         this->visit(node->body);
-
-    if (ENUMBITMASK_ISTRUE(f_flags, orbiter::LoadFuncFlags::METHOD))
-        cleanup_count -= 1;
 
     if (this->builder_.CheckIfLastInstructionIs(orbiter::OPCode::RET))
         ((ReturnInstruction *) this->builder_.context->current_->instr.tail)->slots = cleanup_count;
@@ -1007,7 +997,6 @@ Instruction *IRBuilder::visitNativeVariable(parser::NativeVariable *node) {
 
 Instruction *IRBuilder::visitNew(const parser::Unary *node) {
     const auto *func = (parser::Call *) node->value;
-    const auto self_idx = func->args.size();
 
     auto *clazz = this->visit(func->left);
 
@@ -1024,9 +1013,7 @@ Instruction *IRBuilder::visitNew(const parser::Unary *node) {
 
     this->builder_.AddInstruction(call);
 
-    this->builder_.StackDiscard(1);
-
-    this->builder_.context->stack_push_count -= self_idx;
+    this->builder_.context->stack_push_count -= call->arguments;
 
     return self;
 }

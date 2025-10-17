@@ -312,22 +312,24 @@ Instruction *Builder::StackPop() {
 }
 
 Instruction *Builder::GetStackPush(Instruction *s_reg) {
-    this->context->stack_push_count += 1;
-
-    if (this->context->stack_push_count > this->context->stack_push_max)
-        this->context->stack_push_max = this->context->stack_push_count;
+    this->UpdateStackSize();
 
     return this->CreateObject<UnaryOpInstr>(OPCode::PUSH, s_reg);
 }
 
 Instruction *Builder::StackPush(Instruction *s_reg) {
-    this->context->stack_push_count += 1;
-
-    if (this->context->stack_push_count > this->context->stack_push_max)
-        this->context->stack_push_max = this->context->stack_push_count;
+    this->UpdateStackSize();
 
     return this->CreateInstruction<UnaryOpInstr>(OPCode::PUSH, s_reg);
 }
+
+Instruction *Builder::StackPushIF(Instruction *s_reg, Instruction *target, Instruction *against,
+                                  const PushIfFlags flags) {
+    this->UpdateStackSize();
+
+    return this->CreateInstruction<TernaryOpImmInstr>(OPCode::PUSHIF, s_reg, target, against, (U8) flags);
+}
+
 
 Instruction *Builder::GetStoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key) {
     return this->CreateObject<LSObjectProp>(OPCode::STOBJP, obj, value, offset,
