@@ -174,6 +174,9 @@ Instruction *IRBuilder::CreateCall(const parser::Call *node, Instruction *f_src)
     if (kwargs != nullptr)
         call->SetKwargs(kwargs);
 
+    if (opcode == orbiter::OPCode::DEFER)
+        this->builder_.context->deferred_stack_count = node->args.size();
+
     return call;
 }
 
@@ -595,7 +598,10 @@ Instruction *IRBuilder::visitCallPrepend(const parser::Call *node, Instruction *
 
         this->builder_.AddInstruction(call);
 
-        this->builder_.context->stack_push_count -= call->arguments + p_count;
+        if (this->builder_.context->deferred)
+            this->builder_.context->deferred_stack_count += p_count + 1;
+        else
+            this->builder_.context->stack_push_count -= call->arguments;
 
         return call;
     }
@@ -609,7 +615,10 @@ Instruction *IRBuilder::visitCallPrepend(const parser::Call *node, Instruction *
 
     this->builder_.AddInstruction(call);
 
-    this->builder_.context->stack_push_count -= call->arguments;
+    if (this->builder_.context->deferred)
+        this->builder_.context->deferred_stack_count += p_count;
+    else
+        this->builder_.context->stack_push_count -= call->arguments;
 
     return call;
 }
@@ -1036,6 +1045,8 @@ Instruction *IRBuilder::visitReturn(const parser::Unary *unary) {
         this->builder_.StoreToStackOffset(value, kBaseStackPointerReg, tmp_ret);
 
         this->builder_.CreateUnaryOp(orbiter::OPCode::EXECDEFER);
+
+        this->builder_.context->stack_push_count -= this->builder_.context->deferred_stack_count;
 
         value = this->builder_.LoadFromStackOffset(kBaseStackPointerReg, tmp_ret, true);
 

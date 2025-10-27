@@ -240,6 +240,8 @@ namespace liftoff::ir {
 
         U32 program_size = 0;
 
+        U32 deferred_stack_count = 0;
+
         bool deferred = false;
 
         /// Represents the type of the intermediate representation (IR) context.
