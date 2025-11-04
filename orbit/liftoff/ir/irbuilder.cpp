@@ -175,7 +175,7 @@ Instruction *IRBuilder::CreateCall(const parser::Call *node, Instruction *f_src)
         call->SetKwargs(kwargs);
 
     if (opcode == orbiter::OPCode::DEFER)
-        this->builder_.context->deferred_stack_count = node->args.size();
+        this->builder_.context->deferred_stack_count += node->args.size();
 
     return call;
 }
