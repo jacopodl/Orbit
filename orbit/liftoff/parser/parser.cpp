@@ -753,13 +753,13 @@ ASTHandle<ASTNode *> Parser::ParseTryCatchFinally() {
                 if (!this->Match(TokenType::ATOM))
                     throw ParserException(33);
 
-                cb->catches.emplace_back(this->ParseLiteral()).release();
+                cb->catches.emplace_back(this->ParseLiteral());
             } while (this->MatchEat(TokenType::PIPE, true));
 
             if (!this->MatchEat(TokenType::RIGHT_ROUND, true))
                 throw ParserException(84);
         } else if (this->Match(TokenType::ATOM))
-            cb->catches.emplace_back(this->ParseLiteral()).release();
+            cb->catches.emplace_back(this->ParseLiteral());
 
         this->EatNL();
 
@@ -780,7 +780,11 @@ ASTHandle<ASTNode *> Parser::ParseTryCatchFinally() {
         this->IgnoreNewLineIF(TokenType::KW_CATCH);
     }
 
-    if (this->MatchEat(TokenType::KW_FINALLY, true)) {
+    this->IgnoreNewLineIF(TokenType::KW_FINALLY);
+
+    if (this->Match(TokenType::KW_FINALLY)) {
+        this->Eat(true);
+
         tryb->finally = this->ParseBlock(true).release();
         tryb->loc.end = tryb->finally->loc.end;
     }
