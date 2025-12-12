@@ -205,14 +205,14 @@ namespace liftoff::ir {
 
     protected:
         explicit PendingActionInstruction(BasicBlock *jmp, const orbiter::PendingAction action) noexcept : PhysInstruction(
-                orbiter::OPCode::TRY_SPA, 2), action(action) {
+                orbiter::OPCode::TSPA, 2), action(action) {
             assert(action != orbiter::PendingAction::RETURN);
 
             this->SetOperand(1, (Object *) jmp);
         }
 
         explicit PendingActionInstruction(Instruction *value, const U16 pops) noexcept : PhysInstruction(
-                orbiter::OPCode::TRY_SPA, 2), action(orbiter::PendingAction::RETURN), pops(pops) {
+                orbiter::OPCode::TSPA, 2), action(orbiter::PendingAction::RETURN), pops(pops) {
             this->SetOperand(0, value);
         }
 

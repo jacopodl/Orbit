@@ -222,11 +222,10 @@ namespace orbiter {
         SYNC_EXIT,
 
         // Try/Catch/Finally operations
-        TRY_BEGIN, // Begin try block:              OPCODE | 24 OFFSET
-        TRY_END,
-        TRY_SPA, // Jump if false:                  OPCODE | 2 PENDING OP | 4 SRC | 18 JMP OFFSET
-        LDEXC,
-        RETHROW
+        TBGIN, // Begin try block:                                          OPCODE | 24 OFFSET
+        TEND,  // End try block context                                     OPCODE | 24 RESERVED
+        TSPA, // Sets the suspended operation in a try/catch/finally block  OPCODE | 2 PENDING OP | 4 SRC | 18 JMP OFFSET
+        LDEXC // Load current caught exception                              OPCODE | 24 OFFSET
     };
 }
 

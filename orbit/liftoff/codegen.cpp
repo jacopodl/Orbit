@@ -357,15 +357,15 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                            0);
                 break;
-            case orbiter::OPCode::TRY_BEGIN:
+            case orbiter::OPCode::TBGIN:
                 *(orbiter::MachineWord *) m_code = EMIT_JMP(instr->opcode,
                                                             ((BasicBlock *)instr->operands[1].value)->offset);
                 break;
-            case orbiter::OPCode::TRY_END:
+            case orbiter::OPCode::TEND:
             case orbiter::OPCode::LDEXC:
                 *(orbiter::MachineWord *) m_code = EMIT_OP(instr->opcode);
                 break;
-            case orbiter::OPCode::TRY_SPA: {
+            case orbiter::OPCode::TSPA: {
                 const auto action = ((PendingActionInstruction *) instr)->action;
                 const auto *src = (const Instruction *) instr->operands[0].value;
                 const auto *jmp = (const BasicBlock *) (const Instruction *) instr->operands[1].value;
