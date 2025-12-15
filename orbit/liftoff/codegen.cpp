@@ -29,6 +29,10 @@ using namespace liftoff::ir;
 #define EMIT_JMP(opcode, offset) \
     (((U32)(opcode) << 24) | (offset & 0xFFFFFF))
 
+// Emit macro specific to conditional jump instructions with opcode, src register and offset
+#define EMIT_C_JMP(opcode, src, offset) \
+    (((U32)(opcode) << 24) | ((src) << 20) |(offset & 0x1FFFFF))
+
 // ============================================================================
 // Emit Macros with Destination and Immediate
 // ============================================================================
@@ -335,14 +339,14 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
             case orbiter::OPCode::JT: {
                 const auto *jmp = (const BasicBlock *) (const Instruction *) instr->operands[1].value;
 
-                assert(jmp->offset <= 0xFFFF);
+                assert(jmp->offset <= 0x1FFFFF);
 
-                *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
-                                                           ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                           jmp->offset);
+                *(orbiter::MachineWord *) m_code = EMIT_C_JMP(instr->opcode,
+                                                              ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                              jmp->offset);
                 break;
             }
-            case orbiter::OPCode::JMP:{
+            case orbiter::OPCode::JMP: {
                 const auto *jmp = (const BasicBlock *) (const Instruction *) instr->operands[1].value;
 
                 assert(jmp->offset <= 0xFFFFFF);
@@ -438,8 +442,15 @@ orbiter::datatype::HCode Codegen::Generate() noexcept {
         for (auto *b_cursor = ir->entry_; b_cursor; b_cursor = b_cursor->next)
             m_cursor = EmitOpcodes(b_cursor, m_cursor);
 
-        auto code = CodeNew(this->allocator_.GetIsolate(), m_code, ir->unknown_names.get(), ir->static_values.get(),
-                            ir->program_size, ir->local_slots, ir->GetStackCount());
+        auto code = CodeNew(
+            this->allocator_.GetIsolate(),
+            m_code,
+            ir->unknown_names.get(),
+            ir->static_values.get(),
+            ir->program_size,
+            ir->local_slots,
+            ir->GetStackCount()
+        );
         if (!code)
             throw std::bad_alloc();
 

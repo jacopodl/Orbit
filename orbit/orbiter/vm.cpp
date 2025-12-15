@@ -505,6 +505,7 @@ CGOTO
 #define FETCH_R_SRC(instr)          ((instr >> 16) & 0xFu)
 #define FETCH_F_SRC(target, instr)  ((target) FETCH_R_SRC(instr))
 #define FETCH_R_RSRC(instr)         ((instr >> 12) & 0xFu)
+#define FETCH_J_SRC(instr)          FETCH_R_DST(instr)
 #define FETCH_IMM(instr)            ((instr) & 0xFFFFu)
 
 #define ACCESS_STACK_BP(offset) ((PtrSize *)(stack->stack + (regs->BP.reg + (offset))))
@@ -1164,8 +1165,8 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JEN) {
-                const auto src = FETCH_R_SRC(instr);
-                const auto offset = FETCH_IMM(instr);
+                const auto src = FETCH_J_SRC(instr);
+                const auto offset = instr & 0x1FFFFF;
 
                 if (REG_N(src) == (PtrSize) kOddBallNIL) {
                     JMP_TO(offset);
@@ -1176,8 +1177,8 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JERR) {
-                const auto src = FETCH_R_SRC(instr);
-                const auto offset = FETCH_IMM(instr);
+                const auto src = FETCH_J_SRC(instr);
+                const auto offset = instr & 0x1FFFFF;
                 auto *e_key = (Atom *) REG_N(src);
 
                 if (((Error *) fiber->panic.current_->error)->kind == e_key) {
@@ -1192,8 +1193,8 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JF) {
-                const auto src = FETCH_R_SRC(instr);
-                const auto offset = FETCH_IMM(instr);
+                const auto src = FETCH_J_SRC(instr);
+                const auto offset = instr & 0x1FFFFF;
 
                 if (REG_N(src) == kOddBallFALSE) {
                     JMP_TO(offset);
@@ -1204,8 +1205,8 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JT) {
-                const auto src = FETCH_R_SRC(instr);
-                const auto offset = FETCH_IMM(instr);
+                const auto src = FETCH_J_SRC(instr);
+                const auto offset = instr & 0x1FFFFF;
 
                 if (REG_N(src) == kOddBallTRUE) {
                     JMP_TO(offset);

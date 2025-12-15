@@ -210,10 +210,10 @@ namespace orbiter {
         NOBJ, // Create new object                  OPCODE | 4 DST | 4 SRC(Class type)   | 16 UNSIGNED OFFSET
 
         // Jump Instructions
-        JEN, // Jump if nil:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
-        JERR, // Jump if error match                OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
-        JF, // Jump if false:                       OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
-        JT, // Jump if true:                        OPCODE | 4 RESERVED | 4 SRC | 16 OFFSET
+        JEN, // Jump if nil:                        OPCODE | 4 SRC | 20 OFFSET
+        JERR, // Jump if error match                OPCODE | 4 SRC | 20 OFFSET
+        JF, // Jump if false:                       OPCODE | 4 SRC | 20 OFFSET
+        JT, // Jump if true:                        OPCODE | 4 SRC | 20 OFFSET
         JMP, // Unconditional jump:                 OPCODE | 24 OFFSET
 
         // Sync block Operations
