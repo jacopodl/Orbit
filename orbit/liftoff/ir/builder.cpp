@@ -59,7 +59,9 @@ BasicBlock *Builder::CreateAppendBasicBlock() {
 }
 
 bool Builder::CheckIfLastInstructionIs(OPCode opcode) const {
-    if (this->context->current_ != nullptr && this->context->current_->instr.tail->objType_ == ObjectType::INSTRUCTION)
+    if (this->context->current_ != nullptr
+        && this->context->current_->instr.tail != nullptr
+        && this->context->current_->instr.tail->objType_ == ObjectType::INSTRUCTION)
         return ((PhysInstruction *) this->context->current_->instr.tail)->opcode == opcode;
 
     return false;
@@ -400,9 +402,9 @@ Instruction *Builder::LoadFromOffset(const OPCode opcode, const U8 r_base, const
 
 Instruction *Builder::SetupTryCatch(BasicBlock *catch_block, BasicBlock *finally_block) {
     return this->CreateInstruction<BranchInstruction>(OPCode::TBGIN, nullptr,
-                                               catch_block != nullptr
-                                                   ? catch_block
-                                                   : finally_block);
+                                                      catch_block != nullptr
+                                                          ? catch_block
+                                                          : finally_block);
 }
 
 Instruction *Builder::StackDiscard(U16 slots) {

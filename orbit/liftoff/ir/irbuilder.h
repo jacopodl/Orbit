@@ -99,9 +99,9 @@ namespace liftoff::ir {
 
         Instruction *visitSubscript(parser::Subscript *node);
 
-        Instruction *visitSwitchCase(parser::SwitchCase *node);
+        Instruction *visitSwitchCase(const parser::SwitchCase *node);
 
-        Instruction *visitSwitchBlock(parser::SwitchBlock *node);
+        Instruction *visitSwitchBlock(const parser::SwitchBlock *node);
 
         Instruction *visitTryBlock(parser::TryBlock *node);
 

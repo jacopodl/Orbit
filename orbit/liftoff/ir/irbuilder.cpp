@@ -1082,13 +1082,70 @@ Instruction *IRBuilder::visitSubscript(parser::Subscript *node) {
     return nullptr;
 }
 
-Instruction *IRBuilder::visitSwitchCase(parser::SwitchCase *node) {
-    // TODO: Implement SwitchCase visitation
+Instruction *IRBuilder::visitSwitchCase(const parser::SwitchCase *node) {
     return nullptr;
 }
 
-Instruction *IRBuilder::visitSwitchBlock(parser::SwitchBlock *node) {
-    // TODO: Implement SwitchBlock visitation
+Instruction *IRBuilder::visitSwitchBlock(const parser::SwitchBlock *node) {
+    Instruction *swtest = nullptr;
+    if (node->test != nullptr)
+        swtest = this->visit(node->test);
+
+    BasicBlock *default_block = nullptr;
+    const auto end_block = this->builder_.CreateBasicBlock();
+
+    JBlock ctx{&this->builder_, JBlockType::SWITCH};
+    ctx.end = end_block;
+
+    std::vector<BasicBlock *> bodies;
+    for (auto &case_: node->cases) {
+        const auto *case_node = (parser::SwitchCase *) case_.get();
+
+        bodies.push_back(this->builder_.CreateBasicBlock());
+
+        if (case_node->tests.empty())
+            default_block = bodies.back();
+
+        for (auto &test: case_node->tests) {
+            auto *case_test = this->visit(test.get());
+
+            if (swtest == nullptr) {
+                this->builder_.CreateBranch(orbiter::OPCode::JT, case_test, nullptr, bodies.back());
+
+                continue;
+            }
+
+            auto *cmp = this->builder_.CreateBinaryOpFlags(orbiter::OPCode::EQ,
+                                                           (U8) orbiter::EqualityMode::NORMAL,
+                                                           swtest,
+                                                           case_test);
+
+            this->builder_.CreateBranch(orbiter::OPCode::JT, cmp, nullptr, bodies.back());
+        }
+    }
+
+    // Jump to default or end of the switch statement
+    this->builder_.CreateJump(default_block != nullptr ? default_block : end_block);
+
+    // Process cases body
+    auto case_index = 0;
+    for (auto &case_: node->cases) {
+        const auto *case_node = (parser::SwitchCase *) case_.get();
+
+        this->builder_.AppendBasicBlock(bodies[case_index++]);
+
+        this->sym_t_->EnterNestedScope(case_node->body->loc.start.offset);
+
+        this->visit(case_node->body);
+
+        this->sym_t_->LeaveNestedScope();
+
+        if (!case_node->fallthrough)
+            this->builder_.CreateJump(end_block);
+    }
+
+    this->builder_.AppendBasicBlock(end_block);
+
     return nullptr;
 }
 
@@ -1363,6 +1420,8 @@ IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module)
 
         return IRCHandle(context);
     } catch (const SymbolTableException &) {
+        assert(false);
+    } catch (...) {
         assert(false);
     }
 

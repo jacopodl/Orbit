@@ -17,7 +17,8 @@ namespace liftoff::ir {
         LABEL,
         LOOP,
         TCF,
-        SYNC
+        SYNC,
+        SWITCH
     };
 
     class JBlock {
