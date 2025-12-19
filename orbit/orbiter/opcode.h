@@ -16,10 +16,15 @@ namespace orbiter {
     };
 
     // Flags for arithmetic operations
-    enum class ArithFlags : U8 {
+    enum class AddSubFlags : U8 {
+        NONE = 0x0,
+        IMM8 = 0x1
+    };
+
+    enum class DivFlags : U8 {
         NONE = 0x0, // Default integer operation
         DIV_REM = 0x1, // Store remainder instead of quotient (MOD operation)
-        FLOAT = 0x2, // Floating point operation
+        FLOAT = 0x2 // Floating point operation
 
         // Combinations:
         // FLOAT | DIV_REM = MODR (floating point modulo)
@@ -230,7 +235,7 @@ namespace orbiter {
     };
 }
 
-ENUMBITMASK_ENABLE(orbiter::ArithFlags);
+ENUMBITMASK_ENABLE(orbiter::DivFlags);
 
 ENUMBITMASK_ENABLE(orbiter::CallMode);
 

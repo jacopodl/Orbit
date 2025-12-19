@@ -190,6 +190,7 @@ namespace orbiter::datatype {
 #define O_IS_SMI(object)                    (((MSize)object & 0x01u) != 0)
 #define O_IS_ODDBALL(object)                ((object == nullptr) || ((!O_IS_SMI(object)) && (((MSize)object & orbiter::datatype::kOddBallMask) == orbiter::datatype::kOddBallMask)))
 #define O_IS_OBJECT(object)                 ((object != nullptr) && ((!O_IS_SMI(object)) && (((MSize)object & orbiter::datatype::kOddBallMask) != orbiter::datatype::kOddBallMask)))
+#define O_TO_SMI(num)                       (((num) << 1) | 0x01)
 
 #define O_IS_FALSE(object)                  (O_IS_ODDBALL(object) && ((object & orbiter::datatype::kOddBallFALSE) == orbiter::datatype::kOddBallFALSE))
 #define O_IS_TRUE(object)                   (O_IS_ODDBALL(object) && ((object & orbiter::datatype::kOddBallTRUE) == orbiter::datatype::kOddBallTRUE))

@@ -84,8 +84,12 @@ namespace liftoff::ir {
     };
 
     // BinaryOp
-    class BinaryOpInstr final : public PhysInstruction {
+    class BinaryOpInstr : public PhysInstruction {
         friend Builder;
+        friend class BinaryOpImmInstr;
+
+        explicit BinaryOpInstr(const orbiter::OPCode opcode, const U8 flags) noexcept : PhysInstruction(opcode, 1), flags(flags) {
+        }
 
     protected:
         explicit BinaryOpInstr(const orbiter::OPCode opcode, const U8 flags, Instruction *left,
@@ -103,17 +107,16 @@ namespace liftoff::ir {
         U8 flags = 0;
     };
 
-    class BinaryOpImmInstr final : public PhysInstruction {
+    class BinaryOpImmInstr final : public BinaryOpInstr {
         friend Builder;
 
     protected:
         explicit BinaryOpImmInstr(const orbiter::OPCode opcode, const U8 flags, Instruction *left,
-                                  const U16 right) noexcept : PhysInstruction(opcode, 1), flags(flags), imm(right) {
+                                  const U16 right) noexcept : BinaryOpInstr(opcode, flags), imm(right) {
             this->SetOperand(0, left);
         }
 
     public:
-        U8 flags = 0;
         U16 imm = 0;
     };
 
@@ -147,6 +150,7 @@ namespace liftoff::ir {
             this->SetOperand(0, value);
             this->SetOperand(1, (Object *) jmp);
         }
+
     public:
         void SetBasicBlock(BasicBlock *jmp) const {
             this->SetOperand(1, (Object *) jmp);
@@ -204,15 +208,16 @@ namespace liftoff::ir {
         friend Builder;
 
     protected:
-        explicit PendingActionInstruction(BasicBlock *jmp, const orbiter::PendingAction action) noexcept : PhysInstruction(
-                orbiter::OPCode::TSPA, 2), action(action) {
+        explicit PendingActionInstruction(BasicBlock *jmp,
+                                          const orbiter::PendingAction action) noexcept : PhysInstruction(
+            orbiter::OPCode::TSPA, 2), action(action) {
             assert(action != orbiter::PendingAction::RETURN);
 
             this->SetOperand(1, (Object *) jmp);
         }
 
         explicit PendingActionInstruction(Instruction *value, const U16 pops) noexcept : PhysInstruction(
-                orbiter::OPCode::TSPA, 2), action(orbiter::PendingAction::RETURN), pops(pops) {
+            orbiter::OPCode::TSPA, 2), action(orbiter::PendingAction::RETURN), pops(pops) {
             this->SetOperand(0, value);
         }
 

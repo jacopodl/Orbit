@@ -156,8 +156,16 @@ Instruction *Builder::CreateCallDetached(const OPCode opcode, Instruction *src, 
     return call;
 }
 
+Instruction *Builder::CreateDec(Instruction *src) {
+    return this->CreateInstruction<BinaryOpImmInstr>(OPCode::SUB, (U8) AddSubFlags::IMM8, src, 1);
+}
+
 Instruction *Builder::CreateError(Instruction *kind, Instruction *reason, Instruction *details) {
     return this->CreateInstruction<ErrorInstr>(kind, reason, details);
+}
+
+Instruction *Builder::CreateInc(Instruction *src) {
+    return this->CreateInstruction<BinaryOpImmInstr>(OPCode::ADD, (U8) AddSubFlags::IMM8, src, 1);
 }
 
 Instruction *Builder::CreateJump(BasicBlock *destination) {

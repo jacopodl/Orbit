@@ -121,7 +121,21 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
         switch (instr->opcode) {
             case orbiter::OPCode::ADD:
             case orbiter::OPCode::SUB:
-            case orbiter::OPCode::MUL:
+            case orbiter::OPCode::MUL: {
+                const auto imm8 = ((BinaryOpInstr *) instr)->flags == (U8) orbiter::AddSubFlags::IMM8;
+
+                *(orbiter::MachineWord *) m_code = EMIT_DSSF(instr->opcode,
+                                                             instr->assigned_reg,
+                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                             !imm8 ? ((Instruction*)instr->operands[1].value)->
+                                                             assigned_reg:0,
+                                                             ((ir::BinaryOpInstr*) instr)->flags);
+
+                if (imm8)
+                    *(orbiter::MachineWord *) m_code = (*(orbiter::MachineWord *) m_code)
+                                                       | ((BinaryOpImmInstr *) instr)->imm;
+                break;
+            }
             case orbiter::OPCode::DIV:
                 *(orbiter::MachineWord *) m_code = EMIT_DSSF(instr->opcode,
                                                              instr->assigned_reg,

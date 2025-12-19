@@ -532,8 +532,13 @@ CATCH_FINALLY:
                 const auto dst = FETCH_R_DST(instr);
                 const auto src_l = FETCH_R_SRC(instr);
                 const auto src_r = FETCH_R_RSRC(instr);
+                const auto flag = (AddSubFlags) ((instr >> 8) & 0xFu);
 
-                REG_N(dst) = (PtrSize) VMAdd(fiber->isolate, REG_N(src_l), REG_N(src_r)).get();
+                REG_N(dst) = (PtrSize) VMAdd(
+                    fiber->isolate,
+                    REG_N(src_l),
+                    flag == AddSubFlags::IMM8 ? O_TO_SMI(instr & 0xFF) : REG_N(src_r)
+                ).get();
 
                 DISPATCH;
             }

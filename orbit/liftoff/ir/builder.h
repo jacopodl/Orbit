@@ -153,7 +153,11 @@ namespace liftoff::ir {
         Instruction *CreateCallDetached(orbiter::OPCode opcode, Instruction *src, U16 arguments,
                                         orbiter::CallMode mode);
 
+        Instruction *CreateDec(Instruction *src);
+
         Instruction *CreateError(Instruction *kind, Instruction *reason, Instruction *details);
+
+        Instruction *CreateInc(Instruction *src);
 
         Instruction *CreateJump(BasicBlock *destination);
 

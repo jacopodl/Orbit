@@ -11,8 +11,8 @@
 using namespace liftoff;
 using namespace liftoff::ir;
 
-orbiter::OPCode InfixOp2OpCode(const scanner::TokenType tt, const bool imm, orbiter::ArithFlags &flags) {
-    flags = orbiter::ArithFlags::NONE;
+orbiter::OPCode InfixOp2OpCode(const scanner::TokenType tt, const bool imm, U8 &flags) {
+    flags = 0;
 
     switch (tt) {
         case scanner::TokenType::PLUS:
@@ -24,10 +24,10 @@ orbiter::OPCode InfixOp2OpCode(const scanner::TokenType tt, const bool imm, orbi
         case scanner::TokenType::SLASH:
             return orbiter::OPCode::DIV;
         case scanner::TokenType::SLASH_SLASH:
-            flags = orbiter::ArithFlags::FLOAT;
+            flags = (U8) orbiter::DivFlags::FLOAT;
             return orbiter::OPCode::DIV;
         case scanner::TokenType::PERCENT:
-            flags = orbiter::ArithFlags::DIV_REM;
+            flags = (U8) orbiter::DivFlags::DIV_REM;
             return orbiter::OPCode::DIV;
 
         case scanner::TokenType::AMPERSAND:
@@ -95,14 +95,14 @@ Instruction *IRBuilder::BinaryOP(const parser::Binary *binary) {
 
     assert(right != nullptr);
 
-    auto op_flags = orbiter::ArithFlags::NONE;
+    auto op_flags = (U8) 0;
 
-    auto op_code = InfixOp2OpCode(binary->token_type, r_ignore, op_flags);
+    const auto op_code = InfixOp2OpCode(binary->token_type, r_ignore, op_flags);
 
     if (r_ignore)
-        return this->builder_.CreateBinaryOpFlags(op_code, (U8) op_flags, left, (U16) ((PtrSize) right));
+        return this->builder_.CreateBinaryOpFlags(op_code, op_flags, left, (U16) ((PtrSize) right));
 
-    return this->builder_.CreateBinaryOpFlags(op_code, (U8) op_flags, left, right);
+    return this->builder_.CreateBinaryOpFlags(op_code, op_flags, left, right);
 }
 
 Instruction *IRBuilder::CreateCall(const parser::Call *node, Instruction *f_src) {
@@ -1297,6 +1297,19 @@ Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
             return this->visitTrap(node);
         case parser::NodeType::RETURN:
             return this->visitReturn(node);
+        case parser::NodeType::UPDATE: {
+            value = this->visit(node->value);
+
+            assert(node->value->node_type == parser::NodeType::IDENTIFIER);
+
+            const auto post = node->token_type == scanner::TokenType::PLUS_PLUS
+                                  ? this->builder_.CreateInc(value)
+                                  : this->builder_.CreateDec(value);
+
+            this->StoreVariable(((parser::Identifier *) node->value)->symbol, post, false);
+
+            return value;
+        }
         default:
             assert(false); // Never get here
     }
