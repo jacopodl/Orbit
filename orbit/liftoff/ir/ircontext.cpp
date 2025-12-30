@@ -269,6 +269,8 @@ void IRContext::DeleteInstruction(Instruction *instruction) noexcept {
 
     this->current_->DeleteInstruction(instruction);
 
+    this->program_size -= 4;
+
     this->RemoveFromObjList(instruction);
 
     instruction->~Instruction();

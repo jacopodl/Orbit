@@ -63,7 +63,7 @@ namespace liftoff::ir {
         }
 
         explicit PhysInstruction(const orbiter::OPCode opcode,
-                                 const int operands) noexcept : Instruction(operands), opcode(opcode) {
+                                 const unsigned int operands) noexcept : Instruction(operands), opcode(opcode) {
         }
 
     public:
@@ -88,7 +88,8 @@ namespace liftoff::ir {
         friend Builder;
         friend class BinaryOpImmInstr;
 
-        explicit BinaryOpInstr(const orbiter::OPCode opcode, const U8 flags) noexcept : PhysInstruction(opcode, 1), flags(flags) {
+        explicit BinaryOpInstr(const orbiter::OPCode opcode, const U8 flags) noexcept : PhysInstruction(opcode, 1),
+            flags(flags) {
         }
 
     protected:
@@ -210,14 +211,14 @@ namespace liftoff::ir {
     protected:
         explicit PendingActionInstruction(BasicBlock *jmp,
                                           const orbiter::PendingAction action) noexcept : PhysInstruction(
-            orbiter::OPCode::TSPA, 2), action(action) {
+                orbiter::OPCode::TSPA, 2), action(action) {
             assert(action != orbiter::PendingAction::RETURN);
 
             this->SetOperand(1, (Object *) jmp);
         }
 
         explicit PendingActionInstruction(Instruction *value, const U16 pops) noexcept : PhysInstruction(
-            orbiter::OPCode::TSPA, 2), action(orbiter::PendingAction::RETURN), pops(pops) {
+                orbiter::OPCode::TSPA, 2), action(orbiter::PendingAction::RETURN), pops(pops) {
             this->SetOperand(0, value);
         }
 
@@ -360,6 +361,41 @@ namespace liftoff::ir {
     protected:
         explicit ReturnSubInstruction(Instruction *instr) : PhysInstruction(orbiter::OPCode::RETSUB, 1) {
             this->SetOperand(0, instr);
+        }
+    };
+
+    class SubscrInstruction final : PhysInstruction {
+        friend Builder;
+
+    public:
+        SubscrInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *index) : PhysInstruction(
+            opcode, 2) {
+            this->SetOperand(0, target);
+            this->SetOperand(1, index);
+        }
+
+        SubscrInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *index,
+                          Instruction *value) : PhysInstruction(opcode, 3) {
+            this->SetOperand(0, target);
+            this->SetOperand(1, index);
+            this->SetOperand(2, value);
+        }
+
+        SubscrInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *start, Instruction *stop,
+                          Instruction *step) : PhysInstruction(opcode, 4) {
+            this->SetOperand(0, target);
+            this->SetOperand(1, start);
+            this->SetOperand(2, stop);
+            this->SetOperand(3, step);
+        }
+
+        SubscrInstruction(const orbiter::OPCode opcode, Instruction *target, Instruction *start, Instruction *stop,
+                          Instruction *step, Instruction *value) : PhysInstruction(opcode, 5) {
+            this->SetOperand(0, target);
+            this->SetOperand(1, start);
+            this->SetOperand(2, stop);
+            this->SetOperand(3, step);
+            this->SetOperand(4, value);
         }
     };
 

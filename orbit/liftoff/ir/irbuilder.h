@@ -97,7 +97,7 @@ namespace liftoff::ir {
 
         Instruction *visitSelector(parser::Selector *node);
 
-        Instruction *visitSubscript(parser::Subscript *node);
+        Instruction *visitSubscript(const parser::Subscript *node);
 
         Instruction *visitSwitchCase(const parser::SwitchCase *node);
 
@@ -108,6 +108,8 @@ namespace liftoff::ir {
         Instruction *visitTryBlock(parser::TryBlock *node);
 
         Instruction *visitUnary(const parser::Unary *node);
+
+        Instruction *visitUpdate(const parser::Unary *node);
 
         unsigned int ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,
                                            orbiter::LoadFuncFlags &f_flags);

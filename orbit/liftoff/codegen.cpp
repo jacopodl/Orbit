@@ -67,7 +67,7 @@ using namespace liftoff::ir;
 
 // Emit macro with opcode, destination register, source register, and flags
 #define EMIT_DSF(opcode, dst, src, flags) \
-    (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | ((flags) << 12) & 0xF)
+    (((U32)(opcode) << 24) | ((dst) << 20) | ((src) << 16) | (((flags) << 12) & 0xF))
 
 // Emit macro with opcode, destination register, source register, flags and offset
 #define EMIT_DSFO(opcode, dst, src, flags, offset) \
@@ -103,6 +103,9 @@ using namespace liftoff::ir;
 
 #define EMIT_DSSS(opcode, dst, src1, src2, src3) \
     (((U32)(opcode) << 24) | ((dst) << 20) | ((src1) << 16) | ((src2) << 12) | ((src3) << 8))
+
+#define EMIT_DSSSS(opcode, dst, src1, src2, src3, src4) \
+    (((U32)(opcode) << 24) | ((dst) << 20) | ((src1) << 16) | ((src2) << 12) | ((src3) << 8) | ((src4) << 4))
 
 // ============================================================================
 // Emit Special Macros
@@ -269,11 +272,13 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                             ((ir::OffsetInstruction *) instr)->offset);
                 break;
             case orbiter::OPCode::NERROR:
+            case orbiter::OPCode::STIDX:
+            case orbiter::OPCode::LDSBSCR:
                 *(orbiter::MachineWord *) m_code = EMIT_DSSS(instr->opcode,
                                                              instr->assigned_reg,
-                                                             ((ErrorInstr*)instr->operands[0].value)->assigned_reg,
-                                                             ((ErrorInstr*)instr->operands[1].value)->assigned_reg,
-                                                             ((ErrorInstr *) instr->operands[2].value)->assigned_reg);
+                                                             ((Instruction *)instr->operands[0].value)->assigned_reg,
+                                                             ((Instruction *)instr->operands[1].value)->assigned_reg,
+                                                             ((Instruction *) instr->operands[2].value)->assigned_reg);
                 break;
             case orbiter::OPCode::CLONEW:
             case orbiter::OPCode::NDICT:
@@ -327,6 +332,20 @@ unsigned char *Codegen::EmitOpcodes(BasicBlock *block, unsigned char *m_code) {
                                                             instr->num_ops > 2 ?
                                                             ((Instruction*)instr->operands[2].value)->assigned_reg
                                                             : 0);
+                break;
+            case orbiter::OPCode::LDIDX:
+                *(orbiter::MachineWord *) m_code = EMIT_DSS(instr->opcode,
+                                                            instr->assigned_reg,
+                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
+                                                            ((Instruction*)instr->operands[1].value)->assigned_reg);
+                break;
+            case orbiter::OPCode::STSBSCR:
+                *(orbiter::MachineWord *) m_code = EMIT_DSSSS(instr->opcode,
+                                                              instr->assigned_reg,
+                                                              ((Instruction *)instr->operands[0].value)->assigned_reg,
+                                                              ((Instruction *)instr->operands[1].value)->assigned_reg,
+                                                              ((Instruction *) instr->operands[2].value)->assigned_reg,
+                                                              ((Instruction *) instr->operands[3].value)->assigned_reg);
                 break;
             case orbiter::OPCode::LDINIT:
             case orbiter::OPCode::NOBJ:

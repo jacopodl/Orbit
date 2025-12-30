@@ -159,6 +159,10 @@ namespace liftoff::ir {
 
         Instruction *CreateInc(Instruction *src);
 
+        Instruction *CreateIndexLoad(Instruction *target, Instruction *index);
+
+        Instruction *CreateIndexStore(const SubscrInstruction *load, Instruction *value);
+
         Instruction *CreateJump(BasicBlock *destination);
 
         Instruction *CreateJumpIfETypeMatch(Instruction *src, BasicBlock *catch_block);
@@ -174,6 +178,10 @@ namespace liftoff::ir {
         }
 
         Instruction *CreateStoreVariable(orbiter::OPCode opcode, I16 offset, U8 flags, Instruction *value);
+
+        Instruction *CreateSubscrLoad(Instruction *target, Instruction *start, Instruction *stop, Instruction *step);
+
+        Instruction *CreateSubscrStore(const SubscrInstruction *load, Instruction *value);
 
         Instruction *CreateReturn(Instruction *s_reg, U16 slots);
 

@@ -168,6 +168,17 @@ Instruction *Builder::CreateInc(Instruction *src) {
     return this->CreateInstruction<BinaryOpImmInstr>(OPCode::ADD, (U8) AddSubFlags::IMM8, src, 1);
 }
 
+Instruction *Builder::CreateIndexLoad(Instruction *target, Instruction *index) {
+    return this->CreateInstruction<SubscrInstruction>(OPCode::LDIDX, target, index);
+}
+
+Instruction *Builder::CreateIndexStore(const SubscrInstruction *load, Instruction *value) {
+    return this->CreateInstruction<SubscrInstruction>(OPCode::STIDX,
+                                                      (Instruction *) load->operands[0].value,
+                                                      (Instruction *) load->operands[1].value,
+                                                      value);
+}
+
 Instruction *Builder::CreateJump(BasicBlock *destination) {
     auto *jmp = this->CreateInstruction<BranchInstruction>(OPCode::JMP, nullptr, destination);
 
@@ -202,6 +213,19 @@ Instruction *Builder::CreateStoreVariable(const OPCode opcode, I16 offset, U8 fl
     instr->flags = flags;
 
     return instr;
+}
+
+Instruction *Builder::CreateSubscrLoad(Instruction *target, Instruction *start, Instruction *stop, Instruction *step) {
+    return this->CreateInstruction<SubscrInstruction>(OPCode::LDSBSCR, target, start, stop, step);
+}
+
+Instruction *Builder::CreateSubscrStore(const SubscrInstruction *load, Instruction *value) {
+    return this->CreateInstruction<SubscrInstruction>(OPCode::STSBSCR,
+                                                      (Instruction *) load->operands[0].value,
+                                                      (Instruction *) load->operands[1].value,
+                                                      (Instruction *) load->operands[2].value,
+                                                      (Instruction *) load->operands[3].value,
+                                                      value);
 }
 
 Instruction *Builder::CreateReturn(Instruction *s_reg, const U16 slots) {

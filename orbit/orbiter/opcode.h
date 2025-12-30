@@ -199,11 +199,17 @@ namespace orbiter {
 
         // Container object
         NDICT, // Create new dict                   OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
-        NERROR, // Create new error                 OPCODE | 4 DST | 4 KEY | 4 DESC | 4 aux | 8 RESERVED
+        NERROR, // Create new error                 OPCODE | 4 DST | 4 KEY | 4 DESC | 4 AUX | 8 RESERVED
         NLIST, // Create new list                   OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
         NSET, // Create new set                     OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
         NTUPLE, // Create new tuple                 OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET
         ADDELEM, // Push value to container         OPCODE | 4 DST (Container) | 4 SRC | 4 V_SRC | 12 RESERVED
+
+        // Indexing/Slicing Operations
+        LDIDX, // Load value from object at index   OPCODE | 4 DST | 4 SRC | 4 SRC_INDEX | 12 RESERVED
+        STIDX, // Store value into object at index  OPCODE | 4 DST (Container) | 4 SRC | 4 SRC_INDEX | 4 SRC_VALUE | 8 RESERVED
+        LDSBSCR, // Load values from object slice   OPCODE | 4 DST | 4 START | 4 STOP | 4 END | 8 RESERVED
+        STSBSCR, // Store values into object slice  OPCODE | 4 SRC | 4 START | 4 STOP | 4 END | 4 VALUE | 4 RESERVED
 
         // Class/Trait
         LDINIT, // Load class initializer           OPCODE | 4 DST | 4 SRC | 16 UNSIGNED OFFSET

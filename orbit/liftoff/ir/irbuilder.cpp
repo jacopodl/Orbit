@@ -378,6 +378,30 @@ Instruction *IRBuilder::visitASTNode(parser::ASTNode *node) {
 Instruction *IRBuilder::visitAssignment(parser::Assignment *node) {
     Instruction *value = nullptr;
 
+    if (node->name->node_type == parser::NodeType::INDEX) {
+        auto *last_op = this->visitSubscript((parser::Subscript *) node->name);
+
+        value = this->visit(node->value);
+
+        value = this->builder_.CreateIndexStore((SubscrInstruction *) last_op, value);
+
+        this->builder_.context->DeleteInstruction(last_op);
+
+        return value;
+    }
+
+    if (node->name->node_type == parser::NodeType::SLICE) {
+        auto *last_op = this->visitSubscript((parser::Subscript *) node->name);
+
+        value = this->visit(node->value);
+
+        value = this->builder_.CreateSubscrStore((SubscrInstruction *) last_op, value);
+
+        this->builder_.context->DeleteInstruction(last_op);
+
+        return value;
+    }
+
     if (node->name->node_type == parser::NodeType::SELECTOR) {
         const auto *selector = (parser::Selector *) node->name;
         const auto *property = ((parser::Identifier *) selector->right);
@@ -1078,9 +1102,35 @@ Instruction *IRBuilder::visitSelector(parser::Selector *node) {
     return this->builder_.LoadObjectProp(base, offset, true, super);
 }
 
-Instruction *IRBuilder::visitSubscript(parser::Subscript *node) {
-    // TODO: Implement Subscript visitation
-    return nullptr;
+Instruction *IRBuilder::visitSubscript(const parser::Subscript *node) {
+    const auto obj = this->visit(node->expression);
+    Instruction *start = nullptr;
+
+    if (node->node_type == parser::NodeType::INDEX) {
+        start = this->visit(node->start);
+
+        return this->builder_.CreateIndexLoad(obj, start);
+    }
+
+    Instruction *stop = nullptr;
+    Instruction *step = nullptr;
+
+    if (node->start != nullptr)
+        start = this->visit(node->start);
+    else
+        start = this->builder_.LoadImmediate(0);
+
+    if (node->stop != nullptr)
+        stop = this->visit(node->stop);
+    else
+        stop = this->builder_.LoadNilValue();
+
+    if (node->step != nullptr)
+        step = this->visit(node->step);
+    else
+        step = this->builder_.LoadImmediate(1);
+
+    return this->builder_.CreateSubscrLoad(obj, start, stop, step);
 }
 
 Instruction *IRBuilder::visitSwitchCase(const parser::SwitchCase *node) {
@@ -1297,19 +1347,8 @@ Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
             return this->visitTrap(node);
         case parser::NodeType::RETURN:
             return this->visitReturn(node);
-        case parser::NodeType::UPDATE: {
-            value = this->visit(node->value);
-
-            assert(node->value->node_type == parser::NodeType::IDENTIFIER);
-
-            const auto post = node->token_type == scanner::TokenType::PLUS_PLUS
-                                  ? this->builder_.CreateInc(value)
-                                  : this->builder_.CreateDec(value);
-
-            this->StoreVariable(((parser::Identifier *) node->value)->symbol, post, false);
-
-            return value;
-        }
+        case parser::NodeType::UPDATE:
+            return this->visitUpdate(node);
         default:
             assert(false); // Never get here
     }
@@ -1317,6 +1356,46 @@ Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
     // TODO: yield
 
     return nullptr;
+}
+
+Instruction *IRBuilder::visitUpdate(const parser::Unary *node) {
+    const auto value = this->visit(node->value);
+
+    const auto post = node->token_type == scanner::TokenType::PLUS_PLUS
+                          ? this->builder_.CreateInc(value)
+                          : this->builder_.CreateDec(value);
+
+    if (node->value->node_type == parser::NodeType::IDENTIFIER) {
+        this->StoreVariable(((parser::Identifier *) node->value)->symbol, post, false);
+
+        return value;
+    }
+
+    if (node->value->node_type == parser::NodeType::SELECTOR) {
+        const auto *sel_load = (LSObjectProp *) this->builder_.context->RFindFirstInstruction(orbiter::OPCode::LDOBJP);
+
+        assert(sel_load != nullptr);
+
+        this->builder_.StoreObjectProp(
+            (Instruction *) sel_load->operands[0].value,
+            post,
+            sel_load->offset,
+            sel_load->flags == orbiter::LoadObjectPropFlags::KEY);
+
+        return value;
+    }
+
+    // INDEX
+
+    assert(node->value->node_type == parser::NodeType::INDEX);
+
+    const auto *last_load = (SubscrInstruction *) this->builder_.context->RFindFirstInstruction(orbiter::OPCode::LDIDX);
+
+    assert(last_load != nullptr);
+
+    this->builder_.CreateIndexStore(last_load, post);
+
+    return value;
 }
 
 unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,
