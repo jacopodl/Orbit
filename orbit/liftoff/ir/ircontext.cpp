@@ -231,14 +231,10 @@ void IRContext::RemoveFromObjList(Object *obj) noexcept {
 
 void IRContext::InsertInstructionAfter(Instruction *instruction, Instruction *after) noexcept {
     instruction->basic_block->AddInstructionAfter(instruction, after);
-
-    this->program_size += 4;
 }
 
 void IRContext::InsertInstructionBefore(Instruction *instruction, Instruction *before) noexcept {
     instruction->basic_block->AddInstructionBefore(instruction, before);
-
-    this->program_size += 4;
 }
 
 void IRContext::InvalidateActiveVar(const Symbol *symbol) {
@@ -268,8 +264,6 @@ void IRContext::DeleteInstruction(Instruction *instruction) noexcept {
         return;
 
     this->current_->DeleteInstruction(instruction);
-
-    this->program_size -= 4;
 
     this->RemoveFromObjList(instruction);
 

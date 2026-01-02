@@ -18,8 +18,6 @@ BasicBlock *Builder::AddInstruction(Instruction *instruction) {
 
     bb->AddInstruction(instruction);
 
-    this->context->program_size += 4;
-
     return bb;
 }
 
@@ -101,14 +99,12 @@ Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
     alloca = this->CreateObject<UnaryImmInstr>(OPCode::ALLOCA, (U8) flags, slots);
 
     if (last_alloca == nullptr) {
-        if (bb_entry != nullptr) {
+        if (bb_entry != nullptr)
             bb_entry->AddInstructionFirst(alloca);
-
-            this->context->program_size += 4;
-        } else
+        else
             this->AddInstruction(alloca);
     } else
-        this->context->InsertInstructionAfter(last_alloca, alloca);
+        IRContext::InsertInstructionAfter(last_alloca, alloca);
 
 
     this->context->stack_slots += slots;
@@ -248,8 +244,6 @@ Instruction *Builder::CreateReturn(Instruction *s_reg, const U16 slots) {
             auto *execdefer = this->CreateObject<UnaryImmInstr>(OPCode::EXECDEFER, 0, 0);
 
             this->context->current_->AddInstructionBefore(s_reg, execdefer);
-
-            this->context->program_size += 4;
 
             return this->CreateInstruction<ReturnInstruction>(s_reg, slots);
         }

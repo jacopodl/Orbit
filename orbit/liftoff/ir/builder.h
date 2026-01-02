@@ -262,14 +262,10 @@ namespace liftoff::ir {
         }
 
         Instruction *GetLoadFromStackOffset(U8 r_base, I16 offset) {
-            this->context->program_size += 4;
-
             return this->CreateObject<OffsetInstruction>(orbiter::OPCode::SKLDR, r_base, offset);
         }
 
         Instruction *GetStoreToStackOffset(Instruction *src, U8 r_base, I16 offset) {
-            this->context->program_size += 4;
-
             return this->CreateObject<OffsetInstruction>(orbiter::OPCode::SKSTR, r_base, offset, src);
         }
 

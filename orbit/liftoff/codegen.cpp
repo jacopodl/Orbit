@@ -467,7 +467,7 @@ orbiter::datatype::HCode Codegen::Generate() noexcept {
         offset += b_cursor->size;
     }
 
-    auto *m_code = this->allocator_.alloc<unsigned char>(ir->program_size);
+    auto *m_code = this->allocator_.alloc<unsigned char>(offset);
     if (m_code == nullptr)
         return {};
 
@@ -481,7 +481,7 @@ orbiter::datatype::HCode Codegen::Generate() noexcept {
             m_code,
             ir->unknown_names.get(),
             ir->static_values.get(),
-            ir->program_size,
+            offset,
             ir->local_slots,
             ir->GetStackCount()
         );

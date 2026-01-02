@@ -242,8 +242,6 @@ namespace liftoff::ir {
 
         U32 deferred_stack_count = 0;
 
-        U32 program_size = 0;
-
         /// Represents the type of the intermediate representation (IR) context.
         IRContextType type_;
 
@@ -449,7 +447,7 @@ namespace liftoff::ir {
          *                     must already exist in the instruction list.
          * @param after The instruction to be inserted after the specified `instruction`.
          */
-        void InsertInstructionAfter(Instruction *instruction, Instruction *after) noexcept;
+        static void InsertInstructionAfter(Instruction *instruction, Instruction *after) noexcept;
 
         /**
          * @brief Inserts a new instruction before a specified instruction in the instruction list.
@@ -461,7 +459,7 @@ namespace liftoff::ir {
          *                     must already exist in the instruction list.
          * @param before The instruction to be inserted before the specified `instruction`.
          */
-        void InsertInstructionBefore(Instruction *instruction, Instruction *before) noexcept;
+        static void InsertInstructionBefore(Instruction *instruction, Instruction *before) noexcept;
 
         /**
          * @brief Invalidates a specific active variable or clears all active variables in the
