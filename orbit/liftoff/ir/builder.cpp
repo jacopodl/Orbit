@@ -384,6 +384,16 @@ Instruction *Builder::LoadImmediate(const MachineSize value) {
     return instr;
 }
 
+Instruction *Builder::LoadModule(datatype::ORString *path) {
+    auto *ld_path = this->LoadConstant((datatype::OObject *) path);
+
+    return this->LoadModule(ld_path);
+}
+
+Instruction *Builder::LoadModule(Instruction *src) {
+    return this->CreateInstruction<UnaryOpInstr>(OPCode::LDMOD, src);
+}
+
 Instruction *Builder::LoadObjectProp(Instruction *src, U16 offset, bool as_key, bool super) {
     const auto flags = (as_key
                             ? LoadObjectPropFlags::KEY

@@ -876,13 +876,29 @@ Instruction *IRBuilder::visitIdentifier(parser::Identifier *node) {
     return this->LoadVariable(sym);
 }
 
-Instruction *IRBuilder::visitImport(parser::Import *node) {
-    // TODO: Implement Import visitation
-    return nullptr;
+Instruction *IRBuilder::visitImport(const parser::Import *node) {
+    auto *module = this->builder_.LoadModule(node->path);
+
+    if (node->node_type == parser::NodeType::IMPORT) {
+        this->StoreVariable(node->alias, module, true);
+
+        return module;
+    }
+
+    for (auto &name: node->names) {
+        const auto *iname = (parser::ImportName *) name.get();
+
+        const auto offset = (I16) this->builder_.context->PushUnknownProps(iname->name);
+
+        auto *prop = this->builder_.LoadObjectProp(module, offset, true, false);
+
+        this->StoreVariable(iname->alias, prop, true);
+    }
+
+    return module;
 }
 
 Instruction *IRBuilder::visitImportName(parser::ImportName *node) {
-    // TODO: Implement ImportName visitation
     return nullptr;
 }
 

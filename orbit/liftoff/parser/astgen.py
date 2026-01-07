@@ -122,7 +122,7 @@ NODES = {
     "Import": {
         "fields": {
             "path": "orbiter::datatype::ORString*",
-            "alias": "orbiter::datatype::ORString*",
+            "alias": "Symbol*",
             "names": "std::vector<ASTHandle<ASTNode*>>"
         },
         "node_type": ["IMPORT", "IMPORT_FROM"]
@@ -130,7 +130,7 @@ NODES = {
     "ImportName": {
         "fields": {
             "name": "orbiter::datatype::ORString*",
-            "alias": "orbiter::datatype::ORString*"
+            "alias": "Symbol*"
         }
     },
     "Jump": {

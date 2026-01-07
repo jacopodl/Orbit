@@ -67,7 +67,7 @@ namespace liftoff::ir {
 
         Instruction *visitIdentifier(parser::Identifier *node);
 
-        Instruction *visitImport(parser::Import *node);
+        Instruction *visitImport(const parser::Import *node);
 
         Instruction *visitImportName(parser::ImportName *node);
 

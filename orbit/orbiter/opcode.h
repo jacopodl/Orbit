@@ -7,8 +7,6 @@
 
 #include <orbit/datatype.h>
 
-#include <orbit/util/enum_bitmask.h>
-
 namespace orbiter {
     enum class AllocaFlags : U8 {
         DEFAULT,
@@ -196,6 +194,7 @@ namespace orbiter {
         ALLOCA,
 
         LDFUNC, // Create function from Code object:    OPCODE | 4 DST | 4 SRC_CODE | 4 SRC_DARGS | 8 FLAGS | 4 RESERVED
+        LDMOD, // Load module:                          OPCODE | 4 DST | 4 SRC_PATH | 16 RESERVED
 
         // Container object
         NDICT, // Create new dict                   OPCODE | 4 DST | 4 RESERVED | 16 UNSIGNED OFFSET

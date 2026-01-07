@@ -236,6 +236,10 @@ namespace liftoff::ir {
 
         Instruction *LoadImmediate(MachineSize value);
 
+        Instruction *LoadModule(orbiter::datatype::ORString *path);
+
+        Instruction *LoadModule(Instruction *src);
+
         Instruction *LoadNilValue() {
             return this->CreateInstruction<UnaryImmInstr>(orbiter::OPCode::LDCST, (U8) orbiter::LoadConstantMode::NIL);
         }

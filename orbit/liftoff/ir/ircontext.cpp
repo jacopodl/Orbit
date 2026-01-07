@@ -139,6 +139,7 @@ U16 IRContext::PushUnknownProps(const char *id) {
 }
 
 U16 IRContext::PushStaticValue(orbiter::datatype::OObject *value) {
+    // TODO: check if an element equal to the one you are loading already exists!
     if (!this->static_values) {
         this->static_values = orbiter::datatype::ListNew(this->isolate_);
         if (!this->static_values)

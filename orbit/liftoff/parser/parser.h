@@ -96,7 +96,8 @@ namespace liftoff::parser {
         "Invalid 'prot' usage: can only be used within class/trait definitions",
         "Invalid assignment: cannot assign non-assignable expression (e.g., defer, panic, spawn)",
         "Invalid expression: non-value expression (e.g., defer, panic, spawn) cannot be used in value context (e.g., tuple, function argument, binary operation)",
-        "Missing closing parenthesis: expected ')' after exception types"
+        "Missing closing parenthesis: expected ')' after exception types",
+        "Invalid import: module name is not a valid identifier. Use 'as' to provide an alias"
     };
 
     constexpr auto kInitMethodName = "init";
@@ -251,7 +252,7 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseNativeStatement();
 
-        [[nodiscard]] ASTHandle<ASTNode *> ParseNativeFuncStatement(scanner::Position start);
+        [[nodiscard]] ASTHandle<ASTNode *> ParseNativeFuncStatement(const scanner::Position &start);
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseSwitchCase(bool as_if);
 
@@ -341,6 +342,8 @@ namespace liftoff::parser {
         [[nodiscard]] orbiter::datatype::HORString MakeFuncName() const;
 
         void AdjustInlineExport(const Assignment *decl, AccessModifier access, bool weak);
+
+        void CheckSetImportAlias(orbiter::datatype::HORString alias, Import *imp) const;
 
         void ClassCheck(const Construct *clazz) const;
 

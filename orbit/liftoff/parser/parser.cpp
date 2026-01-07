@@ -21,7 +21,7 @@ using namespace liftoff::parser;
 #define TKCUR_START this->tkcur_.loc.start
 #define TKCUR_END   this->tkcur_.loc.end
 
-int PeekPrecedence(TokenType token) {
+int PeekPrecedence(const TokenType token) {
     switch (token) {
         case TokenType::END_OF_LINE:
         case TokenType::END_OF_FILE:
@@ -337,6 +337,8 @@ ASTHandle<ASTNode *> Parser::ParseImportStatement() {
     this->Eat(true);
 
     if (this->Match(TokenType::STRING)) {
+        HORString alias;
+
         auto mod_path = ORStringNew(this->isolate_, this->tkcur_.buffer, this->tkcur_.length);
         if (!mod_path)
             throw DatatypeException();
@@ -355,14 +357,16 @@ ASTHandle<ASTNode *> Parser::ParseImportStatement() {
             if (!this->Match(TokenType::IDENTIFIER))
                 throw ParserException(47);
 
-            imp->alias = ORStringNew(this->isolate_, this->tkcur_.buffer, this->tkcur_.length).release();
-            if (imp->alias == nullptr)
+            alias = ORStringNew(this->isolate_, this->tkcur_.buffer, this->tkcur_.length);
+            if (!alias)
                 throw DatatypeException();
 
             imp->loc.end = TKCUR_LOC.end;
 
             this->Eat(false);
         }
+
+        this->CheckSetImportAlias(alias, imp.get());
 
         return imp;
     }
@@ -371,6 +375,7 @@ ASTHandle<ASTNode *> Parser::ParseImportStatement() {
 
     do {
         auto imp_name = MakeImportName(this->isolate_, TKCUR_LOC);
+        HORString alias;
 
         if (!this->Match(TokenType::IDENTIFIER))
             throw ParserException(46);
@@ -385,12 +390,19 @@ ASTHandle<ASTNode *> Parser::ParseImportStatement() {
             if (!this->Match(TokenType::IDENTIFIER))
                 throw ParserException(47);
 
-            imp_name->alias = ORStringNew(this->isolate_, this->tkcur_.buffer, this->tkcur_.length).release();
-            if (imp_name->alias == nullptr)
+            alias = ORStringNew(this->isolate_, this->tkcur_.buffer, this->tkcur_.length);
+            if (!alias)
                 throw DatatypeException();
 
             this->Eat(true);
         }
+
+        imp_name->alias = this->sym_t_->Declare(!alias ? imp_name->name : alias.get(),
+                                                SymbolType::CONSTANT,
+                                                imp->loc.start.offset);
+
+        if (imp_name->alias == nullptr)
+            throw SymbolTableException();
 
         imp->names.emplace_back(std::move(imp_name));
     } while (this->MatchEat(TokenType::COMMA, true));
@@ -531,7 +543,7 @@ ASTHandle<ASTNode *> Parser::ParseNativeStatement() {
     return variable;
 }
 
-ASTHandle<ASTNode *> Parser::ParseNativeFuncStatement(Position start) {
+ASTHandle<ASTNode *> Parser::ParseNativeFuncStatement(const Position &start) {
     auto func = MakeNativeFunc(this->isolate_, TKCUR_LOC);
 
     func->loc.start = start;
@@ -828,7 +840,7 @@ ASTHandle<ASTNode *> Parser::ParseVarDecl(const Position &start, AccessModifier 
             this->exports.push_back(id_str);
 
         const auto sym = this->sym_t_->Declare(id_str.get(), constant ? SymbolType::CONSTANT : SymbolType::VARIABLE,
-                                         TKCUR_LOC.start.offset);
+                                               TKCUR_LOC.start.offset);
         if (sym == nullptr)
             throw SymbolTableException();
 
@@ -1243,7 +1255,7 @@ ASTHandle<ASTNode *> Parser::ParseExpressionList(ASTHandle<ASTNode *> &left) {
 
     list->elements.emplace_back(left.release());
 
-    Position end;
+    Position end{};
     do {
         this->EatNL();
 
@@ -1306,7 +1318,7 @@ ASTHandle<ASTNode *> Parser::ParseFuncCall(ASTHandle<ASTNode *> &left) {
     this->Eat(true);
 
     if (!this->Match(TokenType::RIGHT_ROUND)) {
-        Position end;
+        Position end{};
         int mode = 0;
 
         do {
@@ -2308,7 +2320,7 @@ void Parser::AdjustInlineExport(const Assignment *decl, AccessModifier access, b
         } else {
             const auto &tuple = (ListExpression *) decl->name;
             for (const auto &cursor: tuple->elements) {
-                const auto *id = (const Identifier *) decl->name;
+                const auto *id = (const Identifier *) cursor.get();
 
                 id->symbol->access = AccessModifier::PUBLIC;
 
@@ -2316,6 +2328,26 @@ void Parser::AdjustInlineExport(const Assignment *decl, AccessModifier access, b
             }
         }
     }
+}
+
+void Parser::CheckSetImportAlias(HORString alias, Import *imp) const {
+    if (!alias) {
+        const auto *mod_name_end = ORSTRING_TO_CSTR(imp->path) + ORSTRING_LENGTH(imp->path);
+        const auto length = ORSTRING_LENGTH(imp->path);
+
+        unsigned int idx = 0;
+        while (idx < length && std::isalnum(*((mod_name_end - idx) - 1)))
+            idx++;
+
+        if (!std::isalpha(*(mod_name_end - idx)))
+            throw ParserException(85);
+
+        alias = ORStringNew(this->isolate_, mod_name_end - idx, idx);
+    }
+
+    imp->alias = this->sym_t_->Declare(alias.get(), SymbolType::CONSTANT, imp->loc.start.offset);
+    if (!imp->alias)
+        throw SymbolTableException();
 }
 
 void Parser::ClassCheck(const Construct *clazz) const {
