@@ -81,6 +81,35 @@ namespace orbiter::datatype {
     bool DictLookup(const Dict *dict, const char *key, HOObject &out_value);
 
     /**
+     * @brief Removes a key-value pair from the dictionary
+     *
+     * This function removes a key and its associated value from the specified dictionary.
+     * If the key exists, its entry is removed and the associated resources are released.
+     * If the key does not exist, no changes are made to the dictionary.
+     *
+     * @param dict Pointer to the dictionary object from which the key-value pair will be removed
+     * @param key Pointer to the key object to be removed
+     *
+     * @return true if the key-value pair was successfully removed, false if the key was not found
+     */
+    bool DictRemove(Dict *dict, OObject *key);
+
+    /**
+     * @brief Removes a key-value pair from the dictionary
+     *
+     * This function removes the entry associated with the specified key from the
+     * given dictionary. If the key exists in the dictionary, the entry is deleted,
+     * and any associated resources are released. If the key does not exist, no
+     * modifications are made to the dictionary.
+     *
+     * @param dict Pointer to the dictionary object from which the key-value pair will be removed
+     * @param key Pointer to the key identifying the entry to be removed
+     *
+     * @return true if the key was found and successfully removed, false otherwise
+     */
+    bool DictRemove(Dict *dict, const char *key);
+
+    /**
      * @brief Set up additional features and properties for the specified type
      *
      * This function enriches the previously created type with various functionalities.

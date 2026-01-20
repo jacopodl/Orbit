@@ -23,8 +23,8 @@ bool orbiter::datatype::DictInsert(Dict *dict, OObject *key, OObject *value) {
     if (entry == nullptr)
         return false;
 
-    entry->key = key;
-    entry->value = value;
+    entry->key = O_INCREF(key);
+    entry->value = O_INCREF(value);
 
     if (!dict->dict.Insert(entry)) {
         dict->dict.FreeHEntry(entry);
@@ -61,6 +61,28 @@ bool orbiter::datatype::DictLookup(const Dict *dict, const char *key, HOObject &
 
     if (okey)
         return DictLookup(dict, (OObject *) okey.get(), out_value);
+
+    return false;
+}
+
+bool orbiter::datatype::DictRemove(Dict *dict, OObject *key) {
+    ORHEntry *out;
+
+    if (!dict->dict.Remove(key, &out))
+        return false;
+
+    O_DECREF(out->key);
+    O_DECREF(out->value);
+
+    dict->dict.FreeHEntry(out);
+
+    return true;
+}
+
+bool orbiter::datatype::DictRemove(Dict *dict, const char *key) {
+    const auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
+    if (okey)
+        return DictRemove(dict, (OObject *) okey.get());
 
     return false;
 }
