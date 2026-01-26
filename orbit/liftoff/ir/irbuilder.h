@@ -105,13 +105,17 @@ namespace liftoff::ir {
 
         Instruction *visitSwitchBlock(const parser::SwitchBlock *node);
 
+        Instruction *visitSyncBlock(const parser::Binary *binary);
+
         Instruction *visitTrap(const parser::Unary *node);
 
-        Instruction *visitTryBlock(parser::TryBlock *node);
+        Instruction *visitTryBlock(const parser::TryBlock *node);
 
         Instruction *visitUnary(const parser::Unary *node);
 
         Instruction *visitUpdate(const parser::Unary *node);
+
+        Instruction *visitYield(const parser::Unary *unary);
 
         unsigned int ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,
                                            orbiter::LoadFuncFlags &f_flags);

@@ -139,7 +139,9 @@ namespace liftoff {
         }
 
         [[nodiscard]] U16 GetParameterCount() const {
-            assert(this->type == ScopeType::FUNCTION || this->type == ScopeType::NATIVE_FUNC);
+            assert(this->type == ScopeType::FUNCTION
+                || this->type == ScopeType::GENERATOR
+                || this->type == ScopeType::NATIVE_FUNC);
 
             return this->parameter_count;
         }

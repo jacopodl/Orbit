@@ -21,11 +21,11 @@ BasicBlock *Builder::AddInstruction(Instruction *instruction) {
     return bb;
 }
 
-const PhysInstruction *Builder::GetLastInstructionMatch(OPCode opcode) const noexcept {
+PhysInstruction *Builder::GetLastInstructionMatch(OPCode opcode) const noexcept {
     if (this->context->current_ == nullptr)
         return nullptr;
 
-    const auto *instr = (PhysInstruction *) this->context->current_->instr.tail;
+    auto *instr = (PhysInstruction *) this->context->current_->instr.tail;
 
     if (instr == nullptr || instr->type() != ObjectType::INSTRUCTION || instr->opcode != opcode)
         return nullptr;
@@ -294,6 +294,46 @@ Instruction *Builder::CreateUnaryOp(const OPCode opcode, Instruction *s_reg) {
 
 Instruction *Builder::CreateUnaryOp(const OPCode opcode, const U16 imm, const U8 flags) {
     return this->CreateInstruction<UnaryImmInstr>(opcode, flags, imm);
+}
+
+Instruction *Builder::CreateYield(Instruction *s_reg) {
+    const auto *cursor = this->context->j_chain;
+
+    while (cursor != nullptr) {
+        if (cursor->type == JBlockType::SYNC)
+            this->CreateUnaryOp(OPCode::SYNC_EXIT, cursor->value);
+
+        cursor = cursor->prev;
+    }
+
+    cursor = this->context->j_chain;
+    while (cursor != nullptr) {
+        if (cursor->type == JBlockType::TCF)
+            this->CreateUnaryOp(OPCode::TEND);
+
+        cursor = cursor->prev;
+    }
+
+    auto *res = this->CreateInstruction<UnaryOpInstr>(OPCode::YLD, s_reg);
+
+    cursor = this->context->j_chain;
+    while (cursor != nullptr) {
+        if (cursor->type == JBlockType::TCF)
+            this->SetupTryCatch(cursor->alt, cursor->end);
+
+        cursor = cursor->prev;
+    }
+
+    // Restore SYNC
+    cursor = this->context->j_chain;
+    while (cursor != nullptr) {
+        if (cursor->type == JBlockType::SYNC)
+            this->CreateUnaryOp(OPCode::SYNC_ENTER, cursor->value);
+
+        cursor = cursor->prev;
+    }
+
+    return res;
 }
 
 Instruction *Builder::FindAndCreateAppropriateLoad(Instruction *src) {

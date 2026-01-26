@@ -593,19 +593,8 @@ Instruction *IRBuilder::visitBinary(parser::Binary *node) {
             right = this->visit(node->right);
 
             return this->builder_.CreateBinaryOpFlags(orbiter::OPCode::MEMB, (U8) flags, left, right);
-        case parser::NodeType::SYNC_BLOCK: {
-            left = this->visit(node->left);
-
-            const JBlock _(&this->builder_, left);
-
-            this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_ENTER, left);
-
-            this->visit(node->right);
-
-            this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_EXIT, left);
-
-            return nullptr;
-        }
+        case parser::NodeType::SYNC_BLOCK:
+            return this->visitSyncBlock(node);
         default:
             assert(false);
     }
@@ -1325,6 +1314,31 @@ Instruction *IRBuilder::visitSwitchBlock(const parser::SwitchBlock *node) {
     return nullptr;
 }
 
+Instruction *IRBuilder::visitSyncBlock(const parser::Binary *binary) {
+    if (!((parser::Block *) binary->right)->statements.empty()) {
+        auto *left = this->visit(binary->left);
+
+        const JBlock _(&this->builder_, left);
+
+        this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_ENTER, left);
+
+        this->visit(binary->right);
+
+        // This is used when you're after a Yield. Before Yield, the lock is released and reacquired
+        // upon function re-entry. If the block is empty, remove the lock acquisition entirely.
+        auto *last_i = this->builder_.GetLastInstructionMatch(orbiter::OPCode::SYNC_ENTER);
+        if (last_i != nullptr) {
+            this->builder_.context->DeleteInstruction(last_i);
+
+            return nullptr;
+        }
+
+        this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_EXIT, left);
+    }
+
+    return nullptr;
+}
+
 Instruction *IRBuilder::visitTrap(const parser::Unary *node) {
     auto *finally_block = this->builder_.CreateBasicBlock();
 
@@ -1341,7 +1355,7 @@ Instruction *IRBuilder::visitTrap(const parser::Unary *node) {
     return ret;
 }
 
-Instruction *IRBuilder::visitTryBlock(parser::TryBlock *node) {
+Instruction *IRBuilder::visitTryBlock(const parser::TryBlock *node) {
     BasicBlock *catch_ctl = nullptr;
     BasicBlock *finally_block = nullptr;
 
@@ -1355,6 +1369,7 @@ Instruction *IRBuilder::visitTryBlock(parser::TryBlock *node) {
     this->builder_.SetupTryCatch(catch_ctl, finally_block);
 
     JBlock ctx(&this->builder_, JBlockType::TCF);
+    ctx.alt = catch_ctl;
     ctx.end = finally_block;
 
     this->sym_t_->EnterNestedScope(node->try_block->loc.start.offset);
@@ -1476,11 +1491,11 @@ Instruction *IRBuilder::visitUnary(const parser::Unary *node) {
             return this->visitNilSafety(node);
         case parser::NodeType::UPDATE:
             return this->visitUpdate(node);
+        case parser::NodeType::YIELD:
+            return this->visitYield(node);
         default:
             assert(false); // Never get here
     }
-
-    // TODO: yield
 
     return nullptr;
 }
@@ -1523,6 +1538,14 @@ Instruction *IRBuilder::visitUpdate(const parser::Unary *node) {
     this->builder_.CreateIndexStore(last_load, post);
 
     return value;
+}
+
+Instruction *IRBuilder::visitYield(const parser::Unary *unary) {
+    auto *value = unary->value != nullptr
+                      ? this->visit(unary->value)
+                      : this->builder_.LoadNilValue();
+
+    return this->builder_.CreateYield(value);
 }
 
 unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,

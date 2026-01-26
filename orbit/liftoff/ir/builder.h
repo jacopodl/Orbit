@@ -71,19 +71,6 @@ namespace liftoff::ir {
             return instr;
         }
 
-        /**
-         * @brief Retrieves the last instruction with the specified opcode.
-         *
-         * This method searches the current basic block for the last instruction that matches
-         * the given opcode and returns it if found. If no matching instruction exists or
-         * the current context is null, it returns a null pointer.
-         *
-         * @param opcode The opcode to match while searching for the instruction.
-         * @return A pointer to the last instruction matching the specified opcode,
-         *         or null if no such instruction exists.
-         */
-        [[nodiscard]] const PhysInstruction *GetLastInstructionMatch(orbiter::OPCode opcode) const noexcept;
-
         void UpdateStackSize(const U16 size) const noexcept {
             this->context->stack_push_count += size;
 
@@ -203,6 +190,8 @@ namespace liftoff::ir {
             return this->CreateUnaryOp(opcode, 0, 0);
         }
 
+        Instruction *CreateYield(Instruction *s_reg);
+
         Instruction *FindAndCreateAppropriateLoad(Instruction *src);
 
         Instruction *LoadAtomConstant(const char *string);
@@ -299,6 +288,20 @@ namespace liftoff::ir {
         Instruction *StoreToStackOffset(Instruction *src, U8 r_base, I16 offset);
 
         PhiInstr *CreatePhi();
+
+        /**
+         * @brief Retrieves the last instruction with the specified opcode.
+         *
+         * This method searches the current basic block for the last instruction that matches
+         * the given opcode and returns it if found. If no matching instruction exists or
+         * the current context is null, it returns a null pointer.
+         *
+         * @param opcode The opcode to match while searching for the instruction.
+         * @return A pointer to the last instruction matching the specified opcode,
+         *         or null if no such instruction exists.
+         */
+        [[nodiscard]] PhysInstruction *GetLastInstructionMatch(orbiter::OPCode opcode) const noexcept;
+
 
         /**
          * @brief Adds an instruction to the current basic block.
