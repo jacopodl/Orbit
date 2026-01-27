@@ -801,6 +801,9 @@ Instruction *IRBuilder::visitFunction(const parser::Function *node) {
     if (node->node_type == parser::NodeType::INIT)
         f_flags |= orbiter::LoadFuncFlags::INIT;
 
+    if (node->symbol->scope->type == ScopeType::GENERATOR)
+        f_flags |= orbiter::LoadFuncFlags::GENERATOR;
+
     const auto params_count = this->ProcessFunctionParams(node, def_args, f_flags);
 
     if (!this->sym_t_->EnterScope(node->name))
