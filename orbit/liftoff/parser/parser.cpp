@@ -1322,7 +1322,7 @@ ASTHandle<ASTNode *> Parser::ParseExprOrTuple() {
 ASTHandle<ASTNode *> Parser::ParseFunc() {
     const auto start = TKCUR_START;
 
-    return this->ParseFunction(start, true, AccessModifier::PRIVATE);
+    return this->ParseFunction(start, false, AccessModifier::PRIVATE);
 }
 
 ASTHandle<ASTNode *> Parser::ParseFuncCall(ASTHandle<ASTNode *> &left) {
@@ -1848,7 +1848,10 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 stmt = this->ParseForInStatement();
                 break;
             case TokenType::KW_FUNC: {
-                stmt = this->ParseFunction(start, false, access);
+                if (this->context_->Check(ContextType::CLASS) || this->context_->Check(ContextType::TRAIT))
+                    stmt = this->ParseFunction(start, true, access);
+                else
+                    stmt = this->ParseExpression(); // Use expression version
                 break;
             }
             case TokenType::KW_IF:
@@ -2019,7 +2022,7 @@ ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
     return decl;
 }
 
-ASTHandle<Function *> Parser::ParseFunction(const Position &start, const bool inl, const AccessModifier access) {
+ASTHandle<Function *> Parser::ParseFunction(const Position &start, const bool must_named, const AccessModifier access) {
     Context isolate(this, ContextType::FUNC);
 
     const auto loc = TKCUR_LOC;
@@ -2032,10 +2035,7 @@ ASTHandle<Function *> Parser::ParseFunction(const Position &start, const bool in
 
     this->Eat(true);
 
-    if (!inl) {
-        if (!this->Match(TokenType::IDENTIFIER))
-            throw ParserException(16);
-
+    if (this->Match(TokenType::IDENTIFIER)) {
         auto id_name = ORStringNew(this->isolate_, this->tkcur_.buffer, this->tkcur_.length);
         if (!id_name)
             throw DatatypeException();
@@ -2044,6 +2044,9 @@ ASTHandle<Function *> Parser::ParseFunction(const Position &start, const bool in
 
         this->Eat(true);
     } else {
+        if (must_named)
+            throw ParserException(88);
+
         func->name = this->MakeFuncName().release();
         func->anon = true;
     }
@@ -2055,19 +2058,10 @@ ASTHandle<Function *> Parser::ParseFunction(const Position &start, const bool in
     if (sym == nullptr)
         throw SymbolTableException();
 
-    if (inl)
+    if (func->anon)
         sym->flags |= SymbolFlags::ANON;
 
     sym->access = access;
-
-    if (!func->constant && (this->context_->CheckBack(ContextType::CLASS)
-                            || this->context_->CheckBack(ContextType::TRAIT))) {
-        func->params.emplace_back(std::move(this->PushSelfParam(loc)));
-
-        func->method = true;
-
-        sym->type = SymbolType::METHOD;
-    }
 
     Loc last_param{};
     auto params = this->ParseFuncParams(last_param);
@@ -2095,6 +2089,15 @@ ASTHandle<Function *> Parser::ParseFunction(const Position &start, const bool in
             func->constant = true;
         } else
             throw ParserException(0);
+    }
+
+    if (!func->constant && (this->context_->CheckBack(ContextType::CLASS)
+                            || this->context_->CheckBack(ContextType::TRAIT))) {
+        func->params.insert(func->params.begin(), std::move(this->PushSelfParam(loc)));
+
+        func->method = true;
+
+        sym->type = SymbolType::METHOD;
     }
 
     this->IgnoreNewLineIF(TokenType::LEFT_BRACES);

@@ -99,7 +99,8 @@ namespace liftoff::parser {
         "Missing closing parenthesis: expected ')' after exception types",
         "Invalid import: module name is not a valid identifier. Use 'as' to provide an alias",
         "Invalid native function call arity",
-        "Invalid call to a native variable"
+        "Invalid call to a native variable",
+        "Invalid function declaration: anonymous functions are not allowed in this context"
     };
 
     constexpr auto kInitMethodName = "init";
@@ -326,7 +327,7 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseWalrus(ASTHandle<ASTNode *> &left);
 
-        [[nodiscard]] ASTHandle<Function *> ParseFunction(const scanner::Position &start, bool inl,
+        [[nodiscard]] ASTHandle<Function *> ParseFunction(const scanner::Position &start, bool must_named,
                                                           AccessModifier access);
 
         [[nodiscard]] ASTHandle<Parameter *> ParseParameter(const scanner::Position &start, NodeType type);
