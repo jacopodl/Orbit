@@ -187,6 +187,9 @@ Instruction *Builder::CreateJump(BasicBlock *destination) {
 }
 
 Instruction *Builder::CreateJumpIfETypeMatch(Instruction *src, BasicBlock *catch_block) {
+    if (src == nullptr)
+        src = this->LoadNilValue();
+
     auto *jmp = this->CreateInstruction<BranchInstruction>(OPCode::JERR, src, catch_block);
 
     this->context->current_->alt = catch_block;
