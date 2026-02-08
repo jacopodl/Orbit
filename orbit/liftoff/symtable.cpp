@@ -6,44 +6,197 @@
 
 #include <orbit/liftoff/symtable.h>
 
-using namespace orbiter::datatype;
 using namespace liftoff;
+using namespace orbiter::datatype;
 
-bool SymbolTable::DeclareNestedScope(const MSize offset) noexcept {
+Scope *Scope::New(orbiter::Isolate *isolate, const MSize line_start) noexcept {
+    orbiter::memory::IsolateAllocator allocator(isolate);
+
+    auto *scope = allocator.alloc<Scope>(sizeof(Scope));
+    if (scope != nullptr) {
+        new(scope)Scope(isolate, line_start);
+
+        if (!scope->scope.symbols.Initialize()) {
+            allocator.FreeObject(scope);
+
+            return nullptr;
+        }
+
+        scope->active = &scope->scope;
+    }
+
+    return scope;
+}
+
+Symbol *SymbolTable::SymbolNew(ORString *name, const SymbolType type, const StorageLocation location,
+                               const MSize offset) noexcept {
+    orbiter::memory::IsolateAllocator allocator(isolate);
+
+    auto *symbol = allocator.calloc<Symbol>(sizeof(Symbol));
+    if (symbol == nullptr) {
+        this->status = SymbolTableError::MEMORY_ERROR;
+
+        return nullptr;
+    }
+
+    symbol->next = nullptr;
+    symbol->decl_scope = this->scope;
+    symbol->defining_scope = nullptr;
+    symbol->name = O_FAST_INCREF(name);
+    symbol->decl_offset = offset;
+    symbol->access = AccessModifier::PRIVATE;
+    symbol->location = location;
+
+    symbol->type = type;
+    symbol->offset = 0;
+    symbol->nesting = this->scope->active->nesting;
+
+    if (location == StorageLocation::AUTO) {
+        switch (this->scope->type) {
+            case ScopeType::FUNCTION:
+            case ScopeType::NATIVE_FUNC:
+                symbol->location = StorageLocation::STACK;
+                break;
+            case ScopeType::MODULE:
+                symbol->location = StorageLocation::MODULE;
+                break;
+            case ScopeType::CLASS:
+            case ScopeType::TRAIT:
+                symbol->location = StorageLocation::SLOTS;
+                break;
+        }
+    }
+
+    return symbol;
+}
+
+void SymbolTable::ScopeDel(Scope *target) const noexcept {
+    // The Scope destructor is not used directly because IsolateAllocator is required to release SubScope resources.
+    // The allocator is not stored as a member to minimize memory footprint.
+    const orbiter::memory::IsolateAllocator allocator(this->isolate);
+
+    assert(target->scope.next_sibling == nullptr);
+
+    this->SubScopeDel(&target->scope, false);
+
+    target->~Scope();
+
+    allocator.free(target);
+}
+
+void SymbolTable::SubScopeDel(SubScope *sub_scope, const bool r_memory) const noexcept {
+    sub_scope->symbols.Finalize([this](const STHEntry *entry) {
+        O_FAST_DECREF(entry->key);
+
+        this->SymbolDel(entry->value);
+    });
+
+    auto *next = sub_scope->child;
+    for (auto cursor = next; cursor != nullptr; cursor = next) {
+        next = cursor->next_sibling;
+
+        this->SubScopeDel(cursor, true);
+    }
+
+    if (r_memory) {
+        const orbiter::memory::IsolateAllocator allocator(this->isolate);
+        allocator.free(sub_scope);
+    }
+}
+
+void SymbolTable::SymbolDel(Symbol *symbol) const noexcept {
+    if (symbol == nullptr)
+        return;
+
+    const orbiter::memory::IsolateAllocator allocator(this->isolate);
+
+    while (symbol != nullptr) {
+        O_FAST_DECREF(symbol->name);
+
+        if (symbol->defining_scope != nullptr)
+            this->ScopeDel(symbol->defining_scope);
+
+        auto *tmp = symbol->next;
+
+        allocator.free(symbol);
+
+        symbol = tmp;
+    }
+}
+
+// PUBLIC:
+
+bool SymbolTable::CreateNestedScope(const MSize offset) noexcept {
     orbiter::memory::IsolateAllocator allocator(this->isolate);
 
     auto *active = this->scope->active;
 
     auto *sub = allocator.alloc<SubScope>(sizeof(SubScope));
-    if (sub != nullptr) {
-        new(sub)SubScope(this->isolate);
+    if (sub == nullptr) {
+        this->status = SymbolTableError::MEMORY_ERROR;
 
-        if (!sub->symbols.Initialize(kSTMapSubscopeCapacity)) {
-            this->status = SymbolTableError::MEMORY_ERROR;
-
-            allocator.free(sub);
-
-            return false;
-        }
-
-        sub->parent = active;
-        sub->offset_start = offset;
-        sub->nesting = active->nesting + 1;
-
-        if (active->sibling != nullptr) {
-            for (auto *cursor = active->sibling; cursor != nullptr; cursor = cursor->next) {
-                if (cursor->next == nullptr) {
-                    cursor->next = sub;
-                    break;
-                }
-            }
-        } else
-            active->sibling = sub;
+        return false;
     }
+
+    new(sub)SubScope(this->isolate);
+    if (!sub->symbols.Initialize(kSTMapSubscopeCapacity)) {
+        this->status = SymbolTableError::MEMORY_ERROR;
+
+        allocator.free(sub);
+
+        return false;
+    }
+
+    sub->parent = active;
+    sub->offset.start = offset;
+    sub->nesting = active->nesting + 1;
+
+    if (active->child != nullptr) {
+        for (auto *cursor = active->child; cursor != nullptr; cursor = cursor->next_sibling) {
+            if (cursor->next_sibling == nullptr) {
+                cursor->next_sibling = sub;
+
+                break;
+            }
+        }
+    } else
+        active->child = sub;
 
     this->scope->active = sub;
 
     return true;
+}
+
+bool SymbolTable::EnterNestedScope(const MSize offset) const noexcept {
+    const auto active = this->scope->active;
+    SubScope *target = nullptr;
+
+    if (offset >= active->offset.start && offset < active->offset.end) {
+        bool changed = true;
+
+        target = active;
+
+        while (changed && target != nullptr && target->child != nullptr) {
+            changed = false;
+
+            for (auto *cursor = target->child; cursor != nullptr; cursor = cursor->next_sibling) {
+                if (offset >= cursor->offset.start && offset < cursor->offset.end) {
+                    target = cursor;
+                    changed = true;
+
+                    break;
+                }
+            }
+        }
+    }
+
+    if (target != nullptr) {
+        this->scope->active = target;
+
+        return true;
+    }
+
+    return false;
 }
 
 bool SymbolTable::EnterScope(ORString *name) noexcept {
@@ -55,137 +208,28 @@ bool SymbolTable::EnterScope(ORString *name) noexcept {
         return false;
     }
 
-    if (entry->value->scope == nullptr) {
+    if (entry->value->defining_scope == nullptr) {
         this->status = SymbolTableError::SCOPE_NOT_FOUND;
 
         return false;
     }
 
-    entry->value->scope->back = this->scope;
-
-    this->scope = entry->value->scope;
+    this->scope = entry->value->defining_scope;
 
     return true;
 }
 
-bool SymbolTable::EnterScope(const char *name) noexcept {
-    const auto o_name = ORStringNew(this->isolate, name);
-    if (!o_name) {
-        this->status = SymbolTableError::MEMORY_ERROR;
-        return false;
-    }
-
-    return this->EnterScope(o_name.get());
-}
-
-bool SymbolTable::EnterNestedScope(const MSize offset) const noexcept {
-    const auto active = this->scope->active;
-    SubScope *target = nullptr;
-
-    if (offset >= active->offset_start && offset < active->offset_end) {
-        bool changed = true;
-
-        target = active;
-
-        while (changed && target != nullptr && target->sibling != nullptr) {
-            changed = false;
-
-            for (auto *cursor = target->sibling; cursor != nullptr; cursor = cursor->next) {
-                if (offset >= cursor->offset_start && offset < cursor->offset_end) {
-                    target = cursor;
-                    changed = true;
-                }
-            }
-        }
-    }
-
-    if (target != nullptr) {
-        this->scope->active = target;
-        return true;
-    }
-
-    return false;
-}
-
-const char *SymbolTable::GetStatusMessage() const {
-    static const char *messages[] = {
-        "no error",
-        "memory allocation failed",
-        "scope not found",
-        "symbol already exists",
-        "symbol not found"
-    };
-
-    return messages[(int) this->status];
-}
-
-Scope *SymbolTable::ScopeNew(const MSize line_start) const noexcept {
-    orbiter::memory::IsolateAllocator allocator(this->isolate);
-
-    auto *scope = allocator.alloc<Scope>(sizeof(Scope));
-    if (scope != nullptr) {
-        new(scope)Scope(isolate, line_start);
-
-        if (!scope->sub_scope.symbols.Initialize()) {
-            scope->~Scope();
-
-            allocator.free(scope);
-
-            return nullptr;
-        }
-
-        scope->active = &scope->sub_scope;
-    }
-
-    return scope;
-}
-
-Symbol *SymbolTable::SymbolNew(ORString *name, const SymbolType type, const MSize offset) noexcept {
-    orbiter::memory::IsolateAllocator allocator(isolate);
-
-    auto *symbol = allocator.calloc<Symbol>(sizeof(Symbol));
-    if (symbol == nullptr) {
-        this->status = SymbolTableError::MEMORY_ERROR;
-
-        return nullptr;
-    }
-
-    symbol->defining_scope = this->scope;
-
-    symbol->name = O_FAST_INCREF(name);
-
-    symbol->type = type;
-    symbol->decl_offset = offset;
-
-    symbol->offset = 0;
-    symbol->stack_offset = 0;
-
-    symbol->tdz = false;
-
-    if (type != SymbolType::UNKNOWN && type != SymbolType::ECONST) {
-        if (type == SymbolType::PARAMETER)
-            symbol->offset = this->scope->parameter_count++;
-        else if (type == SymbolType::CONSTANT || type == SymbolType::CLASS || type == SymbolType::TRAIT)
-            symbol->offset = this->scope->static_offset++;
-    }
-
-    symbol->nesting = this->scope->active->nesting;
-
-    return symbol;
-}
-
-
-Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const MSize offset) noexcept {
+Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const StorageLocation location,
+                             const MSize offset) noexcept {
     auto *table = this->scope->active;
 
     STHEntry *entry;
-
     if (table->symbols.Lookup(name, &entry)) {
         auto *value = entry->value;
 
         if (value->decl_offset != offset) {
             if (value->type == SymbolType::UNKNOWN) {
-                value->next = this->SymbolNew(name, type, offset);
+                value->next = this->SymbolNew(name, type, location, offset);
                 if (value->next == nullptr) {
                     this->status = SymbolTableError::MEMORY_ERROR;
                     return nullptr;
@@ -199,7 +243,6 @@ Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const MSize 
         }
 
         value->type = type;
-
         return value;
     }
 
@@ -209,7 +252,7 @@ Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const MSize 
     }
 
     entry->key = O_FAST_INCREF(name);
-    entry->value = this->SymbolNew(name, type, offset);
+    entry->value = this->SymbolNew(name, type, location, offset);
     if (entry->value == nullptr) {
         O_FAST_DECREF(entry->key);
 
@@ -229,28 +272,29 @@ Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const MSize 
     return entry->value;
 }
 
-Symbol *SymbolTable::Declare(const char *name, const SymbolType type, const MSize offset) noexcept {
+Symbol *SymbolTable::Declare(const char *name, const SymbolType type, const StorageLocation location,
+                             const MSize offset) noexcept {
     const auto o_name = ORStringNew(this->isolate, name);
     if (!o_name) {
         this->status = SymbolTableError::MEMORY_ERROR;
         return nullptr;
     }
 
-    return this->Declare(o_name.get(), type, offset);
+    return this->Declare(o_name.get(), type, location, offset);
 }
 
 Symbol *SymbolTable::DeclareSymbolScope(ORString *name, const SymbolType type, const MSize offset,
                                         const MSize line_start) noexcept {
     auto *table = this->scope->active;
 
-    STHEntry *entry;
-
     auto *sym = this->Declare(name, type, offset);
     if (sym == nullptr)
         return nullptr;
 
-    auto *scope = this->ScopeNew(line_start);
-    if (scope == nullptr) {
+    auto *new_scope = Scope::New(this->isolate, line_start);
+    if (new_scope == nullptr) {
+        STHEntry *entry;
+
         if (table->symbols.Remove(sym->name, &entry)) {
             O_FAST_DECREF(entry->key);
 
@@ -262,31 +306,31 @@ Symbol *SymbolTable::DeclareSymbolScope(ORString *name, const SymbolType type, c
         return nullptr;
     }
 
+    new_scope->back = this->scope;
+
     switch (type) {
         case SymbolType::CLASS:
-            scope->type = ScopeType::CLASS;
+            new_scope->type = ScopeType::CLASS;
             break;
         case SymbolType::TRAIT:
-            scope->type = ScopeType::TRAIT;
+            new_scope->type = ScopeType::TRAIT;
             break;
         case SymbolType::FUNC:
         case SymbolType::METHOD:
-            scope->type = ScopeType::FUNCTION;
+            new_scope->type = ScopeType::FUNCTION;
             break;
         case SymbolType::MODULE:
             assert(false);
         case SymbolType::NATIVE_FUNC:
-            scope->type = ScopeType::NATIVE_FUNC;
+            new_scope->type = ScopeType::NATIVE_FUNC;
             break;
         default:
             break;
     }
 
-    sym->scope = scope;
+    sym->defining_scope = new_scope;
 
-    scope->back = this->scope;
-
-    this->scope = scope;
+    this->scope = new_scope;
 
     return sym;
 }
@@ -302,44 +346,41 @@ Symbol *SymbolTable::DeclareSymbolScope(const char *name, const SymbolType type,
     return this->DeclareSymbolScope(o_name.get(), type, offset, line_start);
 }
 
-Symbol *SymbolTable::Lookup(ORString *name, const MSize offset, const bool class_prop) noexcept {
-    STHEntry *entry;
-
-    const auto *scope = this->scope;
+Symbol *SymbolTable::Lookup(ORString *name, const MSize offset) noexcept {
+    const auto *cursor = this->scope;
 
     /*
      * Prevent looking up variables inside a class/trait scope unless 'self' is used.
      * Search in class/trait scope only if the current scope is a class/trait,
      * otherwise skip class/trait scopes while climbing the hierarchy.
      */
-    const auto from_clazz = scope->type == ScopeType::CLASS || scope->type == ScopeType::TRAIT || class_prop;
+    const auto include_members = cursor->type == ScopeType::CLASS || cursor->type == ScopeType::TRAIT;
+    while (cursor != nullptr) {
+        const auto *inner_scope = cursor->active;
+        while (inner_scope != nullptr) {
+            if (!include_members && (cursor->type == ScopeType::CLASS || cursor->type == ScopeType::TRAIT)) {
+                inner_scope = inner_scope->parent;
+                continue;
+            }
 
-    while (class_prop && scope != nullptr && (scope->type != ScopeType::CLASS && scope->type != ScopeType::TRAIT))
-        scope = scope->back;
-
-    while (scope != nullptr) {
-        const auto *s_scope = scope->active;
-
-        while (s_scope != nullptr) {
-            if ((from_clazz || (scope->type != ScopeType::CLASS
-                                && scope->type != ScopeType::TRAIT))
-                && s_scope->symbols.Lookup(name, &entry)) {
+            STHEntry *entry;
+            if (inner_scope->symbols.Lookup(name, &entry)) {
                 auto *sym = entry->value;
 
-                if (from_clazz)
+                if (include_members)
                     return sym;
 
                 if (sym->next != nullptr && sym->next->decl_offset <= offset)
                     sym = sym->next;
 
-                if (!sym->tdz && s_scope->nesting >= sym->nesting && sym->decl_offset <= offset)
+                if (ENUMBITMASK_ISTRUE(sym->flags, SymbolFlags::INITIALIZED) && sym->decl_offset <= offset)
                     return sym;
             }
 
-            s_scope = s_scope->parent;
+            inner_scope = inner_scope->parent;
         }
 
-        scope = scope->back;
+        cursor = cursor->back;
     }
 
     this->status = SymbolTableError::SYMBOL_NOT_FOUND;
@@ -359,25 +400,15 @@ Symbol *SymbolTable::Lookup(const char *name, const MSize offset) noexcept {
 Symbol *SymbolTable::LookupInsert(ORString *name, const MSize offset) noexcept {
     auto *sym = this->Lookup(name, offset);
     if (sym != nullptr && sym->type != SymbolType::UNKNOWN) {
-        if ((sym->type != SymbolType::FUNC && sym->type != SymbolType::VARIABLE && sym->type != SymbolType::PARAMETER)
-            || sym->defining_scope == nullptr
-            || this->scope == sym->defining_scope
-            || sym->defining_scope->type != ScopeType::FUNCTION)
+        const auto needs_closure = (sym->type == SymbolType::FUNC
+                                    || sym->type == SymbolType::VARIABLE
+                                    || sym->type == SymbolType::PARAMETER)
+                                   && this->scope != sym->decl_scope
+                                   && sym->decl_scope->type == ScopeType::FUNCTION;
+        if (!needs_closure)
             return sym;
 
-        if (sym->type == SymbolType::PARAMETER)
-            sym->stack_offset = sym->offset;
-
-        sym->flags |= SymbolFlags::UPVALUE;
-
-        if (this->c_offset == nullptr)
-            this->c_offset = &sym->defining_scope->closure_offset;
-
-        sym->offset = *this->c_offset;
-
-        *this->c_offset += 1;
-
-        this->scope->closure = true;
+        sym->location = StorageLocation::CLOSURE;
 
         return sym;
     }
@@ -400,6 +431,37 @@ Symbol *SymbolTable::LookupInsert(const char *name, const MSize offset) noexcept
     return this->LookupInsert(o_name.get(), offset);
 }
 
+Symbol *SymbolTable::LookupMember(ORString *name) {
+    auto class_scope = this->scope;
+    while (class_scope != nullptr
+           && (class_scope->type != ScopeType::CLASS && class_scope->type != ScopeType::TRAIT))
+        class_scope = class_scope->back;
+
+    assert(class_scope != nullptr);
+
+    const auto *inner_scope = class_scope->active;
+    while (inner_scope != nullptr) {
+        STHEntry *entry;
+        if (inner_scope->symbols.Lookup(name, &entry))
+            return entry->value;
+
+        inner_scope = inner_scope->parent;
+    }
+
+    this->status = SymbolTableError::SYMBOL_NOT_FOUND;
+    return nullptr;
+}
+
+Symbol *SymbolTable::LookupMember(const char *name) noexcept {
+    const auto o_name = ORStringNew(this->isolate, name);
+    if (!o_name) {
+        this->status = SymbolTableError::MEMORY_ERROR;
+        return nullptr;
+    }
+
+    return this->LookupMember(o_name.get());
+}
+
 SymbolTable *SymbolTable::New(orbiter::Isolate *isolate) noexcept {
     orbiter::memory::IsolateAllocator allocator(isolate);
 
@@ -407,108 +469,43 @@ SymbolTable *SymbolTable::New(orbiter::Isolate *isolate) noexcept {
     if (table != nullptr) {
         new(table)SymbolTable(isolate);
 
-        auto *scope = table->ScopeNew(0);
-        if (scope == nullptr) {
+        table->scope = Scope::New(isolate, 0);
+        if (table->scope == nullptr) {
             allocator.free(table);
 
             return nullptr;
         }
 
-        scope->type = ScopeType::MODULE;
-
-        table->scope = scope;
-
         table->isolate = isolate;
-
-        table->status = SymbolTableError::OK;
     }
 
     return table;
 }
 
-void SymbolTable::ComputeLocalVarOffset(const SubScope *s_scope) const noexcept {
-    for (auto s_cursor = s_scope; s_cursor != nullptr; s_cursor = s_cursor->next) {
-        bool sibling = false;
-
-        for (auto cursor = s_cursor->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next) {
-            auto *value = cursor->value;
-            while (value != nullptr && ENUMBITMASK_ISFALSE(value->flags, SymbolFlags::ANON)) {
-                if (s_cursor->sibling != nullptr && value->decl_offset > s_cursor->sibling->offset_start) {
-                    const auto g_offset = this->scope->global_offset;
-                    const auto l_offset = this->scope->local_variables;
-
-                    this->ComputeLocalVarOffset(s_scope->sibling);
-
-                    sibling = true;
-
-                    this->scope->global_offset = g_offset;
-                    this->scope->local_variables = l_offset;
-                }
-
-                if ((value->type == SymbolType::VARIABLE
-                     || value->type == SymbolType::FUNC
-                     || value->type == SymbolType::METHOD))
-                    value->offset = this->scope->local_variables++;
-
-                if (value->type != SymbolType::ECONST
-                    && value->type != SymbolType::LABEL
-                    && value->type != SymbolType::MODULE
-                    && value->type != SymbolType::PARAMETER
-                    && value->type != SymbolType::UNKNOWN) {
-                    if (value->defining_scope->type != ScopeType::CLASS)
-                        value->offset = this->scope->global_offset++;
-                }
-
-                if (value->type == SymbolType::UNKNOWN)
-                    value->offset = this->scope->unknown_variables++;
-
-                value = value->next;
-            }
-        }
-
-        if (!sibling && s_cursor->sibling != nullptr)
-            this->ComputeLocalVarOffset(s_cursor->sibling);
-    }
-}
-
-void SymbolTable::Delete(SymbolTable *table) noexcept {
-    if (table == nullptr)
-        return;
-
-    const orbiter::memory::IsolateAllocator allocator(table->isolate);
-
-    table->~SymbolTable();
-
-    allocator.free(table);
-}
-
 void SymbolTable::LeaveNestedScope(const MSize offset) const noexcept {
-    this->scope->active->offset_end = offset;
+    this->scope->active->offset.end = offset;
 
     this->scope->active = this->scope->active->parent;
 }
 
+void SymbolTable::LeaveNestedScope() const noexcept {
+    this->scope->active = this->scope->active->parent;
+}
+
 void SymbolTable::LeaveScope(const MSize offset, const MSize line_end) noexcept {
+    auto *current = this->scope;
+
+    current->active = &current->scope;
+
+    current->scope.offset.end = offset;
+    current->line.end = line_end;
+
+    // fixme this->ComputeLocalVarOffset(current->active);
+
+    if (this->scope->type != ScopeType::MODULE)
+        this->scope = current->back;
+
     this->status = SymbolTableError::OK;
-
-    auto *c_scope = this->scope;
-
-    c_scope->active = &c_scope->sub_scope;
-
-    c_scope->sub_scope.offset_end = offset;
-    c_scope->line_end = line_end;
-
-    this->ComputeLocalVarOffset(c_scope->active);
-
-    if (this->c_offset == &c_scope->closure_offset)
-        this->c_offset = nullptr;
-
-    if (this->scope->type != ScopeType::MODULE) {
-        this->scope = c_scope->back;
-
-        if (this->scope->type == ScopeType::FUNCTION && this->scope->back->type == ScopeType::FUNCTION)
-            this->scope->closure = c_scope->closure;
-    }
 }
 
 void SymbolTable::LeaveScope() noexcept {
@@ -518,59 +515,10 @@ void SymbolTable::LeaveScope() noexcept {
         this->scope = this->scope->back;
 }
 
-void SymbolTable::ScopeDel(Scope *scope) const noexcept {
-    const orbiter::memory::IsolateAllocator allocator(this->isolate);
-
-    this->SubScopeDel(&scope->sub_scope, false);
-
-    scope->~Scope();
-
-    allocator.free(scope);
-}
-
-void SymbolTable::SymbolDel(Symbol *symbol) const noexcept {
-    if (symbol == nullptr)
-        return;
-
-    const orbiter::memory::IsolateAllocator allocator(this->isolate);
-
-    while (symbol != nullptr) {
-        O_FAST_DECREF(symbol->name);
-
-        if (symbol->scope != nullptr)
-            this->ScopeDel(symbol->scope);
-
-        auto *tmp = symbol->next;
-
-        allocator.free(symbol);
-
-        symbol = tmp;
-    }
-}
-
-void SymbolTable::SubScopeDel(SubScope *sub_scope, const bool r_memory) const noexcept {
-    sub_scope->symbols.Finalize([this](const STHEntry *entry) {
-        O_FAST_DECREF(entry->key);
-
-        this->SymbolDel(entry->value);
-    });
-
-    auto *next = sub_scope->sibling;
-    for (auto cursor = next; cursor != nullptr; cursor = next) {
-        next = cursor->next;
-
-        this->SubScopeDel(cursor, true);
-    }
-
-    const orbiter::memory::IsolateAllocator allocator(this->isolate);
-
-    if (r_memory)
-        allocator.free(sub_scope);
-}
-
 SymbolTable::~SymbolTable() noexcept {
     auto *base = this->scope;
 
+    // The current scope may not be the root scope; it must be unwound to the module level before deletion.
     while (base->type != ScopeType::MODULE)
         base = base->back;
 

@@ -23,18 +23,43 @@ namespace liftoff {
         orbiter::datatype::ORStringHash
     >;
 
-    enum class SymbolTableError {
-        OK = 0,
-        MEMORY_ERROR,
-        SCOPE_NOT_FOUND,
-        SYMBOL_ALREADY_EXISTS,
-        SYMBOL_NOT_FOUND
+    enum class AccessModifier {
+        PRIVATE,
+        PROTECTED,
+        PUBLIC
+    };
+
+    enum class ScopeType {
+        CLASS,
+        FUNCTION,
+        MODULE,
+        NATIVE_FUNC,
+        TRAIT
+    };
+
+    enum class StorageLocation {
+        AUTO,
+
+        CLOSURE,
+        GLOBAL,
+        MODULE,
+        SLOTS,
+        STACK
+    };
+
+    enum class SymbolFlags : U8 {
+        INITIALIZED = 1,
+
+        ANON = 1 << 1,
+        CONST = 1 << 2,
+        SELF = 1 << 3,
+        SYNTHETIC = 1 << 4,
+        UPVALUE = 1 << 5
     };
 
     enum class SymbolType {
-        ECONST,
         CLASS,
-        CONSTANT,
+        ECONST,
         FUNC,
         LABEL,
         METHOD,
@@ -48,42 +73,21 @@ namespace liftoff {
         UNKNOWN
     };
 
-    enum class ScopeType {
-        CLASS,
-        FUNCTION,
-        GENERATOR,
-        MODULE,
-        NATIVE_FUNC,
-        TRAIT
-    };
-
-    enum class AccessModifier {
-        PRIVATE,
-        PROTECTED,
-        PUBLIC
-    };
-
-    enum class SymbolFlags : U8 {
-        ANON = 1,
-        SELF = 1 << 1,
-        SYNTETIC = 1 << 2,
-        UPVALUE = 1 << 3,
-    };
-
     class SubScope {
         STHMap symbols;
 
-        SubScope *next = nullptr;
+        SubScope *child = nullptr;
+
+        SubScope *next_sibling = nullptr;
 
         SubScope *parent = nullptr;
 
-        SubScope *sibling = nullptr;
+        struct {
+            MSize start;
+            MSize end;
+        } offset{};
 
-        MSize offset_start = 0;
-
-        MSize offset_end = 0;
-
-        unsigned short nesting = 0;
+        MSize nesting = 0;
 
         explicit SubScope(orbiter::Isolate *isolate) : symbols(isolate) {
         }
@@ -94,65 +98,35 @@ namespace liftoff {
     };
 
     class Scope {
-        SubScope sub_scope;
+        SubScope scope;
 
         SubScope *active = nullptr;
 
-        unsigned short closure_offset = 0;
-
-        unsigned short static_offset = 0;
-
-        unsigned short parameter_count = 0;
-
-        unsigned short local_variables = 0;
-
-        unsigned short global_offset = 0;
-
-        unsigned short unknown_variables = 0;
-
-        explicit Scope(orbiter::Isolate *isolate, MSize line_start) : sub_scope(isolate), line_start(line_start) {
+        explicit Scope(orbiter::Isolate *isolate, const MSize line_start) : scope(isolate) {
+            this->line.start = line_start;
         }
+
+        static Scope *New(orbiter::Isolate *isolate, MSize line_start) noexcept;
 
         friend class SymbolTable;
 
     public:
-        Scope *back = nullptr;
-
         ScopeType type = ScopeType::MODULE;
 
-        MSize line_start = 0;
+        Scope *back = nullptr;
 
-        MSize line_end = 0;
-
-        bool closure = false;
-
-        [[nodiscard]] bool ShouldCreateClosure() const {
-            return this->closure_offset > 0;
-        }
-
-        [[nodiscard]] U16 GetClosureSize() const {
-            return this->closure_offset;
-        }
-
-        [[nodiscard]] U16 GetLocalVariableCount() const {
-            return this->global_offset > 0 ? this->global_offset : this->local_variables;
-        }
-
-        [[nodiscard]] U16 GetParameterCount() const {
-            assert(this->type == ScopeType::FUNCTION
-                || this->type == ScopeType::GENERATOR
-                || this->type == ScopeType::NATIVE_FUNC);
-
-            return this->parameter_count;
-        }
+        struct {
+            MSize start;
+            MSize end;
+        } line{};
     };
 
     struct Symbol {
         Symbol *next;
 
-        Scope *defining_scope;
+        Scope *decl_scope;
 
-        Scope *scope;
+        Scope *defining_scope;
 
         orbiter::datatype::ORString *name;
 
@@ -160,17 +134,23 @@ namespace liftoff {
 
         AccessModifier access;
 
+        StorageLocation location;
+
         SymbolFlags flags;
 
         SymbolType type;
 
         unsigned short offset;
 
-        unsigned short stack_offset;
-
         unsigned short nesting;
+    };
 
-        bool tdz;
+    enum class SymbolTableError {
+        OK = 0,
+        MEMORY_ERROR,
+        SCOPE_NOT_FOUND,
+        SYMBOL_ALREADY_EXISTS,
+        SYMBOL_NOT_FOUND
     };
 
     class SymbolTable {
@@ -183,15 +163,12 @@ namespace liftoff {
 
         ~SymbolTable() noexcept;
 
-        [[nodiscard]] Scope *ScopeNew(MSize line_start) const noexcept;
+        [[nodiscard]] Symbol *SymbolNew(orbiter::datatype::ORString *name, SymbolType type, StorageLocation location,
+                                        MSize offset) noexcept;
 
-        [[nodiscard]] Symbol *SymbolNew(orbiter::datatype::ORString *name, SymbolType type, MSize offset) noexcept;
-
-        void ComputeLocalVarOffset(const SubScope *s_scope) const noexcept;
+        void ScopeDel(Scope *target) const noexcept;
 
         void SubScopeDel(SubScope *sub_scope, bool r_memory) const noexcept;
-
-        void ScopeDel(Scope *scope) const noexcept;
 
         void SymbolDel(Symbol *symbol) const noexcept;
 
@@ -208,21 +185,22 @@ namespace liftoff {
         SymbolTableError status = SymbolTableError::OK;
 
         /**
-         * @brief Creates a new symbol table with the specified isolate.
-         *
-         * @param isolate Isolate associated with the symbol table.
-         * @return A pointer to the newly created symbol table.
-         */
-        static SymbolTable *New(orbiter::Isolate *isolate) noexcept;
-
-        /**
-         * @brief Declare a new nested scope at a specified offset.
+         * @brief Create a new nested scope at a specified offset.
          * This method is used during parsing and creates and enters a nested scope.
          *
-         * @param offset The offset used for scope declaration.
-         * @return True if the nested scope was successfully declared.
+         * @param offset The offset used for scope creation.
+         * @return True if the nested scope was successfully created.
          */
-        bool DeclareNestedScope(MSize offset) noexcept;
+        bool CreateNestedScope(MSize offset) noexcept;
+
+        /**
+         * @brief Enter an existing nested scope using the specified offset.
+         * This method enters a nested scope but does not create it.
+         *
+         * @param offset The offset used for entering the scope.
+         * @return True if the scope was successfully entered, false if not found.
+         */
+        [[nodiscard]] bool EnterNestedScope(MSize offset) const noexcept;
 
         /**
          * @brief Enters a new scope with the given name.
@@ -232,28 +210,10 @@ namespace liftoff {
          */
         bool EnterScope(orbiter::datatype::ORString *name) noexcept;
 
-        /**
-         * @brief Enters a new scope with the given name.
-         * @param name The name of the new scope (as a C-string).
-         * @return True if the scope was successfully entered, false otherwise.
-         */
-        bool EnterScope(const char *name) noexcept;
+        Symbol *Declare(orbiter::datatype::ORString *name, SymbolType type, StorageLocation location,
+                        MSize offset) noexcept;
 
-        /**
-         * @brief Enter an existing nested scope using the specified offset.
-         * This method enters a nested scope but does not create it.
-         *
-         * @param offset The offset used for entering the scope.
-         * @return True if the scope was successfully entered, false if not found.
-         */
-        bool EnterNestedScope(MSize offset) const noexcept;
-
-        /**
-         * @brief Get SymbolTable status message.
-         *
-         * @return SymbolTable status message.
-         */
-        [[nodiscard]] const char *GetStatusMessage() const;
+        Symbol *Declare(const char *name, SymbolType type, StorageLocation location, MSize offset) noexcept;
 
         /**
          * @brief Declares a new symbol with the specified name, type, and offset.
@@ -263,7 +223,9 @@ namespace liftoff {
          * @param offset The offset of the symbol in source code.
          * @return A pointer to the newly declared symbol.
          */
-        Symbol *Declare(orbiter::datatype::ORString *name, SymbolType type, MSize offset) noexcept;
+        Symbol *Declare(orbiter::datatype::ORString *name, const SymbolType type, const MSize offset) noexcept {
+            return this->Declare(name, type, StorageLocation::AUTO, offset);
+        }
 
         /**
          * @brief Declares a new symbol with the specified name, type, and offset.
@@ -273,7 +235,9 @@ namespace liftoff {
          * @param offset The offset of the symbol in source code.
          * @return A pointer to the newly declared symbol.
          */
-        Symbol *Declare(const char *name, SymbolType type, MSize offset) noexcept;
+        Symbol *Declare(const char *name, const SymbolType type, const MSize offset) noexcept {
+            return this->Declare(name, type, StorageLocation::AUTO, offset);
+        }
 
         /**
          * @brief Declares a new symbol scope with the specified details.
@@ -308,21 +272,9 @@ namespace liftoff {
          *
          * @param name The name of the symbol to look for.
          * @param offset The current instruction offset, used to resolve scoped definitions based on execution order.
-         * @param class_prop A flag indicating whether the lookup should include class/trait scopes.
          * @return A pointer to the discovered Symbol if found, or `nullptr` otherwise.
          */
-        Symbol *Lookup(orbiter::datatype::ORString *name, MSize offset, bool class_prop) noexcept;
-
-        /**
-         * @brief Looks up a symbol with the specified name and offset.
-         *
-         * @param name The name of the symbol.
-         * @param offset The offset of the symbol in source code.
-         * @return A pointer to the found symbol or nullptr if not found.
-         */
-        Symbol *Lookup(orbiter::datatype::ORString *name, MSize offset) noexcept {
-            return this->Lookup(name, offset, false);
-        }
+        Symbol *Lookup(orbiter::datatype::ORString *name, MSize offset) noexcept;
 
         /**
          * @brief Looks up a symbol with the specified name and offset.
@@ -351,12 +303,17 @@ namespace liftoff {
          */
         Symbol *LookupInsert(const char *name, MSize offset) noexcept;
 
+        Symbol *LookupMember(orbiter::datatype::ORString *name);
+
+        Symbol *LookupMember(const char *name) noexcept;
+
         /**
-         * @brief Deletes the specified symbol table.
+         * @brief Creates a new symbol table with the specified isolate.
          *
-         * @param table The symbol table to be deleted.
+         * @param isolate Isolate associated with the symbol table.
+         * @return A pointer to the newly created symbol table.
          */
-        static void Delete(SymbolTable *table) noexcept;
+        static SymbolTable *New(orbiter::Isolate *isolate) noexcept;
 
         /**
          * @brief Leave the nested scope using the specified offset as end position.
@@ -370,9 +327,7 @@ namespace liftoff {
          * @brief Leave the nested scope.
          * @note This method is designed to step back during various compiler analyses.
          */
-        void LeaveNestedScope() const noexcept {
-            this->scope->active = this->scope->active->parent;
-        }
+        void LeaveNestedScope() const noexcept;
 
         /**
          * @brief Leave the current scope, effectively ending its lifetime.
