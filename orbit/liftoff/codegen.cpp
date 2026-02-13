@@ -438,6 +438,9 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
             case orbiter::OPCode::LDEXC:
                 *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode, instr->assigned_reg, 0);
                 break;
+            default:
+                assert(false);
+                break;
         }
 
         m_code += 4;
