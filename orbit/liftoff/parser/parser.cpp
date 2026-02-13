@@ -840,7 +840,7 @@ ASTHandle<ASTNode *> Parser::ParseVarDecl(const Position &start, const AccessMod
                                           const bool weak, const bool decl_only) {
     std::vector<ASTHandle<ASTNode *> > identifiers;
 
-    StorageLocation location = StorageLocation::AUTO;
+    auto location = StorageLocation::AUTO;
 
     if (this->context_->Check(ContextType::LOOP))
         location = StorageLocation::STACK;
@@ -1984,9 +1984,14 @@ ASTHandle<ASTNode *> Parser::ParseTernary(ASTHandle<ASTNode *> &left) {
 
 ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
     auto node_type = NodeType::VAR_DECLARATION;
+    auto location = StorageLocation::AUTO;
+
     Symbol *sym = nullptr;
 
     this->Eat(true);
+
+    if (this->context_->Check(ContextType::LOOP))
+        location = StorageLocation::STACK;
 
     if (left->node_type == NodeType::TUPLE) {
         const auto &tuple = (ASTHandle<ListExpression *> &) left;
@@ -1997,7 +2002,7 @@ ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
             if (cursor->node_type != NodeType::IDENTIFIER)
                 throw ParserException(23);
 
-            sym = this->sym_t_->Declare(id->value, SymbolType::VARIABLE, id->loc.start.offset);
+            sym = this->sym_t_->Declare(id->value, SymbolType::VARIABLE, location, id->loc.start.offset);
             if (sym == nullptr)
                 throw SymbolTableException();
 
@@ -2021,7 +2026,7 @@ ASTHandle<ASTNode *> Parser::ParseWalrus(ASTHandle<ASTNode *> &left) {
     decl->inl = true;
 
     if (node_type == NodeType::VAR_DECLARATION) {
-        sym = this->sym_t_->Declare(((Identifier *) decl->name)->value, SymbolType::VARIABLE,
+        sym = this->sym_t_->Declare(((Identifier *) decl->name)->value, SymbolType::VARIABLE, location,
                                     decl->name->loc.start.offset);
         if (sym == nullptr)
             throw SymbolTableException();
