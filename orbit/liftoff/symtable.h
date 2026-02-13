@@ -119,7 +119,9 @@ namespace liftoff {
 
         unsigned short closure_count = 0;
         unsigned short slot_count = 0;
+
         unsigned short stack_count = 0;
+        unsigned short stack_count_max = 0;
 
         unsigned short parameter_count = 0;
         unsigned short static_count = 0;
@@ -154,7 +156,7 @@ namespace liftoff {
         }
 
         [[nodiscard]] U16 GetLocalVariableCount() const {
-            return this->stack_count;
+            return this->stack_count_max;
         }
 
         [[nodiscard]] U16 GetParameterCount() const {

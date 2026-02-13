@@ -74,66 +74,66 @@ Symbol *SymbolTable::SymbolNew(ORString *name, const SymbolType type, const Stor
 }
 
 void SymbolTable::ComputeLocalVarOffset(const SubScope *s_scope) const noexcept {
-    for (auto s_cursor = s_scope; s_cursor != nullptr; s_cursor = s_cursor->child) {
-        bool sibling = false;
+    const auto *child = s_scope->child;
 
-        for (auto cursor = s_cursor->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next) {
-            auto *symbol = cursor->value;
+    const auto stack_count = this->scope->stack_count;
 
-            if (s_cursor->next_sibling != nullptr && symbol->decl_offset > s_cursor->next_sibling->offset.start) {
-                const auto slots_count = this->scope->slot_count;
-                const auto stack_count = this->scope->stack_count;
+    for (auto cursor = s_scope->symbols.iter_begin; cursor != nullptr; cursor = cursor->iter_next) {
+        auto *symbol = cursor->value;
 
-                this->ComputeLocalVarOffset(s_cursor->next_sibling);
+        if (child != nullptr && symbol->decl_offset > child->offset.start) {
+            this->ComputeLocalVarOffset(child);
 
-                sibling = true;
-
-                this->scope->slot_count = slots_count;
-                this->scope->stack_count = stack_count;
-            }
-
-            if (symbol->type == SymbolType::CLASS || symbol->type == SymbolType::TRAIT) {
-                symbol->offset = this->scope->static_count++;
-
-                continue;
-            }
-
-            if (symbol->type == SymbolType::PARAMETER) {
-                symbol->offset = this->scope->parameter_count++;
-
-                continue;
-            }
-
-            if (symbol->type == SymbolType::UNKNOWN)
-                symbol->location = StorageLocation::GLOBAL;
-
-            if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::CONST))
-                symbol->offset = this->scope->static_count++;
-
-            switch (symbol->location) {
-                case StorageLocation::AUTO:
-                    break;
-                case StorageLocation::CLOSURE:
-                    symbol->offset = this->scope->closure_count++;
-                    symbol->stack_offset = this->scope->stack_count++;
-                    break;
-                case StorageLocation::GLOBAL:
-                    symbol->offset = this->scope->unknown_count++;
-                    break;
-                case StorageLocation::MODULE:
-                case StorageLocation::SLOTS:
-                    // Module and slots share the same counter since a scope cannot be both a module and a class/trait
-                    symbol->offset = this->scope->slot_count++;
-                    break;
-                case StorageLocation::STACK:
-                    symbol->offset = this->scope->stack_count++;
-                    break;
-            }
+            child = child->next_sibling;
         }
 
-        if (!sibling && s_cursor->next_sibling != nullptr)
-            this->ComputeLocalVarOffset(s_cursor->next_sibling);
+        if (symbol->type == SymbolType::CLASS || symbol->type == SymbolType::TRAIT) {
+            symbol->offset = this->scope->static_count++;
+
+            continue;
+        }
+
+        if (symbol->type == SymbolType::PARAMETER) {
+            symbol->offset = this->scope->parameter_count++;
+
+            continue;
+        }
+
+        if (symbol->type == SymbolType::UNKNOWN)
+            symbol->location = StorageLocation::GLOBAL;
+
+        if (ENUMBITMASK_ISTRUE(symbol->flags, SymbolFlags::CONST))
+            symbol->offset = this->scope->static_count++;
+
+        switch (symbol->location) {
+            case StorageLocation::AUTO:
+                break;
+            case StorageLocation::CLOSURE:
+                symbol->offset = this->scope->closure_count++;
+                symbol->stack_offset = this->scope->stack_count++;
+                break;
+            case StorageLocation::GLOBAL:
+                symbol->offset = this->scope->unknown_count++;
+                break;
+            case StorageLocation::MODULE:
+            case StorageLocation::SLOTS:
+                // Module and slots share the same counter since a scope cannot be both a module and a class/trait
+                symbol->offset = this->scope->slot_count++;
+                break;
+            case StorageLocation::STACK:
+                symbol->offset = this->scope->stack_count++;
+                break;
+        }
     }
+
+    while (child != nullptr) {
+        this->ComputeLocalVarOffset(child);
+
+        child = child->next_sibling;
+    }
+
+    this->scope->stack_count_max = std::max(this->scope->stack_count, this->scope->stack_count_max);
+    this->scope->stack_count = stack_count;
 }
 
 void SymbolTable::ScopeDel(Scope *target) const noexcept {
@@ -321,6 +321,8 @@ Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const Storag
         }
 
         value->type = type;
+        value->location = location;
+
         return value;
     }
 
