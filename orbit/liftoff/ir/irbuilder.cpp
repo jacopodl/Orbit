@@ -1661,16 +1661,22 @@ void IRBuilder::VisitForInLoop(const parser::Loop *node) {
 
     target = this->builder_.CreateUnaryOp(orbiter::OPCode::GITR, target);
 
+    const auto tmp_slot = (I16) this->builder_.ReserveStackSlots(1);
+
+    this->builder_.StoreToStackOffset(target, kBaseStackPointerReg, tmp_slot);
+
     const JBlock jb(&this->builder_, JBlockType::FOR_IN, nullptr);
 
     this->builder_.AppendBasicBlock(jb.begin);
 
-    this->builder_.CreateBranch(orbiter::OPCode::JEX, target, nullptr, jb.end);
+    const auto generator = this->builder_.LoadFromStackOffset(kBaseStackPointerReg, tmp_slot, true);
+
+    this->builder_.CreateBranch(orbiter::OPCode::JEX, generator, nullptr, jb.end);
 
     if (!this->sym_t_->EnterNestedScope(node->loc.start.offset))
         throw SymbolTableException();
 
-    const auto gen_value = this->builder_.CreateUnaryOp(orbiter::OPCode::ITRNXT, target);
+    const auto gen_value = this->builder_.CreateUnaryOp(orbiter::OPCode::ITRNXT, generator);
 
     if (node->init->node_type == parser::NodeType::VAR_DECLARATION) {
         const auto id = (parser::Identifier *) ((parser::Assignment *) node->init)->name;
@@ -1690,7 +1696,9 @@ void IRBuilder::VisitForInLoop(const parser::Loop *node) {
 
     this->builder_.CreateJump(jb.begin);
 
-    this->builder_.CreateAppendBasicBlock();
+    this->builder_.AppendBasicBlock(jb.end);
+
+    this->builder_.ReleaseStackSlots(1);
 }
 
 IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module) noexcept {
@@ -1704,6 +1712,12 @@ IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module)
         this->builder_.IRContextNew(IRContextType::MODULE, this->sym_t_->scope->GetSlotsCount());
 
         auto *context = this->builder_.context;
+
+        // Alloc stack space (If needed)
+        const auto stack_space = this->sym_t_->scope->GetLocalVariableCount();
+
+        if (stack_space > 0)
+            this->builder_.AllocStackSlots(stack_space, orbiter::AllocaFlags::ZERO_INIT);
 
         for (auto &statement: module->statements)
             this->visit(statement.get());

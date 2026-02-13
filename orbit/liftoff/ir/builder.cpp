@@ -65,7 +65,7 @@ bool Builder::CheckIfLastInstructionIs(OPCode opcode) const {
     return false;
 }
 
-Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
+Instruction *Builder::AllocStackSlots(const U16 slots, AllocaFlags flags) {
     const auto bb_entry = this->context->entry_;
 
     UnaryImmInstr *alloca = nullptr;
@@ -90,6 +90,7 @@ Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
                 last_alloca->imm += slots;
 
                 this->context->stack_slots += slots;
+                this->context->stack_slots_max = this->context->stack_slots;
 
                 return last_alloca;
             }
@@ -108,6 +109,7 @@ Instruction *Builder::AllocStackSlots(U16 slots, AllocaFlags flags) {
 
 
     this->context->stack_slots += slots;
+    this->context->stack_slots_max = this->context->stack_slots;
 
     return alloca;
 }
@@ -587,6 +589,20 @@ U16 Builder::IRContextNew(IRContextType type, U16 local_slots) {
     return r_id;
 }
 
+U16 Builder::ReserveStackSlots(const U16 slots) {
+    const auto base = this->context->stack_slots;
+
+    if (this->context->stack_slots + slots > this->context->stack_slots_max) {
+        this->AllocStackSlots(slots, AllocaFlags::ZERO_INIT);
+
+        return base;
+    }
+
+    this->context->stack_slots += slots;
+
+    return base;
+}
+
 void Builder::AppendBasicBlock(BasicBlock *bb) const noexcept {
     assert(bb != nullptr);
 
@@ -630,4 +646,10 @@ void Builder::LeaveContext() {
 
     if (this->context->back != nullptr)
         this->context = this->context->back;
+}
+
+void Builder::ReleaseStackSlots(const U16 slots) const {
+    assert(this->context->stack_slots >= slots);
+
+    this->context->stack_slots -= slots;
 }

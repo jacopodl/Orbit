@@ -330,6 +330,20 @@ namespace liftoff::ir {
         U16 IRContextNew(IRContextType type, U16 local_slots);
 
         /**
+         * Reserves a specified number of stack slots for use during execution.
+         *
+         * @param slots The number of stack slots to reserve.
+         * @return The base index of the reserved stack slots.
+         *
+         * This method updates the current stack slot counter within the associated
+         * execution context. If the requested slots exceed the maximum stack slots
+         * available, this method allocates additional slots.
+         * The base index before the reservation is returned as a reference point
+         * for the reserved region.
+         */
+        U16 ReserveStackSlots(U16 slots);
+
+        /**
          * @brief Appends a basic block to the current context's linked list of blocks.
          *
          * This method adds a new basic block to the existing sequence of blocks in the
@@ -355,6 +369,14 @@ namespace liftoff::ir {
          * @brief Exits the current compilation context and computing liveness.
          */
         void LeaveContext();
+
+        /**
+         * Releases the specified number of stack slots from the builder's context.
+         * This reduces the current stack slot count by the provided amount.
+         *
+         * @param slots The number of stack slots to release. Must not exceed the current count of stack slots in the context.
+         */
+        void ReleaseStackSlots(U16 slots) const;
     };
 }
 

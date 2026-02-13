@@ -435,6 +435,8 @@ namespace liftoff::ir {
         }
 
         explicit UnaryOpInstr(const orbiter::OPCode opcode, Instruction *src) noexcept : UnaryOpInstr(opcode, 0, src) {
+            if (opcode == orbiter::OPCode::ITRNXT)
+                this->assigned_reg = kReturnRegisterReg;
         }
 
         explicit UnaryOpInstr(const orbiter::OPCode opcode, const U8 flags,
