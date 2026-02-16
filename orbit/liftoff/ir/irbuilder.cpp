@@ -246,6 +246,25 @@ Instruction *IRBuilder::CreateJumpForElvisOrNil(const parser::Binary *binary, or
     return phi->AddTarget(left)->AddTarget(right);
 }
 
+Instruction *IRBuilder::ExpandStoreTuple(const parser::ListExpression *tuple, Instruction *src, const bool decl) {
+    Instruction *last = nullptr;
+
+    auto index = 0;
+    for (const auto &itm: tuple->elements) {
+        const auto *sym = ((parser::Identifier *) itm.get())->symbol;
+
+        auto *t_idx = this->builder_.LoadImmediate(index);
+
+        auto *value = this->builder_.CreateIndexLoad(src, t_idx);
+
+        last = this->StoreVariable(sym, value, decl);
+
+        index += 1;
+    }
+
+    return last;
+}
+
 Instruction *IRBuilder::LoadParameter(const Symbol *symbol) {
     assert(symbol->type == SymbolType::PARAMETER);
 
@@ -485,11 +504,10 @@ Instruction *IRBuilder::visitAssignment(parser::Assignment *node) {
     }
 
     if (node->name->node_type == parser::NodeType::TUPLE) {
-        // TODO: tuple expansion
+        value = this->visit(node->value);
 
-        assert(false);
-
-        return nullptr;
+        return this->ExpandStoreTuple((parser::ListExpression *) node->name, value,
+                                      node->node_type == parser::NodeType::VAR_DECLARATIONS);
     }
 
     const auto *sym = ((parser::Identifier *) node->name)->symbol;
@@ -1678,17 +1696,16 @@ void IRBuilder::VisitForInLoop(const parser::Loop *node) {
 
     const auto gen_value = this->builder_.CreateUnaryOp(orbiter::OPCode::ITRNXT, generator);
 
-    if (node->init->node_type == parser::NodeType::VAR_DECLARATION) {
-        const auto id = (parser::Identifier *) ((parser::Assignment *) node->init)->name;
-
-        this->StoreVariable(id->symbol, gen_value, false);
-    } else if (node->init->node_type == parser::NodeType::VAR_DECLARATIONS) {
-        assert(false); // TODO: tuple assignment
-    } else if (node->init->node_type == parser::NodeType::IDENTIFIER) {
+    if (node->init->node_type == parser::NodeType::IDENTIFIER) {
         const auto id = (parser::Identifier *) node->init;
 
         this->StoreVariable(id->symbol, gen_value, false);
-    }
+    } else if (node->init->node_type == parser::NodeType::VAR_DECLARATION) {
+        const auto id = (parser::Identifier *) ((parser::Assignment *) node->init)->name;
+
+        this->StoreVariable(id->symbol, gen_value, false);
+    } else if (node->init->node_type == parser::NodeType::VAR_DECLARATIONS)
+        this->ExpandStoreTuple((parser::ListExpression *) node->init, gen_value, false);
 
     this->visit(node->body);
 

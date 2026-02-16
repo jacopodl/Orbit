@@ -35,6 +35,8 @@ namespace liftoff::ir {
 
         Instruction *CreateJumpForElvisOrNil(const parser::Binary *binary, orbiter::OPCode opcode);
 
+        Instruction *ExpandStoreTuple(const parser::ListExpression *tuple, Instruction *src, bool decl);
+
         Instruction *LoadVariable(const Symbol *symbol);
 
         Instruction *LoadParameter(const Symbol *symbol);
