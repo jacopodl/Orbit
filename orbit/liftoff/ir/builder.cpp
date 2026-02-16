@@ -425,6 +425,11 @@ Instruction *Builder::LoadFunction(Instruction *src, Instruction *def_args, Load
     return this->CreateInstruction<LoadFunc>(src, def_args, flags);
 }
 
+Instruction *Builder::LoadGlobal(datatype::ORString *id) {
+    const auto offset = (I16) this->context->PushUnknownProps(id);
+    return this->LoadFromOffset(OPCode::LDGBL, 0, offset, 0);
+}
+
 Instruction *Builder::LoadImmediate(const MachineSize value) {
     auto *instr = this->CreateInstruction<UnaryImmInstr>(OPCode::LDIMM, 0, value);
     // TODO: check size, use shift to load whole value
@@ -536,6 +541,11 @@ Instruction *Builder::StackPushIF(Instruction *s_reg, Instruction *target, Instr
 Instruction *Builder::GetStoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key) {
     return this->CreateObject<LSObjectProp>(OPCode::STOBJP, obj, value, offset,
                                             as_key ? LoadObjectPropFlags::KEY : LoadObjectPropFlags::INLINE);
+}
+
+Instruction *Builder::StoreGlobal(datatype::ORString *id, Instruction *value) {
+    const auto offset = (I16) this->context->PushUnknownProps(id);
+    return this->CreateStoreVariable(OPCode::STGBL, offset, 0, value);
 }
 
 Instruction *Builder::StoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key) {

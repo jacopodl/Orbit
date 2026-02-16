@@ -225,6 +225,8 @@ namespace liftoff::ir {
 
         Instruction *LoadFunction(Instruction *src, Instruction *def_args, orbiter::LoadFuncFlags flags);
 
+        Instruction *LoadGlobal(orbiter::datatype::ORString *id);
+
         Instruction *LoadImmediate(MachineSize value);
 
         Instruction *LoadModule(orbiter::datatype::ORString *path);
@@ -280,6 +282,8 @@ namespace liftoff::ir {
                                  orbiter::PushIfFlags flags);
 
         Instruction *GetStoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key);
+
+        Instruction *StoreGlobal(orbiter::datatype::ORString *id, Instruction *value);
 
         Instruction *StoreObjectProp(Instruction *obj, Instruction *value, U16 offset, bool as_key);
 

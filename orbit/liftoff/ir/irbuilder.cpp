@@ -275,8 +275,7 @@ Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
 
     // *** UNKNOWN ***
     if (symbol->location == StorageLocation::GLOBAL) {
-        offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
-        ret = this->builder_.LoadFromOffset(orbiter::OPCode::LDGBL, 0, offset, 0);
+        ret = this->builder_.LoadGlobal(symbol->name);
 
         goto EXIT;
     }
@@ -290,10 +289,9 @@ Instruction *IRBuilder::LoadVariable(const Symbol *symbol) {
 
     // *** MODULE ***
     if (symbol->location == StorageLocation::MODULE) {
-        if (!this->is_module_) {
-            offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
-            ret = this->builder_.LoadFromOffset(orbiter::OPCode::LDGBL, 0, offset, 0);
-        } else
+        if (!this->is_module_)
+            ret = this->builder_.LoadGlobal(symbol->name);
+        else
             ret = this->builder_.LoadFromOffset(orbiter::OPCode::LDGOFF, 0, offset, 0);
 
         goto EXIT;
@@ -347,8 +345,7 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
 
     // *** UNKNOWN ***
     if (symbol->location == StorageLocation::GLOBAL) {
-        offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
-        this->builder_.CreateStoreVariable(orbiter::OPCode::STGBL, offset, 0, value);
+        this->builder_.StoreGlobal(symbol->name, value);
 
         goto EXIT;
     }
@@ -362,10 +359,9 @@ Instruction *IRBuilder::StoreVariable(const Symbol *symbol, Instruction *value, 
             goto EXIT;
         }
 
-        if (!this->is_module_) {
-            offset = (I16) this->builder_.context->PushUnknownProps(symbol->name);
-            this->builder_.CreateStoreVariable(orbiter::OPCode::STGBL, offset, 0, value);
-        } else {
+        if (!this->is_module_)
+            this->builder_.StoreGlobal(symbol->name, value);
+        else {
             if (decl && (symbol->access == AccessModifier::PUBLIC || symbol->access == AccessModifier::PROTECTED))
                 this->builder_.context->ExportSymbol(symbol, v_flags);
 

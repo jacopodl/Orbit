@@ -117,6 +117,9 @@ U16 IRContext::PushUnknownProps(orbiter::datatype::ORString *id) {
             throw std::bad_alloc();
     }
 
+    // The ID value is the key stored in the symbol. Since symbols with identical keys
+    // are always allocated at the same memory location, we can safely perform pointer
+    // comparison instead of value comparison for identity checks.
     const auto array = this->unknown_names->objects;
     for (auto i = 0; i < this->unknown_names->length; i++) {
         if (array[i] == (orbiter::datatype::OObject *) id)
