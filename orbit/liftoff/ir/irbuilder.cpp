@@ -1352,16 +1352,17 @@ Instruction *IRBuilder::visitSyncBlock(const parser::Binary *binary) {
 
         JBlock jb(&this->builder_, JBlockType::SYNC);
 
-        auto v_slot = this->builder_.ReserveStackSlots(1);
-        this->builder_.StoreToStackOffset(left, kBaseStackPointerReg, (I16) v_slot);
+        StackSlotGuard guard(this->builder_, 1);
+        guard.Store(left);
 
         jb.value = this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_ENTER, left);
 
-        auto &c_entry = this->builder_.context->cleanup_entries_.emplace_back(
-            jb.value,
-            nullptr,
-            orbiter::OPCode::SYNC_EXIT,
-            v_slot);
+        this->builder_.context->cleanup_entries_.emplace_back(jb.value,
+                                                              nullptr,
+                                                              orbiter::OPCode::SYNC_EXIT,
+                                                              guard.base);
+
+        const auto cleanup_index = this->builder_.context->cleanup_entries_.size() - 1;
 
         this->visit(binary->right);
 
@@ -1374,11 +1375,10 @@ Instruction *IRBuilder::visitSyncBlock(const parser::Binary *binary) {
             return nullptr;
         }
 
-        left = this->builder_.LoadFromStackOffset(kBaseStackPointerReg, (I16) v_slot, false);
+        left = guard.Load();
 
-        c_entry.end = this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_EXIT, left);
-
-        this->builder_.ReleaseStackSlots(1);
+        this->builder_.context->cleanup_entries_[cleanup_index].end = this->builder_.CreateUnaryOp(
+            orbiter::OPCode::SYNC_EXIT, left);
     }
 
     return nullptr;
@@ -1702,15 +1702,14 @@ void IRBuilder::VisitForInLoop(const parser::Loop *node) {
 
     target = this->builder_.CreateUnaryOp(orbiter::OPCode::GITR, target);
 
-    const auto tmp_slot = (I16) this->builder_.ReserveStackSlots(1);
-
-    this->builder_.StoreToStackOffset(target, kBaseStackPointerReg, tmp_slot);
+    const StackSlotGuard guard(this->builder_, 1);
+    guard.Store(target);
 
     const JBlock jb(&this->builder_, JBlockType::FOR_IN, nullptr);
 
     this->builder_.AppendBasicBlock(jb.begin);
 
-    const auto generator = this->builder_.LoadFromStackOffset(kBaseStackPointerReg, tmp_slot, true);
+    const auto generator = guard.Load();
 
     if (!this->sym_t_->EnterNestedScope(node->loc.start.offset))
         throw SymbolTableException();
@@ -1735,8 +1734,6 @@ void IRBuilder::VisitForInLoop(const parser::Loop *node) {
     this->builder_.CreateJump(jb.begin);
 
     this->builder_.AppendBasicBlock(jb.end);
-
-    this->builder_.ReleaseStackSlots(1);
 }
 
 IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module) noexcept {

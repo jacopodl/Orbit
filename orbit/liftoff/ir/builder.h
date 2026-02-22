@@ -71,6 +71,28 @@ namespace liftoff::ir {
             return instr;
         }
 
+        /**
+         * Reserves a specified number of stack slots for use during execution.
+         *
+         * @param slots The number of stack slots to reserve.
+         * @return The base index of the reserved stack slots.
+         *
+         * This method updates the current stack slot counter within the associated
+         * execution context. If the requested slots exceed the maximum stack slots
+         * available, this method allocates additional slots.
+         * The base index before the reservation is returned as a reference point
+         * for the reserved region.
+         */
+        U16 ReserveStackSlots(U16 slots);
+
+        /**
+         * Releases the specified number of stack slots from the builder's context.
+         * This reduces the current stack slot count by the provided amount.
+         *
+         * @param slots The number of stack slots to release. Must not exceed the current count of stack slots in the context.
+         */
+        void ReleaseStackSlots(U16 slots) const;
+
         void UpdateStackSize(const U16 size) const noexcept {
             this->context->stack_push_count += size;
 
@@ -81,6 +103,8 @@ namespace liftoff::ir {
         void UpdateStackSize() const noexcept {
             this->UpdateStackSize(1);
         }
+
+        friend class StackSlotGuard;
 
     public:
         IRContext *context = nullptr;
@@ -334,20 +358,6 @@ namespace liftoff::ir {
         U16 IRContextNew(IRContextType type, U16 local_slots);
 
         /**
-         * Reserves a specified number of stack slots for use during execution.
-         *
-         * @param slots The number of stack slots to reserve.
-         * @return The base index of the reserved stack slots.
-         *
-         * This method updates the current stack slot counter within the associated
-         * execution context. If the requested slots exceed the maximum stack slots
-         * available, this method allocates additional slots.
-         * The base index before the reservation is returned as a reference point
-         * for the reserved region.
-         */
-        U16 ReserveStackSlots(U16 slots);
-
-        /**
          * @brief Appends a basic block to the current context's linked list of blocks.
          *
          * This method adds a new basic block to the existing sequence of blocks in the
@@ -373,14 +383,45 @@ namespace liftoff::ir {
          * @brief Exits the current compilation context and computing liveness.
          */
         void LeaveContext();
+    };
 
-        /**
-         * Releases the specified number of stack slots from the builder's context.
-         * This reduces the current stack slot count by the provided amount.
-         *
-         * @param slots The number of stack slots to release. Must not exceed the current count of stack slots in the context.
-         */
-        void ReleaseStackSlots(U16 slots) const;
+    class StackSlotGuard {
+        Builder &builder_;
+
+        U16 slots_ = 0;
+
+    public:
+        U16 base = 0;
+
+        StackSlotGuard(Builder &builder, const U16 slots) : builder_(builder), slots_(slots) {
+            this->base = builder_.ReserveStackSlots(slots);
+        }
+
+        ~StackSlotGuard() { builder_.ReleaseStackSlots(this->slots_); }
+
+        StackSlotGuard(const StackSlotGuard &) = delete;
+
+        StackSlotGuard &operator=(const StackSlotGuard &) = delete;
+
+        [[nodiscard]] Instruction *Load(const U16 index) const {
+            assert(index < this->slots_);
+
+            return builder_.LoadFromStackOffset(kBaseStackPointerReg, (I16) (this->base + index), false);
+        }
+
+        [[nodiscard]] Instruction *Load() const {
+            return this->Load(0);
+        }
+
+        void Store(Instruction *value, const U16 index) const {
+            assert(index<this->slots_);
+
+            builder_.StoreToStackOffset(value, kBaseStackPointerReg, (I16) (this->base + index));
+        }
+
+        void Store(Instruction *value) const {
+            this->Store(value, 0);
+        }
     };
 }
 
