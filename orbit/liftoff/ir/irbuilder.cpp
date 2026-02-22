@@ -974,19 +974,20 @@ Instruction *IRBuilder::visitImportName(parser::ImportName *node) {
 }
 
 Instruction *IRBuilder::visitJump(const parser::Jump *node) {
-    const auto b_target = this->builder_.context->j_chain->FindLabeledBlock(node->label);
+    const auto b_target = FindLabeledBlock(this->builder_.context->j_chain, node->label);
 
     if (b_target == nullptr)
         assert(false); // TODO ERROR
 
     this->PutSyncExit(b_target);
 
-    return this->builder_.CreateJump(
-        node->token_type == scanner::TokenType::KW_BREAK ? b_target->end : b_target->begin);
+    return this->builder_.CreateJump(node->token_type == scanner::TokenType::KW_BREAK
+                                         ? GetJBlockEnd(b_target)
+                                         : GetJBlockBegin(b_target));
 }
 
 Instruction *IRBuilder::visitLabel(const parser::Label *node) {
-    JBlock _(&this->builder_, JBlockType::LABEL, node->label);
+    JBlockTarget _(&this->builder_, JBlockType::LABEL, node->label);
 
     return this->visit(node->statement);
 }
@@ -1051,7 +1052,7 @@ Instruction *IRBuilder::visitLoop(const parser::Loop *node) {
         return nullptr;
     }
 
-    const JBlock jb(&this->builder_, JBlockType::LOOP, nullptr);
+    const JBlockTarget jb(&this->builder_, JBlockType::LOOP, nullptr);
 
     if (node->node_type == parser::NodeType::LOOP) {
         this->builder_.AppendBasicBlock(jb.begin);
@@ -1178,9 +1179,7 @@ Instruction *IRBuilder::visitNilSafety(const parser::Unary *node) {
     auto *end = this->builder_.CreateBasicBlock();
     auto *nil_block = this->builder_.CreateBasicBlock();
 
-    JBlock ctx(&this->builder_, JBlockType::NIL_SAFE);
-    ctx.alt = nil_block;
-    ctx.end = end;
+    JBlockBranch ctx(&this->builder_, JBlockType::NIL_SAFE, nil_block, end);
 
     auto *value = this->visit(node->value);
 
@@ -1221,9 +1220,9 @@ Instruction *IRBuilder::visitSelector(const parser::Selector *node) {
     assert(key->node_type == parser::NodeType::IDENTIFIER);
 
     if (node->token_type == scanner::TokenType::QUESTION_DOT) {
-        auto *ctx = this->builder_.context->GetActiveContextIf(JBlockType::NIL_SAFE);
+        const auto *ctx = this->builder_.context->GetActiveContextIf(JBlockType::NIL_SAFE);
         if (ctx != nullptr)
-            this->builder_.CreateBranch(orbiter::OPCode::JEN, base, nullptr, ctx->alt);
+            this->builder_.CreateBranch(orbiter::OPCode::JEN, base, nullptr, ((JBlockBranch *) ctx)->alt);
     }
 
     if (node->left->node_type == parser::NodeType::IDENTIFIER) {
@@ -1290,8 +1289,7 @@ Instruction *IRBuilder::visitSwitchBlock(const parser::SwitchBlock *node) {
     BasicBlock *default_block = nullptr;
     const auto end_block = this->builder_.CreateBasicBlock();
 
-    JBlock ctx{&this->builder_, JBlockType::SWITCH};
-    ctx.end = end_block;
+    JBlockSwitch ctx(&this->builder_, end_block);
 
     std::vector<BasicBlock *> bodies;
     for (auto &case_: node->cases) {
@@ -1350,14 +1348,14 @@ Instruction *IRBuilder::visitSyncBlock(const parser::Binary *binary) {
     if (!((parser::Block *) binary->right)->statements.empty()) {
         auto *left = this->visit(binary->left);
 
-        JBlock jb(&this->builder_, JBlockType::SYNC);
-
         StackSlotGuard guard(this->builder_, 1);
         guard.Store(left);
 
-        jb.value = this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_ENTER, left);
+        auto *sync_enter = this->builder_.CreateUnaryOp(orbiter::OPCode::SYNC_ENTER, left);
 
-        this->builder_.context->cleanup_entries_.emplace_back(jb.value,
+        JBlockSync jb(&this->builder_, sync_enter);
+
+        this->builder_.context->cleanup_entries_.emplace_back(sync_enter,
                                                               nullptr,
                                                               orbiter::OPCode::SYNC_EXIT,
                                                               guard.base);
@@ -1413,9 +1411,7 @@ Instruction *IRBuilder::visitTryBlock(const parser::TryBlock *node) {
 
     this->builder_.SetupTryCatch(catch_ctl, finally_block);
 
-    JBlock ctx(&this->builder_, JBlockType::TCF);
-    ctx.alt = catch_ctl;
-    ctx.end = finally_block;
+    JBlockBranch ctx(&this->builder_, JBlockType::TCF, catch_ctl, finally_block);
 
     if (!this->sym_t_->EnterNestedScope(node->try_block->loc.start.offset))
         throw SymbolTableException();
@@ -1686,7 +1682,7 @@ void IRBuilder::PutSyncExit(const JBlock *block) {
 
     while (cursor != block) {
         if (cursor->type == JBlockType::SYNC) {
-            const auto slot = this->builder_.context->GetSlotFromCleanupMatch(cursor->value);
+            const auto slot = this->builder_.context->GetSlotFromCleanupMatch(((JBlockSync *) cursor)->value);
 
             const auto value = this->builder_.LoadFromStackOffset(kBaseStackPointerReg, (I16) slot, false);
 
@@ -1705,7 +1701,7 @@ void IRBuilder::VisitForInLoop(const parser::Loop *node) {
     const StackSlotGuard guard(this->builder_, 1);
     guard.Store(target);
 
-    const JBlock jb(&this->builder_, JBlockType::FOR_IN, nullptr);
+    const JBlockTarget jb(&this->builder_, JBlockType::FOR_IN, nullptr);
 
     this->builder_.AppendBasicBlock(jb.begin);
 

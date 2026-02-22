@@ -237,7 +237,7 @@ Instruction *Builder::CreateReturn(Instruction *s_reg, const U16 slots) {
     if (tcf != nullptr) {
         auto *ret = this->CreatePendingReturn(s_reg, slots);
 
-        this->CreateJump(tcf->end);
+        this->CreateJump(((JBlockBranch *) tcf)->end);
 
         return ret;
     }
@@ -306,7 +306,7 @@ Instruction *Builder::CreateYield(Instruction *s_reg) {
 
     while (cursor != nullptr) {
         if (cursor->type == JBlockType::SYNC) {
-            const auto slot = this->context->GetSlotFromCleanupMatch(cursor->value);
+            const auto slot = this->context->GetSlotFromCleanupMatch(((JBlockSync *) cursor)->value);
 
             const auto value = this->LoadFromStackOffset(kBaseStackPointerReg, (I16) slot, false);
 
@@ -328,8 +328,10 @@ Instruction *Builder::CreateYield(Instruction *s_reg) {
 
     cursor = this->context->j_chain;
     while (cursor != nullptr) {
-        if (cursor->type == JBlockType::TCF)
-            this->SetupTryCatch(cursor->alt, cursor->end);
+        if (cursor->type == JBlockType::TCF) {
+            const auto *tcf = (JBlockBranch *) cursor;
+            this->SetupTryCatch(tcf->alt, tcf->end);
+        }
 
         cursor = cursor->prev;
     }
@@ -338,7 +340,7 @@ Instruction *Builder::CreateYield(Instruction *s_reg) {
     cursor = this->context->j_chain;
     while (cursor != nullptr) {
         if (cursor->type == JBlockType::SYNC) {
-            const auto slot = this->context->GetSlotFromCleanupMatch(cursor->value);
+            const auto slot = this->context->GetSlotFromCleanupMatch(((JBlockSync *) cursor)->value);
 
             const auto value = this->LoadFromStackOffset(kBaseStackPointerReg, (I16) slot, false);
 
@@ -469,9 +471,9 @@ Instruction *Builder::LoadObjectProp(Instruction *src, U16 offset, bool as_key, 
 Instruction *Builder::LoadFromOffset(const OPCode opcode, const U8 r_base, const I16 offset, const U8 flags) {
     if (this->context->current_ != nullptr) {
         const OffsetInstruction *last = nullptr;
-        
+
         bool call = false;
-        
+
         for (auto cursor = this->context->current_->instr.tail; cursor != nullptr; cursor = cursor->prev) {
             const auto *instr = (OffsetInstruction *) cursor;
 
@@ -515,10 +517,9 @@ Instruction *Builder::LoadFromOffset(const OPCode opcode, const U8 r_base, const
                 && last->r_base == r_base
                 && last->offset == offset
                 && last->flags == flags) {
-                
                 if (!call || opcode == OPCode::SKLDR)
                     return (Instruction *) last;
-                
+
                 break;
             }
         }
