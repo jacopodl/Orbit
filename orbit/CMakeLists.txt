@@ -4,7 +4,12 @@ file(GLOB_RECURSE VM_SRC RELATIVE "${CMAKE_CURRENT_LIST_DIR}" "*.cpp")
 message(STATUS "Orbiter source files: ${VM_SRC}")
 
 # Add architecture-specific assembly files
-enable_language(ASM)
+# On Windows MSVC the assembler language is ASM_MASM; everywhere else plain ASM.
+if(MSVC)
+    enable_language(ASM_MASM)
+else()
+    enable_language(ASM)
+endif()
 set(ASM_SRC "")
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
@@ -14,7 +19,12 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64|ARM64")
 
     target_compile_definitions(Orbiter PRIVATE ORBIT_HAS_FFI_STUB)
 elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64")
-    file(GLOB ASM_SRC_ARCH "${CMAKE_CURRENT_SOURCE_DIR}/orbiter/native/arch/x86_64/*.S")
+    if(MSVC)
+        # MASM (ml64) requires .asm extension
+        file(GLOB ASM_SRC_ARCH "${CMAKE_CURRENT_SOURCE_DIR}/orbiter/native/arch/x86_64/win64/*.asm")
+    else()
+        file(GLOB ASM_SRC_ARCH "${CMAKE_CURRENT_SOURCE_DIR}/orbiter/native/arch/x86_64/*/*.S")
+    endif()
     set(ASM_SRC ${ASM_SRC_ARCH})
     message(STATUS "Using x86_64 assembly files")
 
