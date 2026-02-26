@@ -323,6 +323,20 @@ Symbol *SymbolTable::Declare(ORString *name, const SymbolType type, const Storag
         value->type = type;
         value->location = location;
 
+        if (location == StorageLocation::AUTO) {
+            switch (this->scope->type) {
+                case ScopeType::FUNCTION:
+                case ScopeType::NATIVE_FUNC:
+                    value->location = StorageLocation::STACK;
+                    break;
+                case ScopeType::MODULE:
+                    value->location = StorageLocation::MODULE;
+                    break;
+                default:
+                    assert(false);
+            }
+        }
+
         return value;
     }
 
