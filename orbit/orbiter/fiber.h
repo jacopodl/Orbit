@@ -22,6 +22,15 @@ namespace orbiter {
         datatype::OObject *func;
     };
 
+    enum class FiberState : U8 {
+        RUNNABLE, // ready, never executed or resumed after yield
+        RUNNING, // currently executing (set by eval() on entry)
+        YIELDED, // cooperatively yielded or preempted (re-enqueue)
+        SUSPENDED, // waiting for event (not re-enqueued)
+        COMPLETED, // terminated normally
+        PANICKED // unhandled panic propagated to top
+    };
+
     class Fiber {
     public:
         VMContext vm{};
@@ -47,6 +56,8 @@ namespace orbiter {
             Fiber *next;
             Fiber *prev;
         } queue{};
+
+        FiberState state = FiberState::RUNNABLE;
 
         ~Fiber();
 
@@ -153,7 +164,7 @@ namespace orbiter {
 
             this->UnsetContext();
 
-            this->vm.state = VMState::RUNNABLE;
+            this->state = FiberState::RUNNABLE;
         }
 
         /**

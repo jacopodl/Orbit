@@ -752,7 +752,7 @@ OObject *orbiter::eval(Fiber *fiber) {
     auto *regs = &fiber->vm.regs;
     auto *stack = &fiber->vm.stack;
 
-    fiber->vm.state = VMState::RUNNING;
+    fiber->state = FiberState::RUNNING;
 
 #define TARGET_OP(op)   case OPCode::op:
 #define CGOTO           continue

@@ -50,18 +50,10 @@ namespace orbiter {
         Register CP; // Catch point register
     };
 
-    enum class VMState {
-        RUNNABLE,
-        RUNNING,
-        SUSPENDED
-    };
-
     struct VMContext {
         Registers regs;
 
         VMStack stack;
-
-        VMState state;
 
         bool Push(datatype::OObject *value) {
             *((datatype::OObject **) (this->stack.stack + this->regs.SP.reg)) = O_INCREF(value);
