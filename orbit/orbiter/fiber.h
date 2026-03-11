@@ -57,6 +57,8 @@ namespace orbiter {
             Fiber *prev;
         } queue{};
 
+        void *active_ost = nullptr;
+
         FiberState state = FiberState::RUNNABLE;
 
         ~Fiber();

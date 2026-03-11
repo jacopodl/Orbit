@@ -14,7 +14,11 @@
 namespace orbiter {
     constexpr unsigned int kVCoreDefault = 4;
     constexpr unsigned int kVCoreQueueLengthMax = 255;
+
     constexpr unsigned int kGlobalQueueLengthMax = 300;
+
+    constexpr unsigned int kSpinningCheckMax = 3;
+    constexpr unsigned int kFairnessTickCount = 32;
 
     class VCore {
     public:
@@ -22,6 +26,7 @@ namespace orbiter {
         VCore **prev = nullptr;
 
         bool wired = false;
+        bool stealable = true;
 
         FiberQueue<> queue;
 
@@ -94,9 +99,13 @@ namespace orbiter {
         unsigned int ost_total_ = 0; // OSThread counter
         unsigned int ost_idle_count_ = 0; // OSThread counter (idle)
         unsigned int ost_max_ = 0; // Maximum OS thread allowed
+        unsigned int ost_pending_wakeups_ = 0;
+        unsigned int ost_spinning_count_ = 0;
 
         unsigned int vcores_count_ = 0;
         unsigned int vcore_unwired_count_ = 0;
+
+        bool should_exit_ = false;
 
         Orbiter() : fiber_queue_(kGlobalQueueLengthMax) {
         }
@@ -136,7 +145,13 @@ namespace orbiter {
          */
         bool WireVCore(OSThread *ost, VCore *vcore) noexcept;
 
+        Fiber *FindExecutable(OSThread *ost, Fiber *last, bool global_first) noexcept;
+
+        Fiber *StealWork(const OSThread *ost) const noexcept;
+
         OSThread *AllocOSThread() noexcept;
+
+        void AcquireVCoreOrSuspend(OSThread *ost) noexcept;
 
         void Scheduler(OSThread *ost) noexcept;
 
@@ -175,6 +190,8 @@ namespace orbiter {
          */
         void OSTIdle2Active(OSThread *ost) noexcept;
 
+        void OSTSleep() noexcept;
+
         /**
          * @brief Wakes up or initializes an operating system thread (OSThread) to handle queued fibers.
          *
@@ -194,6 +211,8 @@ namespace orbiter {
          *       ensure thread-safe operations on shared resources.
          */
         void OSTWakeRun() noexcept;
+
+        static void PublishResult(const OSThread *ost, datatype::OObject *result) noexcept;
 
         /**
          * @brief Releases the VCore wired to a given operating system thread (OSThread).

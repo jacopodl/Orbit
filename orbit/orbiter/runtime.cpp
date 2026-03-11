@@ -2,6 +2,8 @@
 //
 // Licensed under the Apache License v2.0
 
+#include <random>
+
 #include <orbit/orbiter/datatype/error.h>
 #include <orbit/orbiter/datatype/errors.h>
 #include <orbit/orbiter/datatype/future.h>
@@ -67,6 +69,92 @@ bool Orbiter::WireVCore(OSThread *ost, VCore *vcore) noexcept {
     return true;
 }
 
+Fiber *Orbiter::FindExecutable(OSThread *ost, Fiber *last, const bool global_first) noexcept {
+    Fiber *fiber = nullptr;
+
+    if (should_exit_)
+        return nullptr;
+
+    if (!global_first) {
+        fiber = ost->current->queue.Dequeue();
+        if (fiber != nullptr)
+            return fiber;
+    }
+
+    // Check from global queue
+    if ((fiber = this->fiber_queue_.Dequeue()) != nullptr)
+        return fiber;
+
+    if (global_first) {
+        fiber = ost->current->queue.Dequeue();
+        if (fiber != nullptr)
+            return fiber;
+    }
+
+    if (last != nullptr)
+        return last;
+
+    std::unique_lock lock(this->ost_lock_);
+
+    const auto vcore_busy = this->vcores_count_ / 2;
+    if (this->ost_spinning_count_ + 1 > vcore_busy)
+        return nullptr;
+
+    ost->spinning = true;
+    this->ost_spinning_count_ += 1;
+
+    ost->current->stealable = false;
+
+    lock.unlock();
+
+    for (auto i = 0; i < kSpinningCheckMax; i++) {
+        if ((fiber = this->StealWork(ost)) != nullptr)
+            break;
+
+        // Check from global queue
+        if ((fiber = this->fiber_queue_.Dequeue()) != nullptr)
+            break;
+    }
+
+    lock.lock();
+
+    ost->spinning = false;
+    this->ost_spinning_count_ -= 1;
+
+    ost->current->stealable = true;
+
+    // Last check on global queue
+    if (fiber == nullptr)
+        fiber = this->fiber_queue_.Dequeue();
+
+    return fiber;
+}
+
+Fiber *Orbiter::StealWork(const OSThread *ost) const noexcept {
+    thread_local std::minstd_rand vc_random([] {
+        std::random_device rd;
+        return rd();
+    }());
+
+    std::uniform_int_distribution<unsigned int> r_distrib(0, this->vcores_count_ - 1);
+
+    auto *vc_current = ost->current;
+
+    const auto start = r_distrib(vc_random);
+    for (auto i = 0; i < this->vcores_count_; i++) {
+        auto *target_vc = this->vcores_ + ((start + i) % this->vcores_count_);
+        if (target_vc == vc_current || !target_vc->stealable)
+            continue;
+
+        // Steal from queues that contain one or more items
+        auto *fiber = vc_current->queue.StealDequeue(1, target_vc->queue);
+        if (fiber != nullptr)
+            return fiber;
+    }
+
+    return nullptr;
+}
+
 OSThread *Orbiter::AllocOSThread() noexcept {
     auto *ost = new(std::nothrow) OSThread();
     if (ost != nullptr)
@@ -75,10 +163,105 @@ OSThread *Orbiter::AllocOSThread() noexcept {
     return ost;
 }
 
+void Orbiter::AcquireVCoreOrSuspend(OSThread *ost) noexcept {
+    std::unique_lock lock(this->vcore_lock_);
+
+    while (ost->current == nullptr && !this->should_exit_) {
+        if (WireVCore(ost, ost->old) || AcquireVCore(ost)) {
+            lock.unlock();
+
+            this->OSTIdle2Active(ost);
+
+            break;
+        }
+
+        lock.unlock();
+        this->OSTActive2Idle(ost);
+
+        this->OSTSleep();
+        lock.lock();
+    }
+}
+
 void Orbiter::Scheduler(OSThread *ost) noexcept {
-    // TODO: impl me
-    assert(false);
-    // Fiber::SetCurrent(...);
+    Fiber *last = nullptr;
+
+    unsigned int fairness_tick = kFairnessTickCount;
+
+    while (!this->should_exit_) {
+        last = ost->fiber;
+
+        if (fairness_tick == 0)
+            fairness_tick = kFairnessTickCount;
+
+        if (ost->current == nullptr)
+            this->AcquireVCoreOrSuspend(ost);
+
+        ost->fiber = this->FindExecutable(ost, last, --fairness_tick == 0);
+        if (ost->fiber == nullptr) {
+            if (should_exit_)
+                break;
+
+            this->OSTActive2Idle(ost);
+            this->OSTSleep();
+
+            continue;
+        }
+
+        if (last != nullptr && last != ost->fiber) {
+            if (!ost->current->queue.Enqueue(last))
+                this->fiber_queue_.Enqueue(last);
+        }
+
+        // Check the fiber is not yet connected to a previous OSThread,
+        // this can happen when the fiber is interrupted by an asynchronous operation (e.g. socket read/write).
+        // Such an operation may complete before the thread that started it has actually released the fiber.
+        if (ost->fiber->active_ost != nullptr) {
+            std::this_thread::yield();
+
+            continue;
+        }
+
+        const auto fiber = ost->fiber;
+
+        fiber->active_ost = ost;
+
+        Fiber::SetCurrent(fiber);
+
+        const auto result = eval(fiber);
+
+        fiber->active_ost = nullptr;
+
+        if (fiber->state == FiberState::RUNNING) {
+            PublishResult(ost, result);
+
+            ost->fiber = nullptr;
+
+            continue;
+        }
+
+        if (fiber->state == FiberState::SUSPENDED) {
+            ost->fiber = nullptr;
+
+            continue;
+        }
+
+        assert(fiber->state == FiberState::YIELDED);
+    }
+
+    std::unique_lock vc_lock(this->vcore_lock_);
+
+    this->ReleaseVCore(ost);
+
+    vc_lock.unlock();
+
+    std::unique_lock _(this->ost_lock_);
+
+    ost->RemoveFromQueue();
+
+    ost->thread.detach();
+
+    this->FreeOSThread(ost);
 }
 
 void Orbiter::FreeOSThread(const OSThread *ost) noexcept {
@@ -97,7 +280,7 @@ void Orbiter::OSTActive2Idle(OSThread *ost) noexcept {
         return;
 
     std::unique_lock vc_lock(this->vcore_lock_);
-    std::unique_lock _(ost_lock_);
+    std::unique_lock _(this->ost_lock_);
 
     this->ReleaseVCore(ost);
     vc_lock.unlock();
@@ -114,7 +297,7 @@ void Orbiter::OSTIdle2Active(OSThread *ost) noexcept {
     if (!ost->idle)
         return;
 
-    std::unique_lock _(ost_lock_);
+    std::unique_lock _(this->ost_lock_);
 
     ost->idle = false;
 
@@ -122,6 +305,20 @@ void Orbiter::OSTIdle2Active(OSThread *ost) noexcept {
     ost->PushToQueue(&this->ost_active_);
 
     this->ost_idle_count_ -= 1;
+}
+
+void Orbiter::OSTSleep() noexcept {
+    std::unique_lock lock(this->ost_lock_);
+
+    this->ost_cond_.wait(lock, [&] {
+        if (this->ost_pending_wakeups_ > 0) {
+            this->ost_pending_wakeups_ -= 1;
+
+            return true;
+        }
+
+        return this->should_exit_;
+    });
 }
 
 void Orbiter::OSTWakeRun() noexcept {
@@ -133,7 +330,12 @@ void Orbiter::OSTWakeRun() noexcept {
     std::unique_lock _(this->ost_lock_);
 
     if (this->ost_idle_ != nullptr) {
-        this->ost_cond_.notify_one();
+        if (this->ost_spinning_count_ == 0) {
+            this->ost_pending_wakeups_ += 1;
+
+            this->ost_cond_.notify_one();
+        }
+
         return;
     }
 
@@ -162,6 +364,21 @@ void Orbiter::OSTWakeRun() noexcept {
     }
 
     ost->thread = std::thread(&Orbiter::Scheduler, this, ost);
+}
+
+void Orbiter::PublishResult(const OSThread *ost, OObject *result) noexcept {
+    auto *fiber = ost->fiber;
+
+    if (fiber->future != nullptr) {
+        if (*fiber->panic.r_current_ != nullptr)
+            FutureReject((Future *) fiber->future, fiber->GetDiscardPanic().get());
+        else
+            FutureResolve((Future *) fiber->future, result);
+    }
+
+    fiber->isolate->gc->RemoveFiber(fiber);
+
+    fiber->isolate->fpool_->DeleteFiber(fiber);
 }
 
 void Orbiter::ReleaseVCore(OSThread *ost) noexcept {
@@ -244,6 +461,7 @@ HOObject Orbiter::Eval(Context *context, Module *module, Code *code) noexcept {
     isolate->gc->AddFiber(fiber);
 
     if (!this->fiber_queue_.Enqueue(fiber)) {
+        isolate->gc->RemoveFiber(fiber);
         isolate->fpool_->DeleteFiber(fiber);
 
         ErrorSet(isolate,

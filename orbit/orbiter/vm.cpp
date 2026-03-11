@@ -787,6 +787,7 @@ CGOTO
 #define ACCESS_STACK_BP(offset) ((PtrSize *)(stack->stack + (regs->BP.reg + (offset))))
 #define ACCESS_STACK_SP(offset) ((PtrSize *)(stack->stack + (regs->SP.reg + (offset))))
 #define LOAD_FROM_STACK         ACCESS_STACK_SP((-sizeof(void *)))
+#define CHECK_PREEMPT           do {if(--fiber->vm.preempt_tick == 0) {fiber->state = FiberState::YIELDED; return nullptr;}} while(0)
 
 BEGIN:
     auto *code = fiber->context.code;
@@ -934,8 +935,11 @@ CATCH_FINALLY:
                     DISPATCH;
                 }
 
-                if (Call(fiber, func, res))
+                if (Call(fiber, func, res)) {
+                    CHECK_PREEMPT;
+
                     goto BEGIN;
+                }
 
                 DISPATCH;
             }
@@ -1647,6 +1651,8 @@ CATCH_FINALLY:
             }
             TARGET_OP(JMP) {
                 const auto offset = instr & 0xFFFFFFu;
+
+                CHECK_PREEMPT;
 
                 JMP_TO(offset);
 
