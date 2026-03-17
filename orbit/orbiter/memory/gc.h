@@ -32,6 +32,9 @@ namespace orbiter {
         constexpr unsigned char kGCPromotionThresholdGen0 = 2;
         constexpr unsigned char kGCPromotionThresholdGen1 = 3;
 
+        constexpr unsigned int kGCThresholdGen1 = 5;
+        constexpr unsigned int kGCThresholdGen2 = 10;
+
 #ifdef _ORBIT_ENVIRON_64BIT_
         constexpr unsigned char kGCMaxEpoch = 0xFFFFFFFFFFFFFE; // (1u<<56) - 2
 #elif  _ORBIT_ENVIRON_32BIT_
@@ -268,11 +271,12 @@ namespace orbiter {
             MSize max_heap_size_;
 
             std::atomic_bool enabled_ = true;
-            std::atomic_bool requested_ = false;
+
+            bool requested_ = false;
 
             std::atomic_uintptr_t allocated_bytes_ = 0;
 
-            std::atomic_uint mutators_ = 0;
+            unsigned int mutators_ = 0;
             unsigned int parked_mutators_ = 0;
 
             explicit GC(Isolate *isolate, const U32 heap_size) noexcept : allocator_(isolate),
@@ -283,6 +287,9 @@ namespace orbiter {
 
                 this->context_.generations[0].promotion_threshold = kGCPromotionThresholdGen0;
                 this->context_.generations[1].promotion_threshold = kGCPromotionThresholdGen1;
+
+                this->context_.generations[1].threshold = kGCThresholdGen1;
+                this->context_.generations[2].threshold = kGCThresholdGen2;
             }
 
             explicit GC(Isolate *isolate) noexcept : GC(isolate, kGCMaxHeapSize) {

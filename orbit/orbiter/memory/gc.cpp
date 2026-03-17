@@ -146,22 +146,28 @@ void GC::NextEpoch() noexcept {
 }
 
 void GC::ReleaseSTW() noexcept {
-    this->parked_mutators_ -= 1;
+    std::unique_lock lock(this->context_.barrier_lock);
 
     this->requested_ = false;
+
+    lock.unlock();
 
     this->context_.wait_barrier.notify_all();
 }
 
 void GC::RequestSTW() noexcept {
-    this->requested_.store(true, std::memory_order_release);
-
     std::unique_lock lock(this->context_.barrier_lock);
 
-    this->parked_mutators_ += 1;
+    if (this->requested_) {
+        this->context_.wait_barrier.wait(lock, [this] {
+            return !this->requested_;
+        });
+    }
+
+    this->requested_ = true;
 
     this->context_.wait_barrier.wait(lock, [this] {
-        return this->parked_mutators_ == this->mutators_;
+        return this->parked_mutators_ == this->mutators_ - 1;
     });
 }
 
@@ -320,15 +326,15 @@ void GC::TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransi
 // *********************************************************************************************************************
 
 bool GC::ParkAtSafepoint() noexcept {
-    if (!this->requested_.load(std::memory_order_relaxed))
-        return false;
-
     std::unique_lock lock(this->context_.barrier_lock);
+
+    if (!this->requested_)
+        return false;
 
     this->parked_mutators_ += 1;
 
     this->context_.wait_barrier.wait(lock, [this] {
-        return !this->requested_.load();
+        return !this->requested_;
     });
 
     this->parked_mutators_ -= 1;
@@ -337,13 +343,17 @@ bool GC::ParkAtSafepoint() noexcept {
 }
 
 MSize GC::ForceCollect() noexcept {
-    std::unique_lock _(this->context_.barrier_lock);
+    this->RequestSTW();
 
-    return this->Collect();
+    const auto result = this->Collect();
+
+    this->ReleaseSTW();
+
+    return result;
 }
 
 OObject *GC::AllocObject(const MSize size) noexcept {
-    auto allocate = sizeof(GCHead) + size;
+    const auto allocate = sizeof(GCHead) + size;
 
     this->ThresholdCollect();
 
@@ -389,14 +399,18 @@ void GC::EnterManagedRegion() noexcept {
     std::unique_lock lock(this->context_.barrier_lock);
 
     this->context_.wait_barrier.wait(lock, [this] {
-        return !this->requested_.load();
+        return !this->requested_;
     });
 
-    this->mutators_.fetch_add(1, std::memory_order_acq_rel);
+    this->mutators_ += 1;
 }
 
 void GC::LeaveManagedRegion() noexcept {
-    this->mutators_.fetch_sub(1, std::memory_order_acq_rel);
+    std::unique_lock lock(this->context_.barrier_lock);
+
+    this->mutators_ -= 1;
+
+    lock.unlock();
 
     // If the GC was waiting, notify the change
     this->context_.wait_barrier.notify_all();
@@ -431,10 +445,10 @@ void GC::RemoveFiber(const Fiber *fiber) noexcept {
 void GC::ThresholdCollect() noexcept {
     auto allocated_bytes = this->allocated_bytes_.load(std::memory_order_relaxed);
 
-    if (!this->enabled_ && allocated_bytes < ((this->max_heap_size_ * 90) / 100))
+    if (!this->enabled_ || allocated_bytes < ((this->max_heap_size_ * 90) / 100))
         return;
 
-    std::unique_lock _(this->context_.barrier_lock);
+    this->RequestSTW();
 
     allocated_bytes = this->allocated_bytes_.load(std::memory_order_relaxed);
 
@@ -454,6 +468,8 @@ void GC::ThresholdCollect() noexcept {
         }
     } else
         this->Collect();
+
+    this->ReleaseSTW();
 
     this->Sweep();
 }
