@@ -97,7 +97,7 @@ namespace orbiter {
             }
 
             [[nodiscard]] bool IsVisited(const MSize epoch) const {
-                return this->epoch == epoch || this->epoch == (epoch - 1);
+                return this->epoch == epoch;
             }
 
             [[nodiscard]] GCHead *Next() const {

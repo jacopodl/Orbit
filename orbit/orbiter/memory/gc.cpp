@@ -13,15 +13,7 @@ using namespace orbiter;
 using namespace orbiter::datatype;
 using namespace orbiter::memory;
 
-thread_local bool gen_z_lock = false;
-
-// *********************************************************************************************************************
-// PRIVATE
-// *********************************************************************************************************************
-
 MSize GC::Collect(int start, int end) noexcept {
-    std::unique_lock lock(this->context_.track_lock, std::defer_lock);
-
     GCTransientList unreachable{};
     GCTransientList nextgen[2]{};
 
@@ -48,15 +40,10 @@ MSize GC::Collect(int start, int end) noexcept {
         const auto selected = this->context_.generations + i;
         const auto total = selected->count;
 
-        // Lock for generation 0 to ensure thread safety
-        if (i == 0) {
-            gen_z_lock = true;
-            lock.lock();
-        }
-
         // Reset collection statistics for the current generation
         this->ResetStats(i);
 
+        // The object list is empty, no need to continue
         if (selected->list == nullptr)
             return 0;
 
@@ -68,12 +55,6 @@ MSize GC::Collect(int start, int end) noexcept {
 
         // 3) Trace and classify unreachable objects
         TraceRoots(selected, &nextgen[1 - chg], &unreachable);
-
-        // Unlock after scanning and tracing for generation 0
-        if (i == 0) {
-            gen_z_lock = false;
-            lock.unlock();
-        }
 
         // Promote objects from the previous generation to the current generation
         if (nextgen[chg].head != nullptr)
@@ -95,16 +76,25 @@ MSize GC::Collect(int start, int end) noexcept {
     }
 
     // Move unreachable objects to the garbage list
-    std::unique_lock _(this->context_.garbage_lock);
-
     return unreachable.MergeTo(&this->context_.garbage);
 }
 
 void GC::Free(GCHead *head) noexcept {
     const auto size = head->size;
     auto *obj = GC_GET_OBJ(head);
+    auto *dtor = O_GET_TYPE(obj)->dtor;
 
-    // TODO: Call DTOR!
+    if (dtor != nullptr && !head->IsFinalized()) {
+        if (!dtor(obj)) {
+            head->SetFinalize(true);
+
+            head->prev = nullptr;
+
+            Track(obj, head->IsContainer());
+
+            return;
+        }
+    }
 
     O_DECREF(O_GET_TYPE(obj));
 
@@ -140,10 +130,10 @@ void GC::HeadRemove(const GCHead *head) noexcept {
 }
 
 void GC::NextEpoch() noexcept {
-    this->epoch += 2;
+    this->epoch += 1;
 
     if (this->epoch > kGCMaxEpoch)
-        this->epoch = 2;
+        this->epoch = 1;
 }
 
 void GC::ReleaseSTW() noexcept {
@@ -307,23 +297,19 @@ void GC::Trace(OObject *object, MSize epoch) noexcept {
 }
 
 void GC::TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransientList *unreachable) noexcept {
-    std::unique_lock lock(this->context_.track_lock, std::defer_lock);
-
-    const auto first_gen = generation == this->context_.generations;
     const auto last_gen = generation == &this->context_.generations[kGCGenerations - 1];
 
     GCHead *next;
     for (auto *cursor = generation->list; cursor != nullptr; cursor = next) {
         next = cursor->Next();
 
-        if (this->epoch == cursor->epoch) {
+        if (cursor->IsVisited(this->epoch)) {
             cursor->age += 1;
 
             if (!last_gen && cursor->age >= generation->promotion_threshold) {
                 cursor->age = 0;
 
                 HeadRemove(cursor);
-
                 generation->count -= 1;
 
                 nextgen->AddHead(cursor);
@@ -333,26 +319,7 @@ void GC::TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransi
         }
 
         HeadRemove(cursor);
-
         generation->count -= 1;
-
-        if (!first_gen && this->epoch - 1 == cursor->epoch) {
-            if (!gen_z_lock)
-                lock.lock();
-
-            cursor->age = 0;
-
-            HeadInsert(&this->context_.generations[0].list, cursor);
-
-            this->context_.generations[0].count += 1;
-
-            if (!gen_z_lock)
-                lock.unlock();
-
-            continue;
-        }
-
-        cursor->SetFinalize(true);
 
         unreachable->AddHead(cursor);
 
