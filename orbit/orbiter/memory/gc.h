@@ -133,7 +133,7 @@ namespace orbiter {
          * mechanisms.
          */
         class GCTransientList {
-            MSize count = 0;
+            MSize count_ = 0;
 
         public:
             GCHead *head = nullptr;
@@ -151,7 +151,7 @@ namespace orbiter {
              * @return The number of elements transferred from the current list to the destination list.
              */
             MSize MergeTo(GCHead **destination) {
-                const auto count = this->count;
+                const auto count = this->count_;
 
                 if (this->head == nullptr)
                     return 0;
@@ -166,7 +166,7 @@ namespace orbiter {
 
                 this->head = nullptr;
                 this->tail = nullptr;
-                this->count = 0;
+                this->count_ = 0;
 
                 return count;
             }
@@ -194,7 +194,7 @@ namespace orbiter {
                 if (this->tail == nullptr)
                     this->tail = head;
 
-                this->count += 1;
+                this->count_ += 1;
             }
         };
 
@@ -214,51 +214,9 @@ namespace orbiter {
             MSize collected;
             MSize uncollected;
 
-            U32 promotion_threshold;
-            U32 threshold;
-            U32 times;
-        };
-
-        /**
-         * @brief Represents the context for managing garbage collection operations and related resources.
-         *
-         * The GCContext class provides critical synchronization mechanisms and metadata structures
-         * required to manage garbage collection in a memory system. It encapsulates locks and
-         * data structures for generational garbage collection, and object tracking.
-         * It serves as the core structure for coordinating the various components involved in garbage
-         * collection processes.
-         *
-         * Key features include:
-         *
-         * - Synchronization:
-         *   Contains multiple mutex locks to ensure thread-safe operations across garbage collection tasks,
-         *   such as garbage list updates, tracked object management and interactions with the virtual machine.
-         *
-         * - Generational Collection:
-         *   Manages multiple generations for garbage collection using the `generations` array, enabling
-         *   optimized collection of objects based on their lifespan and access patterns.
-         *
-         * - Object Tracking:
-         *   Maintains metadata for garbage, including objects awaiting collection, reference-counted objects,
-         *   and tracked allocations. Provides counters for the number of objects and their total memory usage
-         *   in various states.
-         */
-        class GCContext {
-        public:
-            std::mutex barrier_lock;
-
-            std::mutex garbage_lock;
-            std::mutex track_lock;
-            std::mutex vm_lock;
-
-            std::condition_variable wait_barrier;
-
-            GCGeneration generations[kGCGenerations]{};
-
-            GCHead *garbage = nullptr;
-
-            MSize tracked_count = 0;
-            MSize tracked_bytes = 0;
+            U16 promotion_threshold;
+            U16 threshold;
+            U16 times;
         };
 
         /**
@@ -272,22 +230,31 @@ namespace orbiter {
         class GC {
             IsolateAllocator allocator_;
 
-            GCContext context_;
+            std::mutex barrier_lock_;
+            std::mutex garbage_lock_;
+            std::mutex track_lock_;
+            std::mutex vm_lock_;
+
+            std::condition_variable wait_barrier_;
 
             Fiber *fibers_;
 
-            MSize epoch = 2;
+            GCGeneration generations_[kGCGenerations]{};
 
+            GCHead *garbage_ = nullptr;
+
+            MSize epoch_ = 2;
+
+            std::atomic<MSize> allocated_bytes_ = 0;
             MSize max_heap_size_;
-
-            std::atomic_bool enabled_ = true;
-
-            bool requested_ = false;
-
-            std::atomic_uintptr_t allocated_bytes_ = 0;
+            MSize tracked_count_ = 0;
+            MSize tracked_bytes_ = 0;
 
             unsigned int mutators_ = 0;
             unsigned int parked_mutators_ = 0;
+
+            std::atomic_bool enabled_ = true;
+            bool requested_ = false;
 
             explicit GC(Isolate *isolate, const U32 heap_size) noexcept : allocator_(isolate),
                                                                           fibers_(nullptr),
@@ -295,11 +262,11 @@ namespace orbiter {
                 if (heap_size < kGCMinHeapSize)
                     this->max_heap_size_ = kGCMinHeapSize;
 
-                this->context_.generations[0].promotion_threshold = kGCPromotionThresholdGen0;
-                this->context_.generations[1].promotion_threshold = kGCPromotionThresholdGen1;
+                this->generations_[0].promotion_threshold = kGCPromotionThresholdGen0;
+                this->generations_[1].promotion_threshold = kGCPromotionThresholdGen1;
 
-                this->context_.generations[1].threshold = kGCThresholdGen1;
-                this->context_.generations[2].threshold = kGCThresholdGen2;
+                this->generations_[1].threshold = kGCThresholdGen1;
+                this->generations_[2].threshold = kGCThresholdGen2;
             }
 
             explicit GC(Isolate *isolate) noexcept : GC(isolate, kGCMaxHeapSize) {

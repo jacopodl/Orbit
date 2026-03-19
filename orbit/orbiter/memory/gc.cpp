@@ -37,7 +37,7 @@ MSize GC::Collect(int start, int end) noexcept {
         if ((next_gen = (i + 1) % kGCGenerations) == 0)
             next_gen = kGCGenerations - 1;
 
-        const auto selected = this->context_.generations + i;
+        const auto selected = this->generations_ + i;
         const auto total = selected->count;
 
         // Reset collection statistics for the current generation
@@ -70,13 +70,13 @@ MSize GC::Collect(int start, int end) noexcept {
 
     // Promote remaining objects in the nextgen list to the next generation
     if (nextgen[chg].head != nullptr) {
-        const auto selected = this->context_.generations + next_gen;
+        const auto selected = this->generations_ + next_gen;
 
         selected->count += nextgen[chg].MergeTo(&selected->list);
     }
 
     // Move unreachable objects to the garbage list
-    return unreachable.MergeTo(&this->context_.garbage);
+    return unreachable.MergeTo(&this->garbage_);
 }
 
 void GC::Free(GCHead *head) noexcept {
@@ -130,43 +130,43 @@ void GC::HeadRemove(const GCHead *head) noexcept {
 }
 
 void GC::NextEpoch() noexcept {
-    this->epoch += 1;
+    this->epoch_ += 1;
 
-    if (this->epoch > kGCMaxEpoch)
-        this->epoch = 1;
+    if (this->epoch_ > kGCMaxEpoch)
+        this->epoch_ = 1;
 }
 
 void GC::ReleaseSTW() noexcept {
-    std::unique_lock lock(this->context_.barrier_lock);
+    std::unique_lock lock(this->barrier_lock_);
 
     this->requested_ = false;
 
     lock.unlock();
 
-    this->context_.wait_barrier.notify_all();
+    this->wait_barrier_.notify_all();
 }
 
 void GC::RequestSTW() noexcept {
-    std::unique_lock lock(this->context_.barrier_lock);
+    std::unique_lock lock(this->barrier_lock_);
 
     if (this->requested_) {
-        this->context_.wait_barrier.wait(lock, [this] {
+        this->wait_barrier_.wait(lock, [this] {
             return !this->requested_;
         });
     }
 
     this->requested_ = true;
 
-    this->context_.wait_barrier.wait(lock, [this] {
+    this->wait_barrier_.wait(lock, [this] {
         return this->parked_mutators_ == this->mutators_ - 1;
     });
 }
 
 void GC::ResetStats(const int generation) noexcept {
     if (generation > 0)
-        this->context_.generations[generation - 1].times = 0;
+        this->generations_[generation - 1].times = 0;
 
-    auto *gen = this->context_.generations + generation;
+    auto *gen = this->generations_ + generation;
     gen->collected = 0;
     gen->uncollected = 0;
 }
@@ -174,21 +174,21 @@ void GC::ResetStats(const int generation) noexcept {
 void GC::ScanFibers() const noexcept {
     for (auto *cursor = this->fibers_; cursor != nullptr; cursor = cursor->gc_set.next) {
         // FiberContext
-        Visit((OObject *) cursor->context.context, this->epoch);
-        Visit((OObject *) cursor->context.module, this->epoch);
-        Visit((OObject *) cursor->context.code, this->epoch);
-        Visit(cursor->context.func, this->epoch);
+        Visit((OObject *) cursor->context.context, this->epoch_);
+        Visit((OObject *) cursor->context.module, this->epoch_);
+        Visit((OObject *) cursor->context.code, this->epoch_);
+        Visit(cursor->context.func, this->epoch_);
 
         // PanicContainer
         for (const auto *panic = *cursor->panic.r_current_; panic != nullptr; panic = panic->prev)
-            Visit(panic->error, this->epoch);
+            Visit(panic->error, this->epoch_);
 
         // Defer stack
         for (const auto *defer = cursor->defer_stack.stack_; defer != nullptr; defer = defer->next)
-            Visit((OObject *) defer->func, this->epoch);
+            Visit((OObject *) defer->func, this->epoch_);
 
         // Future
-        Visit(cursor->future, this->epoch);
+        Visit(cursor->future, this->epoch_);
 
         this->ScanVMRegisters(cursor);
         this->ScanVMStack(cursor);
@@ -204,7 +204,7 @@ void GC::ScanVMRegisters(Fiber *fiber) const noexcept {
         if (!O_IS_OBJECT(obj))
             continue;
 
-        Visit(obj, this->epoch);
+        Visit(obj, this->epoch_);
     }
 }
 
@@ -219,7 +219,7 @@ void GC::ScanVMStack(const Fiber *fiber) const noexcept {
             obj = (OObject *) ((ExceptionContext *) (stack + i))->ret_value;
 
             if (O_IS_OBJECT(obj))
-                Visit(obj, this->epoch);
+                Visit(obj, this->epoch_);
 
             i += sizeof(ExceptionContext) - sizeof(PtrSize);
 
@@ -229,7 +229,7 @@ void GC::ScanVMStack(const Fiber *fiber) const noexcept {
         if (!O_IS_OBJECT(obj))
             continue;
 
-        Visit(obj, this->epoch);
+        Visit(obj, this->epoch_);
     }
 }
 
@@ -238,21 +238,21 @@ void GC::ScanRoots(const GCGeneration *generation) const noexcept {
         auto *obj = GC_GET_OBJ(cursor);
 
         if (O_GET_RC(obj).GetStrongCount() > 0) {
-            const auto visited = cursor->IsVisited(this->epoch);
+            const auto visited = cursor->IsVisited(this->epoch_);
 
-            cursor->epoch = this->epoch;
+            cursor->epoch = this->epoch_;
 
             if (!visited && cursor->IsContainer())
-                Trace(obj, this->epoch);
+                Trace(obj, this->epoch_);
         }
     }
 }
 
 void GC::Sweep() noexcept {
-    std::unique_lock lock(this->context_.garbage_lock);
+    std::unique_lock lock(this->garbage_lock_);
 
-    auto *cursor = this->context_.garbage;
-    this->context_.garbage = nullptr;
+    auto *cursor = this->garbage_;
+    this->garbage_ = nullptr;
 
     lock.unlock();
 
@@ -297,13 +297,13 @@ void GC::Trace(OObject *object, MSize epoch) noexcept {
 }
 
 void GC::TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransientList *unreachable) noexcept {
-    const auto last_gen = generation == &this->context_.generations[kGCGenerations - 1];
+    const auto last_gen = generation == &this->generations_[kGCGenerations - 1];
 
     GCHead *next;
     for (auto *cursor = generation->list; cursor != nullptr; cursor = next) {
         next = cursor->Next();
 
-        if (cursor->IsVisited(this->epoch)) {
+        if (cursor->IsVisited(this->epoch_)) {
             cursor->age += 1;
 
             if (!last_gen && cursor->age >= generation->promotion_threshold) {
@@ -323,8 +323,8 @@ void GC::TraceRoots(GCGeneration *generation, GCTransientList *nextgen, GCTransi
 
         unreachable->AddHead(cursor);
 
-        this->context_.tracked_count -= 1;
-        this->context_.tracked_bytes -= cursor->size;
+        this->tracked_count_ -= 1;
+        this->tracked_bytes_ -= cursor->size;
     }
 }
 
@@ -344,14 +344,14 @@ void GC::Visit(OObject *object, const MSize epoch) noexcept {
 // *********************************************************************************************************************
 
 bool GC::ParkAtSafepoint() noexcept {
-    std::unique_lock lock(this->context_.barrier_lock);
+    std::unique_lock lock(this->barrier_lock_);
 
     if (!this->requested_)
         return false;
 
     this->parked_mutators_ += 1;
 
-    this->context_.wait_barrier.wait(lock, [this] {
+    this->wait_barrier_.wait(lock, [this] {
         return !this->requested_;
     });
 
@@ -396,7 +396,7 @@ OObject *GC::AllocObject(const MSize size) noexcept {
 }
 
 void GC::AddFiber(Fiber *fiber) noexcept {
-    std::unique_lock _(this->context_.vm_lock);
+    std::unique_lock _(this->vm_lock_);
 
     if (this->fibers_ == nullptr) {
         fiber->gc_set.next = nullptr;
@@ -414,9 +414,9 @@ void GC::AddFiber(Fiber *fiber) noexcept {
 }
 
 void GC::EnterManagedRegion() noexcept {
-    std::unique_lock lock(this->context_.barrier_lock);
+    std::unique_lock lock(this->barrier_lock_);
 
-    this->context_.wait_barrier.wait(lock, [this] {
+    this->wait_barrier_.wait(lock, [this] {
         return !this->requested_;
     });
 
@@ -424,14 +424,14 @@ void GC::EnterManagedRegion() noexcept {
 }
 
 void GC::LeaveManagedRegion() noexcept {
-    std::unique_lock lock(this->context_.barrier_lock);
+    std::unique_lock lock(this->barrier_lock_);
 
     this->mutators_ -= 1;
 
     lock.unlock();
 
     // If the GC was waiting, notify the change
-    this->context_.wait_barrier.notify_all();
+    this->wait_barrier_.notify_all();
 }
 
 void GC::RawFree(OObject *object, bool dtor) noexcept {
@@ -449,7 +449,7 @@ void GC::RawFree(OObject *object, bool dtor) noexcept {
 }
 
 void GC::RemoveFiber(const Fiber *fiber) noexcept {
-    std::unique_lock _(this->context_.vm_lock);
+    std::unique_lock _(this->vm_lock_);
 
     auto *next = fiber->gc_set.next;
 
@@ -475,7 +475,7 @@ void GC::ThresholdCollect() noexcept {
             auto i = 1;
 
             for (; i < kGCGenerations; i++) {
-                const auto *generations = this->context_.generations;
+                const auto *generations = this->generations_;
 
                 if (generations[i - 1].times < generations[i].threshold
                     && generations[i].count < kGCThresholdElementsCount)
@@ -495,9 +495,9 @@ void GC::ThresholdCollect() noexcept {
 void GC::Track(OObject *object, bool is_container) noexcept {
     auto *head = GC_GET_HEAD(object);
 
-    auto *generation = this->context_.generations;
+    auto *generation = this->generations_;
 
-    std::unique_lock _(this->context_.track_lock);
+    std::unique_lock _(this->track_lock_);
 
     if (!head->IsTracked()) {
         if (is_container)
@@ -506,7 +506,7 @@ void GC::Track(OObject *object, bool is_container) noexcept {
         HeadInsert(&generation->list, head);
         generation->count += 1;
 
-        this->context_.tracked_count += 1;
-        this->context_.tracked_bytes += head->size;
+        this->tracked_count_ += 1;
+        this->tracked_bytes_ += head->size;
     }
 }
