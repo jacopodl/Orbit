@@ -802,6 +802,16 @@ CATCH_FINALLY:
 
                 DISPATCH;
             }
+            TARGET_OP(NOT) {
+                const auto dst = FETCH_R_DST(instr);
+                const auto src = FETCH_R_SRC(instr);
+
+                auto *value = (OObject *) REG_N(src);
+
+                REG_N(dst) = ((MSize) value == kOddBallTRUE || O_IS_OBJECT(value)) ? kOddBallFALSE : kOddBallTRUE;
+
+                DISPATCH;
+            }
             TARGET_OP(PANIC) {
                 const auto src = FETCH_R_SRC(instr);
                 const auto value = (OObject *) REG_N(src);
