@@ -238,13 +238,6 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                                                             ((ir::UnaryImmInstr *) instr)->flags, // Shift for LDCST
                                                             ((ir::UnaryImmInstr *) instr)->imm);
                 break;
-            case orbiter::OPCode::MOV:
-            case orbiter::OPCode::MOWN:
-                *(orbiter::MachineWord *) m_code = EMIT_DSF(instr->opcode,
-                                                            instr->assigned_reg,
-                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
-                                                            0);
-                break;
             case orbiter::OPCode::SETPROP:
                 *(orbiter::MachineWord *) m_code = EMIT_DSO(instr->opcode,
                                                             ((ManipTypeInstruction*)instr->operands[0].value)->
