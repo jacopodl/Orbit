@@ -13,6 +13,7 @@
 #include <orbit/orbiter/datatype/future.h>
 #include <orbit/orbiter/datatype/generator.h>
 #include <orbit/orbiter/datatype/nativefunc.h>
+#include <orbit/orbiter/datatype/result.h>
 #include <orbit/orbiter/datatype/tuple.h>
 
 #include <orbit/orbiter/native/ffi.h>
@@ -168,11 +169,15 @@ bool UnwindStack(Fiber *fiber) {
 
         // Load previous frame
         regs->BP.reg -= sizeof(void *);
-        regs->IP.reg = (*(PtrSize *) (stack->stack + regs->BP.reg)) + sizeof(MachineWord);
+
+        regs->IP.reg = *(PtrSize *) (stack->stack + regs->BP.reg);
+        regs->IP.reg &= ~0x01;
 
         regs->BP.reg -= sizeof(void *);
         regs->SP.reg = regs->BP.reg;
+
         regs->BP.reg = *(PtrSize *) (stack->stack + regs->BP.reg);
+        regs->BP.reg &= ~0x01;
 
         regs->SP.reg -= sizeof(FiberContext);
 
@@ -202,6 +207,10 @@ bool UnwindStack(Fiber *fiber) {
             ((Generator *) context->func)->state = GeneratorState::EXHAUSTED;
             ((Generator *) context->func)->acquired = 0;
         }
+
+        // This can only occur if the code is executing in a spawned fiber
+        if (context->code == nullptr)
+            return false;
 
         regs->IP.reg = (PtrSize) context->code->m_end;
     }
@@ -1294,10 +1303,15 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(STRES) {
-                // TODO: Implement result object here
-                src = FETCH_R_SRC(instr);
+                if (fiber->panic.current_ == nullptr) {
+                    result = (OObject *) ACCESS_REG_SRC(instr);
 
-                assert(false);
+                    ACCESS_REG_DST(instr) = (PtrSize) ResultNew(fiber->isolate, result, true).get();
+                } else {
+                    result = fiber->GetDiscardPanic().release();
+
+                    ACCESS_REG_DST(instr) = (PtrSize) ResultNew(fiber->isolate, result, false).get();
+                }
 
                 DISPATCH;
             }

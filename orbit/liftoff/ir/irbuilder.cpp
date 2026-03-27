@@ -1406,11 +1406,11 @@ Instruction *IRBuilder::visitTrap(const parser::Unary *node) {
 
     this->builder_.SetupTryCatch(nullptr, finally_block, guard.base);
 
-    auto *ret = this->visit(node->value);
+    auto *value = this->visit(node->value);
 
     this->builder_.AppendBasicBlock(finally_block);
 
-    this->builder_.CreateUnaryOp(orbiter::OPCode::STRES, ret);
+    auto *ret = this->builder_.CreateUnaryOp(orbiter::OPCode::STRES, value);
 
     this->builder_.CreateUnaryOp(orbiter::OPCode::TEND);
 

@@ -219,7 +219,6 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                 *(orbiter::MachineWord *) m_code = EMIT_OP(instr->opcode);
                 break;
             case orbiter::OPCode::EXECSUB:
-            case orbiter::OPCode::STRES:
                 *(orbiter::MachineWord *) m_code = EMIT_SO(instr->opcode,
                                                            ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                            0);
@@ -358,6 +357,7 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                                                               ((Instruction *) instr->operands[3].value)->assigned_reg);
                 break;
             case orbiter::OPCode::AWAIT:
+            case orbiter::OPCode::STRES:
             case orbiter::OPCode::LDMOD:
             case orbiter::OPCode::LDINIT:
             case orbiter::OPCode::NOBJ:

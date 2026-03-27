@@ -534,9 +534,6 @@ Instruction *Builder::LoadFromOffset(const OPCode opcode, const U8 r_base, const
 Instruction *Builder::SetupTryCatch(BasicBlock *catch_block, BasicBlock *finally_block, const U16 offset) {
     assert(offset <= 63);
 
-    if (catch_block == nullptr)
-        return this->CreateInstruction<TCFInstr>(OPCode::TBGIN, offset);
-
     this->CreateInstruction<TCFInstr>(OPCode::TBGIN, catch_block, offset);
     return this->CreateInstruction<BranchInstruction>(OPCode::TSFIN, nullptr, finally_block);
 }
