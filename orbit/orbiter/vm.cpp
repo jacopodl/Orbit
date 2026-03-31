@@ -282,7 +282,7 @@ int CallInit(Fiber *fiber, const Function *func, const unsigned short p_count, c
             // Check object is instance
             const auto args = *((OObject **) ((fiber->vm.stack.stack + fiber->vm.regs.SP.reg)
                                               - (total_args * sizeof(void *))));
-            if (!O_GET_HEAD(args).is_instance)
+            if (!O_GET_RC(args).IsInstance())
                 assert(false); // FIXME: error!
         } else
             total_args -= 1;

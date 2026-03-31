@@ -237,7 +237,7 @@ void GC::ScanRoots(const GCGeneration *generation) const noexcept {
     for (auto *cursor = generation->list; cursor != nullptr; cursor = cursor->Next()) {
         auto *obj = GC_GET_OBJ(cursor);
 
-        if (O_GET_RC(obj).GetStrongCount() > 0) {
+        if (O_GET_RC(obj).GetCount() > 0) {
             const auto visited = cursor->IsVisited(this->epoch_);
 
             cursor->epoch = this->epoch_;
@@ -387,7 +387,7 @@ OObject *GC::AllocObject(const MSize size) noexcept {
 
         const auto obj = GC_GET_OBJ(head);
 
-        O_UNSAFE_GET_RC(obj) = (MSize) RCType::INLINE;
+        O_UNSAFE_GET_RC(obj) = (MSize) 0;
 
         return obj;
     }

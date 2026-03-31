@@ -491,7 +491,7 @@ namespace orbiter::datatype {
      * @return Pointer to the newly created object, or nullptr if allocation failed.
      */
     template<typename T>
-    T *MakeObject(TypeInfo *type, U16 overalloc) {
+    T *MakeObject(TypeInfo *type, const U16 overalloc) {
         const auto *isolate = type->isolate;
 
         auto *ret = isolate->gc->AllocObject(type->i_size + overalloc);
@@ -499,7 +499,7 @@ namespace orbiter::datatype {
             return nullptr;
 
         O_GET_HEAD(ret).type_ = O_INCREF(type);
-        O_GET_HEAD(ret).is_instance = true;
+        O_UNSAFE_GET_RC(ret) |= RefCount::kIsInstanceMask;
 
         return (T *) ret;
     }
@@ -556,7 +556,7 @@ namespace orbiter::datatype {
      * casts the object itself to TypeInfo otherwise.
      */
     inline TypeInfo *GetTypeInfoFromObject(const OObject *object) {
-        if (O_GET_HEAD(object).is_instance)
+        if (O_GET_RC(object).IsInstance())
             return O_GET_TYPE(object);
 
         return (TypeInfo *) object;

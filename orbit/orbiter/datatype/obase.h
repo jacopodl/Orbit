@@ -9,7 +9,7 @@
 
 #include <orbit/datatype.h>
 
-#include <orbit/orbiter/memory/refcount.h>
+#include <orbit/orbiter/memory/bitoffset.h>
 
 #include <orbit/orbiter/sync/monitor.h>
 
@@ -18,13 +18,7 @@ namespace orbiter {
 }
 
 namespace orbiter::datatype {
-    constexpr auto kOddBallMask = (MSize) memory::RCBitOffsets::InlineMask | memory::RCBitOffsets::StrongVFLAGMask;
-
-    constexpr auto kSMIBit = (sizeof(MSize) * 8) - 1;
-
-    // Orbit uses signed SMI (Small Integers) by default
-    constexpr auto kSMIMinSize = -(static_cast<MSSize>(1) << (kSMIBit - 1));
-    constexpr auto kSMIMaxSize = (static_cast<MSSize>(1) << (kSMIBit - 1)) - 1;
+    constexpr auto kOddBallMask = memory::PtrBitOffsets::SMITagMask | memory::PtrBitOffsets::OddBallMask;
 
     constexpr auto kOddBallNIL = nullptr;
     constexpr auto kOddBallFALSE = 0x08u | kOddBallMask;
@@ -32,6 +26,13 @@ namespace orbiter::datatype {
 
 #define BOOL_TO_OBOOL(value) ((value) ? kOddBallTRUE : kOddBallFALSE)
 #define OBOOL_TO_BOOL(value) ((value) == kOddBallTRUE)
+
+    // Orbit uses signed SMI (Small Integers) by default
+    constexpr auto kSMIBit = (sizeof(MSize) * 8) - 1;
+    constexpr auto kSMIMinSize = -(static_cast<MSSize>(1) << (kSMIBit - 1));
+    constexpr auto kSMIMaxSize = (static_cast<MSSize>(1) << (kSMIBit - 1)) - 1;
+
+    struct OObject;
 
     enum class PropertyFlag:U8 {
         IN_OBJECT = 0x01,
@@ -70,12 +71,37 @@ namespace orbiter::datatype {
         PropertyFlag details;
     };
 
+    struct RefCount {
+        static constexpr MSize kIsInstanceMask = ((uintptr_t) 1) << ((sizeof(void *) * 8) - 1);
+        static constexpr MSize kCountMask = ~kIsInstanceMask;
+
+        std::atomic_uintptr_t bits_{};
+
+        explicit RefCount(const bool is_instance) noexcept : bits_(is_instance ? kIsInstanceMask : 0u) {
+        }
+
+        bool DecStrong() noexcept {
+            return (bits_.fetch_sub(1, std::memory_order_release) & kCountMask) == 1;
+        }
+
+        bool IsInstance() const noexcept {
+            return bits_.load(std::memory_order_relaxed) & kIsInstanceMask;
+        }
+
+        void IncStrong() noexcept {
+            bits_.fetch_add(1, std::memory_order_relaxed);
+        }
+
+        MSize GetCount() const noexcept {
+            return bits_.load(std::memory_order_relaxed) & kCountMask;
+        }
+    };
+
 #define OROBJ_HEAD                                                      \
     struct {                                                            \
-        orbiter::memory::RefCount ref_count_;                           \
+        RefCount ref_count_;                                            \
         struct TypeInfo *type_;                                         \
         std::atomic<orbiter::sync::Monitor *> mon_;                     \
-        bool is_instance;                                               \
     } head_
 
     enum class InstanceType {
@@ -191,27 +217,27 @@ namespace orbiter::datatype {
     // *****************************************************************************************************************
 
     // --- Lifecycle ---
-    using DtorFn          = bool (*)(OObject *);
+    using DtorFn = bool (*)(OObject *);
     using GCTraceCallback = void (*)(OObject *, MSize);
-    using TraceFn         = void (*)(const OObject *self, GCTraceCallback callback, MSize epoch);
+    using TraceFn = void (*)(const OObject *self, GCTraceCallback callback, MSize epoch);
     using TypeInfoAUXDtor = bool (*)(struct TypeInfo *self);
 
     // --- Comparison ---
     using CompareFn = int (*)(const OObject *, const OObject *);
-    using EqualFn   = bool (*)(const OObject *, const OObject *);
+    using EqualFn = bool (*)(const OObject *, const OObject *);
 
     // --- Arithmetic & Bitwise ---
     using BinaryFn = bool(*)(const OObject *, const OObject *, OObject *&result);
-    using UnaryFn  = bool (*)(const OObject *, OObject *&result);
+    using UnaryFn = bool (*)(const OObject *, OObject *&result);
 
     // --- Iteration ---
-    using GetIterFn  = OObject *(*)(OObject *);
+    using GetIterFn = OObject *(*)(OObject *);
     using IterNextFn = bool (*)(OObject *, OObject **);
 
     // --- Conversion ---
     using ToNativeType = bool (*)(OObject *, void *, NativeType);
-    using ToBoolFn     = bool (*)(const OObject *);
-    using ToStrFn      = OObject *(*)(Isolate *, const OObject *);
+    using ToBoolFn = bool (*)(const OObject *);
+    using ToStrFn = OObject *(*)(Isolate *, const OObject *);
 
     // --- Runtime ---
     using HashFn = MSize (*)(const OObject *);
@@ -266,7 +292,7 @@ namespace orbiter::datatype {
     struct TypeOps {
         // --- Comparison ---
         CompareFn compare;
-        EqualFn   equal;
+        EqualFn equal;
 
         // --- Arithmetic ---
         BinaryFn add;
@@ -288,14 +314,14 @@ namespace orbiter::datatype {
         UnaryFn bit_not;
 
         // --- Iteration ---
-        GetIterFn  get_iter;
+        GetIterFn get_iter;
         IterNextFn iter_next;
 
         // --- Conversion ---
         ToNativeType to_native;
-        ToBoolFn     to_bool;
-        ToStrFn      to_string;
-        ToStrFn      to_repr;
+        ToBoolFn to_bool;
+        ToStrFn to_string;
+        ToStrFn to_repr;
 
         // --- Runtime ---
         HashFn hash;
@@ -337,8 +363,8 @@ namespace orbiter::datatype {
 #define O_IS_NIL(object)                    (object == orbiter::datatype::kOddBallNIL)
 #define O_IS_TYPE(object, type)             (O_GET_TYPE(object)->i_type == type)
 
-#define O_DECREF(object)                    (O_IS_OBJECT(object) ? (O_GET_RC(object).DecStrong(nullptr), object) : object)
-#define O_FAST_DECREF(object)               ((object != nullptr) ? (O_GET_RC(object).DecStrong(nullptr), object) : object)
+#define O_DECREF(object)                    (O_IS_OBJECT(object) ? (O_GET_RC(object).DecStrong(), object) : object)
+#define O_FAST_DECREF(object)               ((object != nullptr) ? (O_GET_RC(object).DecStrong(), object) : object)
 
 #define O_INCREF(object)                    (O_IS_OBJECT(object) ? (O_GET_RC(object).IncStrong(), object) : object)
 #define O_FAST_INCREF(object)               ((object != nullptr) ? (O_GET_RC(object).IncStrong(), object) : object)
