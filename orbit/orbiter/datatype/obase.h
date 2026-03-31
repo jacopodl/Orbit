@@ -11,6 +11,8 @@
 
 #include <orbit/orbiter/memory/refcount.h>
 
+#include <orbit/orbiter/sync/monitor.h>
+
 namespace orbiter {
     class Isolate;
 }
@@ -72,6 +74,7 @@ namespace orbiter::datatype {
     struct {                                                            \
         orbiter::memory::RefCount ref_count_;                           \
         struct TypeInfo *type_;                                         \
+        std::atomic<orbiter::sync::Monitor *> mon_;                     \
         bool is_instance;                                               \
     } head_
 
@@ -314,6 +317,7 @@ namespace orbiter::datatype {
 #define O_GET_HEAD(object)                  ((object)->head_)
 #define O_GET_RC(object)                    (O_GET_HEAD(object).ref_count_)
 #define O_UNSAFE_GET_RC(object)             (*((MSize *) &O_GET_HEAD(object).ref_count_))
+#define O_GET_MON(object)                   (O_GET_HEAD(object).mon_)
 #define O_GET_TYPE(object)                  (O_GET_HEAD(object).type_)
 #define O_GET_TYPE_OPS(object)              (((TypeInfoOps *)((unsigned char*) O_GET_TYPE(object)))->ops)
 #define O_GET_ISOLATE(object)               (O_GET_TYPE(object)->isolate)

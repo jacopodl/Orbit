@@ -189,6 +189,32 @@ HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, InstanceTy
     O_GC_TRACK_RETURN(isolate, ti, false);
 }
 
+int orbiter::datatype::MonitorAcquire(Fiber *fiber, OObject *object) noexcept {
+    auto *monitor = O_GET_MON(object).load(std::memory_order_relaxed);
+    if (monitor == nullptr) {
+        memory::IsolateAllocator allocator(O_GET_ISOLATE(object));
+
+        monitor = allocator.AllocObject<sync::Monitor>();
+        if (monitor == nullptr)
+            return -1;
+
+        monitor->Acquire(fiber);
+
+        sync::Monitor *expected = nullptr;
+        if (O_GET_MON(object).compare_exchange_strong(expected, monitor, std::memory_order_acq_rel))
+            return 1;
+
+        allocator.FreeObject(monitor);
+
+        monitor = expected;
+    }
+
+    if (monitor->Acquire(fiber))
+        return 1;
+
+    return 0;
+}
+
 PropertyDescriptor *orbiter::datatype::TIFindLocalProperty(const TypeInfo *type, const char *name) {
     auto *property = type->properties.p_array;
 
@@ -270,4 +296,24 @@ U32 orbiter::datatype::GetTypeName(const OObject *object, char *out_str, const U
     }
 
     return length;
+}
+
+void orbiter::datatype::MonitorDestroy(OObject *object) noexcept {
+    sync::Monitor *expected = O_GET_MON(object).load(std::memory_order_relaxed);
+
+    if (expected == nullptr)
+        return;
+
+    if (O_GET_MON(object).compare_exchange_strong(expected, nullptr, std::memory_order_acq_rel)) {
+        assert(expected->IsDestroyable());
+
+        const memory::IsolateAllocator allocator(O_GET_ISOLATE(object));
+        allocator.FreeObject(expected);
+    }
+}
+
+void orbiter::datatype::MonitorRelease(const OObject *object) noexcept {
+    auto *monitor = O_GET_MON(object).load(std::memory_order_acquire);
+    if (monitor != nullptr)
+        monitor->Release();
 }

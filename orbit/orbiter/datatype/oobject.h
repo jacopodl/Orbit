@@ -437,6 +437,22 @@ namespace orbiter::datatype {
         return MakeType(isolate, isolate->primitive[(int) type], type, headroom, props, slots);
     }
 
+    /**
+     * @brief Acquires a monitor associated with the specified object for the given fiber.
+     *
+     * Attempts to acquire a synchronization monitor for the given object.
+     * If no monitor exists, a new monitor is allocated and associated with the object.
+     * The fiber is then registered with the acquired monitor.
+     *
+     * @param fiber Pointer to the fiber requesting the monitor acquisition
+     * @param object Pointer to the object for which the monitor is being acquired
+     *
+     * @return 1 if the monitor is successfully acquired or a new monitor is allocated and acquired
+     * @return 0 if the monitor is busy and cannot be acquired
+     * @return -1 if a new monitor allocation fails due to insufficient resources
+     */
+    int MonitorAcquire(Fiber *fiber, OObject *object) noexcept;
+
     MSize Hash(const OObject *obj);
 
     /**
@@ -547,6 +563,28 @@ namespace orbiter::datatype {
     }
 
     U32 GetTypeName(const OObject *object, char *out_str, U32 out_size);
+
+    /**
+     * @brief Safely destroys the monitor associated with the given object.
+     *
+     * If a monitor is currently associated with the object, this method ensures
+     * that it is properly cleaned up and deallocated from memory. The monitor must
+     * be in a destroyable state before deallocation.
+     *
+     * @param object Pointer to the object whose associated monitor is to be destroyed.
+     */
+    void MonitorDestroy(OObject *object) noexcept;
+
+    /**
+     * @brief Releases the monitor associated with the specified object
+     *
+     * This method retrieves and releases the monitor associated with the given
+     * object. If the object has no associated monitor, the function safely exits
+     * without any effect.
+     *
+     * @param object Pointer to the object whose associated monitor is to be released
+     */
+    void MonitorRelease(const OObject *object) noexcept;
 
     /**
      * @brief Release an OObject

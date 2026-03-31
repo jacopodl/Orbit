@@ -133,7 +133,8 @@ namespace orbiter::datatype {
             NON_ITERABLE,
             GENERATOR_INVALID_CALL,
             INVALID_NATIVE_TYPE,
-            GENERATOR_SPAWN
+            GENERATOR_SPAWN,
+            NON_SYNCHRONIZABLE
         };
 
         static constexpr const char *Details[] = {
@@ -147,7 +148,8 @@ namespace orbiter::datatype {
             (const char *) "cannot pass arguments when resuming a generator",
             (const char *) "invalid call: native functions can only be called within their defining module by directly "
             "invoking the symbol (indirect calls are not allowed)",
-            (const char *) "'spawn' does not support generator functions"
+            (const char *) "'spawn' does not support generator functions",
+            (const char *) "'%s' object cannot be used as a sync target"
         };
     };
 

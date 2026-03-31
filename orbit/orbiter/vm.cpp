@@ -579,8 +579,7 @@ void ExecuteCleanupForPC(const Fiber *fiber) {
 
         switch (entry->type) {
             case OPCode::SYNC_EXIT:
-                // TODO: impl this
-                printf("sync_exit: %p\n", value);
+                MonitorRelease(value);
                 break;
             default:
                 assert(false);
@@ -1778,11 +1777,31 @@ CATCH_FINALLY:
                 continue;
             }
             TARGET_OP(SYNC_ENTER) {
-                // TDOO: impl this
+                result = (OObject *) ACCESS_REG_SRC(instr);
+
+                if (O_IS_SMI(result)) {
+                    ErrorSetWithObjType(fiber->isolate,
+                                        TypeError::Details[TypeError::Reason::ID],
+                                        TypeError::Details[TypeError::Reason::NON_SYNCHRONIZABLE],
+                                        nullptr,
+                                        result);
+                    goto ERROR;
+                }
+
+                const auto res = MonitorAcquire(fiber, result);
+                if (res < 0)
+                    goto ERROR;
+
+                if (res == 0) {
+                    fiber->state = FiberState::YIELDED;
+                    return nullptr;
+                }
+
                 DISPATCH;
             }
             TARGET_OP(SYNC_EXIT) {
-                // TDOO: impl this
+                MonitorRelease((OObject *) ACCESS_REG_SRC(instr));
+
                 DISPATCH;
             }
             TARGET_OP(TBGIN) {
