@@ -23,8 +23,16 @@ bool orbiter::datatype::CheckParameter(const Parameter *parameters, OObject **ar
     for (auto *cursor = parameters; cursor->name != nullptr; cursor++) {
         bool ok = false;
 
-        if (index >= argc)
-            assert(false); // Never get here
+        if (index >= argc && !cursor->optional) {
+            ErrorSet(isolate,
+                     ValueError::Details[ValueError::Reason::ID],
+                     nullptr,
+                     ValueError::Details[ValueError::Reason::MISSING_PARAMETER],
+                     cursor->name,
+                     index);
+
+            return false;
+        }
 
         const auto *value = argv[index];
 
@@ -54,22 +62,8 @@ bool orbiter::datatype::CheckParameter(const Parameter *parameters, OObject **ar
                     }
                 }
             }
-        } else {
+        } else if (cursor->optional)
             ok = true;
-
-            if (!cursor->optional) {
-                GetTypeName(value, type_name, sizeof(type_name));
-                ErrorSet(isolate,
-                         ValueError::Details[ValueError::Reason::ID],
-                         nullptr,
-                         ValueError::Details[ValueError::Reason::PARAMETER],
-                         type_name,
-                         cursor->name,
-                         index);
-
-                return false;
-            }
-        }
 
         if (!ok) {
             GetTypeName(value, type_name, sizeof(type_name));

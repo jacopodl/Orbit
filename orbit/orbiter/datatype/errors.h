@@ -158,12 +158,14 @@ namespace orbiter::datatype {
             ID,
 
             PARAMETER,
+            MISSING_PARAMETER,
         };
 
         static constexpr const char *Details[] = {
             (const char *) "ValueError",
 
-            (const char *) "unexpected '%s' value for '%s' parameter(%d)"
+            (const char *) "unexpected '%s' value for '%s' parameter(%d)",
+            (const char *) "missing required parameter '%s' at position %d"
         };
     };
 }
