@@ -19,7 +19,7 @@ using namespace liftoff;
 using namespace liftoff::ir;
 using namespace liftoff::parser;
 
-orbiter::datatype::HList Compiler::BuildCodesList(IRContext *ir) {
+orbiter::datatype::HList Compiler::BuildCodesList(const IRContext *ir) {
     orbiter::datatype::HList codes{};
 
     const auto count = ir->GetSubcontextCount();
@@ -40,21 +40,29 @@ orbiter::datatype::HList Compiler::BuildCodesList(IRContext *ir) {
 orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
     /*
      * IR Generation
-     *   -> Optimizations
-     *   -> Liveness Analysis
-     *   -> Linear Scan
-     *   -> Phi Resolution
-     *   -> Code Generation
+     *   -> Step 1: Optimization
+     *   -> Step 2: Spill across call boundaries
+     *   -> Step 3: Instruction numbering
+     *   -> Step 4: Liveness analysis
+     *   -> Step 5: Register allocation
+     *   -> Step 6: Code generation
      */
 
-    // Step 1: Optimization
+    // Step 1: Optimization (DCE, constant folding, ...)
     Optimizer optimizer(ir, this->level_);
     optimizer.Optimize();
 
-    // Step 2-3-4: Perform Liveness Analysis / Allocate Registers / Phi resolution
-    LinearScan(ir, orbiter::kGeneralPurposeRegistersCount).Allocate();
+    // Step 2: Insert PUSH/POP pairs for values live across CALL/EXECSUB boundaries
+    Builder(ir).SpillAcrossCallBoundaries();
 
-    // Step 5: Generate machine code
+    // Step 3: Assign final stable instruction offsets on the fully transformed IR
+    ir->SlotIndexes();
+
+    // Step 4-5: Compute live intervals and allocate registers
+    auto intervals = ir->ComputeLiveIntervals();
+    LinearScan(ir, orbiter::kGeneralPurposeRegistersCount).Allocate(intervals);
+
+    // Step 6: Generate machine code
     auto code = Codegen(ir).Generate();
     if (code) {
         if (ir->GetSubcontextCount() > 0) {

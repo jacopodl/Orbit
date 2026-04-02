@@ -225,42 +225,6 @@ void IRContext::AddActiveVar(const Symbol *symbol, Instruction *instr) {
     this->active_regs_.insert({symbol, instr});
 }
 
-void IRContext::RemoveFromObjList(Object *obj) noexcept {
-    auto *next = obj->memory_.next;
-    auto *prev = obj->memory_.prev;
-
-    obj->memory_.next = nullptr;
-    obj->memory_.prev = nullptr;
-
-    if (next != nullptr)
-        next->memory_.prev = prev;
-
-    if (prev == nullptr) {
-        this->objs_ = next;
-
-        return;
-    }
-
-    prev->memory_.next = next;
-}
-
-void IRContext::InsertInstructionAfter(Instruction *instruction, Instruction *after) noexcept {
-    instruction->basic_block->AddInstructionAfter(instruction, after);
-}
-
-void IRContext::InsertInstructionBefore(Instruction *instruction, Instruction *before) noexcept {
-    instruction->basic_block->AddInstructionBefore(instruction, before);
-}
-
-void IRContext::InvalidateActiveVar(const Symbol *symbol) {
-    if (symbol == nullptr) {
-        this->active_regs_.clear();
-        return;
-    }
-
-    this->active_regs_.erase(symbol);
-}
-
 void IRContext::Delete(IRContext *context) {
     if (context == nullptr)
         return;
@@ -287,4 +251,49 @@ void IRContext::DeleteInstruction(Instruction *instruction) noexcept {
     const orbiter::memory::IsolateAllocator allocator(this->isolate_);
 
     allocator.free(instruction);
+}
+
+void IRContext::RemoveFromObjList(Object *obj) noexcept {
+    auto *next = obj->memory_.next;
+    auto *prev = obj->memory_.prev;
+
+    obj->memory_.next = nullptr;
+    obj->memory_.prev = nullptr;
+
+    if (next != nullptr)
+        next->memory_.prev = prev;
+
+    if (prev == nullptr) {
+        this->objs_ = next;
+
+        return;
+    }
+
+    prev->memory_.next = next;
+}
+
+void IRContext::InvalidateActiveVar(const Symbol *symbol) {
+    if (symbol == nullptr) {
+        this->active_regs_.clear();
+        return;
+    }
+
+    this->active_regs_.erase(symbol);
+}
+
+void IRContext::InsertInstructionAfter(Instruction *instruction, Instruction *after) noexcept {
+    instruction->basic_block->AddInstructionAfter(instruction, after);
+}
+
+void IRContext::InsertInstructionBefore(Instruction *instruction, Instruction *before) noexcept {
+    instruction->basic_block->AddInstructionBefore(instruction, before);
+}
+
+void IRContext::SlotIndexes() const noexcept {
+    U32 index = 0;
+
+    for (const auto *b_cursor = this->entry_; b_cursor != nullptr; b_cursor = b_cursor->next) {
+        for (auto *instr = b_cursor->instr.head; instr != nullptr; instr = instr->next)
+            instr->instr_offset = index++;
+    }
 }

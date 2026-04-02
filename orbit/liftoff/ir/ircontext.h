@@ -513,6 +513,30 @@ namespace liftoff::ir {
         void AddActiveVar(const Symbol *symbol, Instruction *instr);
 
         /**
+         * @brief Deletes an IRContext instance, ensuring proper deallocation of resources.
+         *
+         * This method destroys the IRContext instance and deallocates its memory
+         * using the associated isolate's allocator.
+         *
+         * @param context A pointer to the IRContext instance to be deleted. If the pointer
+         *                is null, the method will return without performing any operation.
+         */
+        static void Delete(IRContext *context);
+
+        void DeleteInstruction(Instruction *instruction) noexcept;
+
+        /**
+         * @brief Invalidates a specific active variable or clears all active variables in the
+         * current IR context.
+         *
+         * If a specific symbol is provided, it removes that symbol from the active registers.
+         * If no symbol is provided, it clears all active registers.
+         *
+         * @param symbol A pointer to the symbol to be invalidated. If nullptr, all active variables are invalidated.
+         */
+        void InvalidateActiveVar(const Symbol *symbol);
+
+        /**
          * @brief Inserts an instruction immediately after a given instruction in the instruction list.
          *
          * This method adds the specified instruction `after` directly after the existing
@@ -537,28 +561,16 @@ namespace liftoff::ir {
         static void InsertInstructionBefore(Instruction *instruction, Instruction *before) noexcept;
 
         /**
-         * @brief Invalidates a specific active variable or clears all active variables in the
-         * current IR context.
+         * Sequentially assigns unique slot indexes to the instructions contained
+         * across all basic blocks in the current intermediate representation context.
          *
-         * If a specific symbol is provided, it removes that symbol from the active registers.
-         * If no symbol is provided, it clears all active registers.
-         *
-         * @param symbol A pointer to the symbol to be invalidated. If nullptr, all active variables are invalidated.
+         * This method iterates through each basic block and its corresponding
+         * instructions, assigning a monotonically increasing index value to
+         * each instruction. The index is set in the `instr_offset` field of the
+         * instruction, which is used to uniquely identify its position within
+         * the IR.
          */
-        void InvalidateActiveVar(const Symbol *symbol);
-
-        /**
-         * @brief Deletes an IRContext instance, ensuring proper deallocation of resources.
-         *
-         * This method destroys the IRContext instance and deallocates its memory
-         * using the associated isolate's allocator.
-         *
-         * @param context A pointer to the IRContext instance to be deleted. If the pointer
-         *                is null, the method will return without performing any operation.
-         */
-        static void Delete(IRContext *context);
-
-        void DeleteInstruction(Instruction *instruction) noexcept;
+        void SlotIndexes() const noexcept;
     };
 
     class IRCHandle {

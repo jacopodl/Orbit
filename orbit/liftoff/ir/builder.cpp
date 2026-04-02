@@ -711,6 +711,73 @@ void Builder::LeaveContext() {
         this->context = this->context->back;
 }
 
+void Builder::SpillAcrossCallBoundaries() {
+    Instruction *last_intf_instr = nullptr;
+
+    U32 logical_counter = 0;
+    U32 last_intf_point = 0;
+
+    for (const auto *block = this->context->entry_; block != nullptr; block = block->next) {
+        for (auto *instr = block->instr.head; instr != nullptr; instr = instr->next) {
+            instr->instr_offset = logical_counter++;
+
+            if (instr->num_ops > 0) {
+                Instruction *first_intf_point = nullptr;
+
+                for (int i = 0; i < instr->num_ops; ++i) {
+                    auto *operand = (Instruction *) instr->operands[i].value;
+                    if (operand != nullptr
+                        && operand->type() == ObjectType::INSTRUCTION
+                        && operand->instr_offset < last_intf_point) {
+                        auto *store = this->GetStackPush(operand);
+
+                        IRContext::InsertInstructionAfter(operand, store);
+
+                        Instruction *load = nullptr;
+                        for (const auto *user = operand->use_list; user != nullptr; user = user->next) {
+                            auto *user_instr = (Instruction *) user->user;
+
+                            if (user_instr != store
+                                && user_instr->instr_offset == 0
+                                || user_instr->instr_offset > last_intf_point) {
+                                if (load == nullptr) {
+                                    load = this->GetStackPop();
+
+                                    IRContext::InsertInstructionAfter(last_intf_instr, load);
+                                }
+
+                                user_instr->ReplaceOperand(operand, load);
+
+                                user = operand->use_list;
+                            }
+                        }
+
+                        if (first_intf_point == nullptr || first_intf_point->instr_offset > operand->instr_offset)
+                            first_intf_point = operand;
+                    }
+                }
+
+                if (first_intf_point != nullptr) {
+                    logical_counter = first_intf_point->instr_offset;
+
+                    for (auto *cursor = first_intf_point; cursor != instr; cursor = cursor->next)
+                        cursor->instr_offset = logical_counter++;
+
+                    instr->instr_offset = logical_counter++;
+                }
+            }
+
+            if (instr->type() == ObjectType::INSTRUCTION) {
+                const auto *phys = (PhysInstruction *) instr;
+                if (phys->opcode == OPCode::CALL || phys->opcode == OPCode::EXECSUB) {
+                    last_intf_instr = instr;
+                    last_intf_point = instr->instr_offset;
+                }
+            }
+        }
+    }
+}
+
 void Builder::ReleaseStackSlots(const U16 slots) const {
     assert(this->context->stack_slots >= slots);
 

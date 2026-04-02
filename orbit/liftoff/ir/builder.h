@@ -389,6 +389,23 @@ namespace liftoff::ir {
          * @brief Exits the current compilation context and computing liveness.
          */
         void LeaveContext();
+
+        /**
+         * Inserts explicit PUSH/POP pairs around call boundaries to preserve values that are live
+         * across a CALL or EXECSUB instruction.
+         *
+         * A value is considered to cross a call boundary if it is defined before a call and consumed
+         * after it. Since calls may clobber all caller-saved registers, such values must be saved to
+         * the stack before the call and reloaded afterwards.
+         *
+         * This pass assigns temporary logical offsets to instructions internally — solely as a means
+         * to detect which values straddle a call boundary. These offsets are provisional and will be
+         * overwritten by a subsequent SlotIndexes() pass, which assigns the final stable numbering
+         * on the fully transformed IR.
+         *
+         * Must run after all optimization passes (DCE, constant folding, etc.) and before SlotIndexes().
+         */
+        void SpillAcrossCallBoundaries();
     };
 
     class StackSlotGuard {

@@ -18,7 +18,7 @@ namespace liftoff {
 
         bool is_module_;
 
-        orbiter::datatype::HList BuildCodesList(ir::IRContext *ir);
+        orbiter::datatype::HList BuildCodesList(const ir::IRContext *ir);
 
         orbiter::datatype::HCode Compile(ir::IRContext *ir);
 
