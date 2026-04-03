@@ -22,16 +22,16 @@ HModule orbiter::datatype::ModuleNew(TypeInfo *tp_module) {
 }
 
 HOType orbiter::datatype::ModuleInit(Isolate *isolate) {
-    auto module = MakeType(isolate, InstanceType::MODULE, 0, 0, 0);
+    auto module = MakeType(isolate, "Module", InstanceType::MODULE, 0, 0, 0);
     return module;
 }
 
 HOType orbiter::datatype::ModuleTypeNew(Isolate *isolate, ORString *name, ORString *doc, U16 exported, U16 slots) {
     const auto total_props = exported + 2; // name + doc
 
-    auto module = MakeTypeExtended(isolate, InstanceType::MODULE, 0, total_props, slots);
+    auto module = MakeTypeExtended(isolate, ORSTRING_TO_CSTR(name), InstanceType::MODULE, 0, total_props, slots);
     if (module) {
-        if (!TIPropertyAdd(module.get(), "__name__", (OObject *) name, 0,PropertyFlag::IS_CONSTANT))
+        if (!TIPropertyAdd(module.get(), "__name__", (OObject *) name, 0, PropertyFlag::IS_CONSTANT))
             return {};
 
         if (!TIPropertyAdd(module.get(), "__doc__", (OObject *) doc, 0, PropertyFlag::IS_CONSTANT))

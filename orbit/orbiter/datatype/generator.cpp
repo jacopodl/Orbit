@@ -54,6 +54,6 @@ HGenerator orbiter::datatype::GeneratorNew(const Fiber *fiber, Function *base, c
 }
 
 HOType orbiter::datatype::GeneratorTypeInit(Isolate *isolate) {
-    auto gen = MakeType(isolate, InstanceType::GENERATOR, sizeof(Generator) - sizeof(OObject), 0, 0);
+    auto gen = MakeType(isolate, "Generator", InstanceType::GENERATOR, sizeof(Generator) - sizeof(OObject), 0, 0);
     return gen;
 }

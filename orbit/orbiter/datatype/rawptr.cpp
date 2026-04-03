@@ -33,7 +33,7 @@ bool orbiter::datatype::RawPtrTypeSetup(TypeInfo *self) {
 }
 
 HOType orbiter::datatype::RawPtrTypeInit(Isolate *isolate) {
-    auto rawptr = MakeType(isolate, InstanceType::RAWPTR, sizeof(RawPtr) - sizeof(OObject), 0, 0);
+    auto rawptr = MakeType(isolate, "Rawptr", InstanceType::RAWPTR, sizeof(RawPtr) - sizeof(OObject), 0, 0);
     return rawptr;
 }
 

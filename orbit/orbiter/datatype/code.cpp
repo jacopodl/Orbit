@@ -30,6 +30,6 @@ HCode orbiter::datatype::CodeNew(Isolate *isolate, const unsigned char *m_code, 
 }
 
 HOType orbiter::datatype::CodeTypeInit(Isolate *isolate) {
-    auto code = MakeType(isolate, InstanceType::CODE, sizeof(Code) - sizeof(OObject), 0, 0);
+    auto code = MakeType(isolate, "Code", InstanceType::CODE, sizeof(Code) - sizeof(OObject), 0, 0);
     return code;
 }

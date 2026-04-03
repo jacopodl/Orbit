@@ -113,6 +113,6 @@ HContext orbiter::datatype::ContextNew(Isolate *isolate) {
 }
 
 HOType orbiter::datatype::ContextInit(Isolate *isolate) {
-    auto context = MakeType(isolate, InstanceType::CONTEXT, sizeof(Context) - sizeof(OObject), 0, 0);
+    auto context = MakeType(isolate, "Context", InstanceType::CONTEXT, sizeof(Context) - sizeof(OObject), 0, 0);
     return context;
 }

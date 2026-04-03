@@ -19,20 +19,20 @@ RUNTIME_METHOD(type_hash, hash,
 RUNTIME_METHOD(type_id, id,
                "Returns a unique integer identifier for an object. "
                "This identifier remains constant throughout the object's lifetime.",
-               0,false, false) {
+               0, false, false) {
     // TODO: IMPL
     return {};
 }
 
 RUNTIME_METHOD(type_repr, repr,
                "Return a string containing a printable representation of an object.",
-               0,false, false) {
+               0, false, false) {
     // TODO: IMPL
     return {};
 }
 
 RUNTIME_METHOD(type_str, str, "Return a string version of an object.",
-               0,false,false) {
+               0, false, false) {
     // TODO: IMPL
     return {};
 }
@@ -46,7 +46,7 @@ const FunctionDef type_methods[] = {
 };
 
 HOType orbiter::datatype::TypeInit(Isolate *isolate) {
-    auto type = MakeType(isolate, nullptr, InstanceType::TYPE, 0, 4, 0);
+    auto type = MakeType(isolate, nullptr, "Type", InstanceType::TYPE, 0, 4, 0);
     return type;
 }
 

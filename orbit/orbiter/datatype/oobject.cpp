@@ -146,11 +146,26 @@ bool orbiter::datatype::TIPropertiesInit(Isolate *isolate, TypeInfo *type, U8 n)
     return true;
 }
 
-HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, InstanceType type,
-                                   U8 headroom, U8 props, U8 slots) {
+HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, const char *name, const InstanceType type,
+                                   const U8 headroom, const U8 props, const U8 slots) {
     auto *ti = (TypeInfo *) isolate->gc->AllocObject(sizeof(TypeInfoOps));
     if (ti == nullptr)
         return {};
+
+    const memory::IsolateAllocator allocator(isolate);
+
+    if (name != nullptr) {
+        const auto slen = strlen(name);
+
+        ti->name = (char *) allocator.Alloc(slen + 1);
+        if (ti->name == nullptr) {
+            isolate->gc->RawFree((OObject *) ti, false);
+            return {};
+        }
+
+        memory::MemoryCopy((char *) ti->name, name, slen);
+        ((char *) ti->name)[slen] = '\0';
+    }
 
     O_GET_HEAD(ti).type_ = nullptr;
 
@@ -167,9 +182,9 @@ HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, InstanceTy
 
     ti->headroom = headroom;
 
-    ti->mro = nullptr;
     ti->isolate = isolate;
     ti->trace = nullptr;
+    ti->mro = nullptr;
 
     ti->aux.data = nullptr;
     ti->aux.dtor = nullptr;
@@ -178,7 +193,9 @@ HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, InstanceTy
     ti->properties.p_array = nullptr;
 
     if (!TIPropertiesInit(isolate, ti, props)) {
-        isolate->gc->Free((OObject *) ti);
+        allocator.free((char *) ti->name);
+
+        isolate->gc->RawFree((OObject *) ti, false);
 
         return {};
     }
@@ -263,34 +280,26 @@ PropertyDescriptor *orbiter::datatype::TIFindProperty(const TypeInfo *type, cons
     return prop;
 }
 
-U32 orbiter::datatype::GetTypeName(const OObject *object, char *out_str, const U32 out_size) {
-    U32 length = 0;
-    InstanceType type;
+U32 orbiter::datatype::GetTypeName(const Isolate *isolate, const OObject *object, char *out_str, const U32 out_size) {
+    TypeInfo *type = nullptr;
 
     if (!O_IS_OBJECT(object)) {
         if (object == nullptr)
-            type = InstanceType::NIL;
+            type = isolate->primitive[(int) InstanceType::NIL];
         else if (O_IS_SMI(object))
-            type = InstanceType::NUMBER;
+            type = isolate->primitive[(int) InstanceType::NUMBER];
         else
-            type = InstanceType::BOOLEAN;
-    } else {
-        type = O_GET_TYPE(object)->i_type;
+            type = isolate->primitive[(int) InstanceType::BOOLEAN];
+    } else
+        type = O_GET_TYPE(object);
 
-        if (type == InstanceType::CLASS) {
-            /// FIXME: return name of class here
-            /// length = ....
-            assert(false);
-        }
-    }
 
-    if (length == 0)
-        length = (U32) strlen(InstanceTypeNames[(int) type]);
+    const auto length = (U32) strlen(type->name);
 
     if (out_str != nullptr) {
         const auto min_length = std::min(length, out_size);
 
-        memory::MemoryCopy(out_str, InstanceTypeNames[(int) type], min_length);
+        memory::MemoryCopy(out_str, type->name, min_length);
         out_str[min_length] = '\0';
     }
 

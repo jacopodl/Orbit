@@ -33,7 +33,7 @@ bool orbiter::datatype::TupleTypeSetup(TypeInfo *self) {
 }
 
 HOType orbiter::datatype::TupleTypeInit(Isolate *isolate) {
-    auto tuple = MakeType(isolate, InstanceType::TUPLE, sizeof(Tuple) - sizeof(OObject), 0, 0);
+    auto tuple = MakeType(isolate, "Tuple", InstanceType::TUPLE, sizeof(Tuple) - sizeof(OObject), 0, 0);
     return tuple;
 }
 

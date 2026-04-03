@@ -44,7 +44,7 @@ HOObject orbiter::datatype::ClosureGet(Closure *closure, U16 index) {
 }
 
 HOType orbiter::datatype::ClosureTypeInit(Isolate *isolate) {
-    auto type = MakeType(isolate, InstanceType::CLOSURE, sizeof(Closure) - sizeof(OObject), 0, 0);
+    auto type = MakeType(isolate, "Closure", InstanceType::CLOSURE, sizeof(Closure) - sizeof(OObject), 0, 0);
     return type;
 }
 
@@ -55,4 +55,3 @@ void orbiter::datatype::ClosureSet(Closure *closure, U16 index, OObject *object)
 
     slots[index] = O_INCREF(object);
 }
-

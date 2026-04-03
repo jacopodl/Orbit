@@ -245,6 +245,6 @@ MSize orbiter::datatype::ORStringHash(ORString *string) {
 }
 
 HOType orbiter::datatype::ORStringTypeInit(Isolate *isolate) {
-    auto string = MakeType(isolate, InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 0, 0);
+    auto string = MakeType(isolate, "String", InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 0, 0);
     return string;
 }

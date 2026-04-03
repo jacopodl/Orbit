@@ -75,13 +75,13 @@ bool orbiter::datatype::ListExtend(List *list, OObject *other) {
         return ListAppend(list, other);
 
     if (O_IS_TYPE(other, InstanceType::TUPLE)) {
-        auto **objects =  ((Tuple *) other)->objects;
+        auto **objects = ((Tuple *) other)->objects;
         const auto count = ((Tuple *) other)->length;
 
         if (!ListCheckSize(list, count))
             return false;
 
-        for (auto i=0;i<count;i++)
+        for (auto i = 0; i < count; i++)
             list->objects[list->length + i] = O_INCREF(objects[i]);
 
         list->length += count;
@@ -169,7 +169,7 @@ HOObject orbiter::datatype::ListGet(List *list, bool *success, MSSize index) {
 }
 
 HOType orbiter::datatype::ListTypeInit(Isolate *isolate) {
-    auto list = MakeType(isolate, InstanceType::LIST, sizeof(List) - sizeof(OObject), 0, 0);
+    auto list = MakeType(isolate, "List", InstanceType::LIST, sizeof(List) - sizeof(OObject), 0, 0);
     return list;
 }
 

@@ -157,6 +157,6 @@ HFunction orbiter::datatype::FunctionNew(const Function *func, OObject **args, U
 }
 
 HOType orbiter::datatype::FunctionTypeInit(Isolate *isolate) {
-    auto func = MakeType(isolate, InstanceType::FUNCTION, sizeof(Function) - sizeof(OObject), 0, 0);
+    auto func = MakeType(isolate, "Function", InstanceType::FUNCTION, sizeof(Function) - sizeof(OObject), 0, 0);
     return func;
 }

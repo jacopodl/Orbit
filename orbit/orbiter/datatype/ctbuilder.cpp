@@ -113,7 +113,7 @@ HClass orbiter::datatype::ClassNew(TypeInfo *type) {
 }
 
 HOType orbiter::datatype::ClassTypeInit(Isolate *isolate) {
-    auto clazz = MakeType(isolate, InstanceType::CLASS, 0, 0, 0);
+    auto clazz = MakeType(isolate, "Class", InstanceType::CLASS, 0, 0, 0);
     return clazz;
 }
 
@@ -122,9 +122,11 @@ HOType orbiter::datatype::ClassTypeNew(const Code *code, TypeInfo *super, TypeIn
     HOType clazz{};
 
     if (super == nullptr)
-        clazz = MakeTypeExtended(isolate, InstanceType::CLASS, 0, code->exported.length, code->slots_count);
+        clazz = MakeTypeExtended(isolate, ORSTRING_TO_CSTR(code->name), InstanceType::CLASS, 0, code->exported.length,
+                                 code->slots_count);
     else
-        clazz = MakeType(isolate, super, InstanceType::CLASS, 0, code->exported.length, code->slots_count);
+        clazz = MakeType(isolate, super, ORSTRING_TO_CSTR(code->name), InstanceType::CLASS, 0, code->exported.length,
+                         code->slots_count);
 
     if (!clazz)
         return {};
@@ -142,14 +144,15 @@ HOType orbiter::datatype::ClassTypeNew(const Code *code, TypeInfo *super, TypeIn
 }
 
 HOType orbiter::datatype::TraitTypeInit(Isolate *isolate) {
-    auto clazz = MakeType(isolate, InstanceType::TRAIT, 0, 0, 0);
+    auto clazz = MakeType(isolate, "Trait", InstanceType::TRAIT, 0, 0, 0);
     return clazz;
 }
 
 HOType orbiter::datatype::TraitTypeNew(const Code *code, TypeInfo **traits, const U16 traits_count) {
     const auto isolate = O_GET_ISOLATE(code);
 
-    auto trait = MakeTypeExtended(isolate, InstanceType::TRAIT, 0, code->exported.length, 0);
+    auto trait = MakeTypeExtended(isolate, ORSTRING_TO_CSTR(code->name), InstanceType::TRAIT, 0, code->exported.length,
+                                  0);
     if (trait) {
         if (!PushProperties(trait.get(), code->exported.symbols, code->exported.length))
             return {};

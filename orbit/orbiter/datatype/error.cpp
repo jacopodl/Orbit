@@ -110,7 +110,7 @@ HError orbiter::datatype::ErrorNew(Isolate *isolate, const char *kind, OObject *
 }
 
 HOType orbiter::datatype::ErrorTypeInit(Isolate *isolate) {
-    auto error = MakeType(isolate, InstanceType::ERROR, 0, 4, 3);
+    auto error = MakeType(isolate, "Error", InstanceType::ERROR, 0, 4, 3);
     return error;
 }
 
@@ -127,10 +127,10 @@ void orbiter::datatype::ErrorSet(Isolate *isolate, const char *kind, OObject *de
 }
 
 void orbiter::datatype::ErrorSetWithObjType(Isolate *isolate, const char *kind, const char *format, const char *p1,
-                                     const OObject *target) {
+                                            const OObject *target) {
     char error[24];
 
-    GetTypeName(target, error, sizeof(error));
+    GetTypeName(isolate, target, error, sizeof(error));
 
     if (p1 == nullptr)
         ErrorSet(isolate, kind, nullptr, format, error);

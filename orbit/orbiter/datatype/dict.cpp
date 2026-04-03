@@ -109,6 +109,6 @@ HDict orbiter::datatype::DictNew(Isolate *isolate, U32 size) {
 }
 
 HOType orbiter::datatype::DictTypeInit(Isolate *isolate) {
-    auto dict = MakeType(isolate, InstanceType::DICT, sizeof(Dict) - sizeof(OObject), 0, 0);
+    auto dict = MakeType(isolate, "Dict", InstanceType::DICT, sizeof(Dict) - sizeof(OObject), 0, 0);
     return dict;
 }

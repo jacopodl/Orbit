@@ -26,14 +26,14 @@ HNativeFunc orbiter::datatype::NativeFuncNew(Isolate *isolate, native::NativeBin
     func->ret_type = binding->ret_type;
     func->arity = binding->params.count;
 
-    func->params = allocator.alloc<native::NativeParam>(func->arity  * sizeof(native::NativeParam));
+    func->params = allocator.alloc<native::NativeParam>(func->arity * sizeof(native::NativeParam));
     if (func->params == nullptr) {
         allocator.free(func->params);
 
         return {};
     }
 
-    for (auto i = 0; i < func->arity ; ++i) {
+    for (auto i = 0; i < func->arity; ++i) {
         func->params[i].name = O_FAST_INCREF(binding->params.params[i].name);
         func->params[i].type = binding->params.params[i].type;
     }
@@ -42,6 +42,6 @@ HNativeFunc orbiter::datatype::NativeFuncNew(Isolate *isolate, native::NativeBin
 }
 
 HOType orbiter::datatype::NativeFuncTypeInit(Isolate *isolate) {
-    auto func = MakeType(isolate, InstanceType::NATIVE_FUNC, sizeof(NativeFunc) - sizeof(OObject), 0, 0);
+    auto func = MakeType(isolate, "NativeFunc", InstanceType::NATIVE_FUNC, sizeof(NativeFunc) - sizeof(OObject), 0, 0);
     return func;
 }

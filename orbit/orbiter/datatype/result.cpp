@@ -24,7 +24,7 @@ bool orbiter::datatype::ResultTypeSetup(TypeInfo *self) {
 }
 
 HOType orbiter::datatype::ResultTypeInit(Isolate *isolate) {
-    auto type = MakeType(isolate, InstanceType::RESULT, sizeof(Result) - sizeof(OObject), 0, 0);
+    auto type = MakeType(isolate, "Result", InstanceType::RESULT, sizeof(Result) - sizeof(OObject), 0, 0);
     return type;
 }
 

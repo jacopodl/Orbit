@@ -971,7 +971,7 @@ CATCH_FINALLY:
                              TypeError::Details[TypeError::Reason::ID],
                              nullptr,
                              TypeError::Details[(int) TypeError::Reason::PANIC],
-                             InstanceTypeNames[(int) InstanceType::ERROR]);
+                             fiber->isolate->primitive[(int) InstanceType::ERROR]->name);
 
                     goto ERROR;
                 }
@@ -1022,7 +1022,7 @@ CATCH_FINALLY:
                     ErrorSetWithObjType(fiber->isolate,
                                         TypeError::Details[TypeError::Reason::ID],
                                         TypeError::Details[TypeError::Reason::MISMATCH],
-                                        InstanceTypeNames[(int) InstanceType::FUTURE],
+                                        fiber->isolate->primitive[(int) InstanceType::FUTURE]->name,
                                         (OObject *) future);
 
                     goto ERROR;

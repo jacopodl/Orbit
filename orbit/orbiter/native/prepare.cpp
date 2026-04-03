@@ -93,7 +93,7 @@ bool orbiter::native::PrepareCall(Isolate *isolate, const NativeFunc *func, Para
         if (to_native == nullptr || !to_native(args[i], &dst[d_index++].value, param->type)) {
             char error[24]{};
 
-            GetTypeName(args[i], error, sizeof(error));
+            GetTypeName(isolate, args[i], error, sizeof(error));
 
             ErrorSet(isolate,
                      FFIError::Details[FFIError::Reason::ID],

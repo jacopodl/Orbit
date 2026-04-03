@@ -41,8 +41,8 @@ bool Dispatch(orbiter::Isolate *isolate, const OObject *left, const OObject *rig
     char lname[24];
     char rname[24];
 
-    GetTypeName(left, lname, sizeof(lname));
-    GetTypeName(right, rname, sizeof(rname));
+    GetTypeName(isolate, left, lname, sizeof(lname));
+    GetTypeName(isolate, right, rname, sizeof(rname));
 
     ErrorSet(isolate,
              NotImplementedError::Details[NotImplementedError::Reason::ID],
@@ -466,7 +466,7 @@ HOObject orbiter::datatype::ToString(Isolate *isolate, const OObject *object) no
     // Fallback: <TypeName at 0xADDR>
     char type_name[24];
 
-    GetTypeName(object, type_name, sizeof(type_name));
+    GetTypeName(isolate, object, type_name, sizeof(type_name));
 
     return HOObject(ORStringFormat(isolate, "<%s at %p>", type_name, object));
 }

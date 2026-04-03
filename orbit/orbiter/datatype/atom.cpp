@@ -100,6 +100,6 @@ HAtom orbiter::datatype::AtomNew(Isolate *isolate, ORString *id) {
 }
 
 HOType orbiter::datatype::AtomTypeInit(Isolate *isolate) {
-    auto atom = MakeType(isolate, InstanceType::ATOM, 0, 0, 1);
+    auto atom = MakeType(isolate, "Atom", InstanceType::ATOM, 0, 0, 1);
     return atom;
 }

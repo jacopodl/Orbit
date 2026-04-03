@@ -104,7 +104,7 @@ namespace orbiter::datatype {
         std::atomic<orbiter::sync::Monitor *> mon_;                     \
     } head_
 
-    enum class InstanceType {
+    enum class InstanceType : U8 {
         TYPE,
 
         ATOM,
@@ -133,36 +133,6 @@ namespace orbiter::datatype {
         STRING,
         TRAIT,
         TUPLE
-    };
-
-    constexpr const char *InstanceTypeNames[] = {
-        "Type",
-        "Atom",
-        "Boolean",
-        "Bytes",
-        "Class",
-        "Closure",
-        "Code",
-        "Context",
-        "Decimal",
-        "Dict",
-        "Error",
-        "Function",
-        "Future",
-        "Generator",
-        "List",
-        "Module",
-        "Namespace",
-        "Nil",
-        "NativeFunc",
-        "Number",
-        "Object",
-        "RawPtr",
-        "Result",
-        //"Set",
-        "String",
-        "Trait",
-        "Tuple"
     };
 
     constexpr int kInstanceTypeCount = 26;
@@ -249,25 +219,16 @@ namespace orbiter::datatype {
     struct TypeInfo {
         OROBJ_HEAD;
 
-        /// Size of the object represented by this datatype (used for memory allocation)
-        U16 i_size;
-
-        U16 offset;
-
-        /// Additional headroom space
-        U8 headroom;
-
-        /// Instance type (enum defining various object types in Orbit)
-        InstanceType i_type;
-
-        /// Trait Method Resolution Order
-        OObject *mro;
+        const char *name;
 
         Isolate *isolate;
 
         DtorFn dtor;
 
         TraceFn trace;
+
+        /// Trait Method Resolution Order
+        OObject *mro;
 
         /* Auxiliary data storage for type-specific information */
         struct {
@@ -287,6 +248,17 @@ namespace orbiter::datatype {
             /* Number of properties in the array */
             U8 count;
         } properties;
+
+        /// Size of the object represented by this datatype (used for memory allocation)
+        U16 i_size;
+
+        U16 offset;
+
+        /// Additional headroom space
+        U8 headroom;
+
+        /// Instance type (enum defining various object types in Orbit)
+        InstanceType i_type;
     };
 
     struct TypeOps {

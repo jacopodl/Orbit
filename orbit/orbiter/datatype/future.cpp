@@ -37,7 +37,7 @@ HFuture orbiter::datatype::FutureNew(Isolate *isolate) {
 }
 
 HOType orbiter::datatype::FutureTypeInit(Isolate *isolate) {
-    auto rawptr = MakeType(isolate, InstanceType::FUTURE, sizeof(Future) - sizeof(OObject), 0, 0);
+    auto rawptr = MakeType(isolate, "Future", InstanceType::FUTURE, sizeof(Future) - sizeof(OObject), 0, 0);
     return rawptr;
 }
 

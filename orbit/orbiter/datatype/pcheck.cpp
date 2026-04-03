@@ -66,7 +66,7 @@ bool orbiter::datatype::CheckParameter(const Parameter *parameters, OObject **ar
             ok = true;
 
         if (!ok) {
-            GetTypeName(value, type_name, sizeof(type_name));
+            GetTypeName(isolate, value, type_name, sizeof(type_name));
             ErrorSet(isolate,
                      TypeError::Details[TypeError::Reason::ID],
                      nullptr,

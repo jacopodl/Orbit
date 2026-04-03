@@ -405,7 +405,8 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created TypeInfo
      */
-    HOType MakeType(Isolate *isolate, TypeInfo *super, InstanceType type, U8 headroom, U8 props, U8 slots);
+    HOType MakeType(Isolate *isolate, TypeInfo *super, const char *name, InstanceType type, U8 headroom, U8 props,
+                    U8 slots);
 
     /**
      * @brief Create a new TypeInfo using the isolate's 'Type' type as superclass
@@ -418,8 +419,9 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the newly created TypeInfo
      */
-    inline HOType MakeType(Isolate *isolate, InstanceType type, U8 headroom, U8 props, U8 slots) {
-        return MakeType(isolate, isolate->primitive[(int) InstanceType::TYPE], type, headroom, props, slots);
+    inline HOType MakeType(Isolate *isolate, const char *name, const InstanceType type, const U8 headroom,
+                           const U8 props, const U8 slots) {
+        return MakeType(isolate, isolate->primitive[(int) InstanceType::TYPE], name, type, headroom, props, slots);
     }
 
     /**
@@ -433,8 +435,9 @@ namespace orbiter::datatype {
      *
      * @return Pointer to the created TypeInfo.
      */
-    inline HOType MakeTypeExtended(Isolate *isolate, InstanceType type, U8 headroom, U8 props, U8 slots) {
-        return MakeType(isolate, isolate->primitive[(int) type], type, headroom, props, slots);
+    inline HOType MakeTypeExtended(Isolate *isolate, const char *name, InstanceType type, const U8 headroom,
+                                   const U8 props, const U8 slots) {
+        return MakeType(isolate, isolate->primitive[(int) type], name, type, headroom, props, slots);
     }
 
     /**
@@ -562,7 +565,7 @@ namespace orbiter::datatype {
         return (TypeInfo *) object;
     }
 
-    U32 GetTypeName(const OObject *object, char *out_str, U32 out_size);
+    U32 GetTypeName(const Isolate *isolate, const OObject *object, char *out_str, U32 out_size);
 
     /**
      * @brief Safely destroys the monitor associated with the given object.
