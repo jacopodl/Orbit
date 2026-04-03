@@ -193,17 +193,6 @@ namespace liftoff::ir {
             U16 size = 0;
         } sub;
 
-        /**
-         * @var logical_counter_
-         *
-         * A 32-bit unsigned integer used to maintain a logical instruction counter within the
-         * intermediate representation (IR) context. This counter is incremented sequentially
-         * for each instruction added, serving as a unique identifier or offset for instructions
-         * during IR generation. It facilitates the tracking and ordering of instructions in the
-         * current IR context.
-         */
-        U32 logical_counter_ = 0;
-
         friend class Builder;
 
         explicit IRContext(orbiter::Isolate *isolate,
