@@ -316,7 +316,7 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                 break;
             }
             case orbiter::OPCode::POP:
-                *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode, 0, 0);
+                *(orbiter::MachineWord *) m_code = EMIT_DO(instr->opcode, instr->assigned_reg, 0);
                 break;
             case orbiter::OPCode::ALLOCA:
             case orbiter::OPCode::POPN:
