@@ -5,8 +5,6 @@
 #ifndef ORBIT_LIFTOFF_IR_BASICBLOCK_H_
 #define ORBIT_LIFTOFF_IR_BASICBLOCK_H_
 
-#include <unordered_set>
-
 #include <orbit/liftoff/symtable.h>
 
 #include <orbit/liftoff/ir/instruction.h>
@@ -98,6 +96,7 @@ namespace liftoff::ir {
          * @param after The new instruction to be inserted after the specified instruction.
          */
         void AddInstructionAfter(Instruction *instr, Instruction *after) noexcept {
+            after->basic_block = this;
             after->next = instr->next;
             after->prev = instr;
 
@@ -121,13 +120,13 @@ namespace liftoff::ir {
          * @param before Pointer to the `Instruction` object to be inserted before `instr`.
          */
         void AddInstructionBefore(Instruction *instr, Instruction *before) noexcept {
+            before->basic_block = this;
             before->next = instr;
             before->prev = instr->prev;
 
             assert(instr->prev!=nullptr);
 
             instr->prev->next = before;
-
             instr->prev = before;
 
             this->size += 4;
