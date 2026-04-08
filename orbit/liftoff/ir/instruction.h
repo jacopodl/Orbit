@@ -45,7 +45,6 @@ namespace liftoff::ir {
         Instruction *prev = nullptr;
 
         U32 instr_offset = 0;
-        U32 intf_point = 0;
 
         I16 assigned_reg = kUninitializedReg;
         I16 stack_slot = -1;

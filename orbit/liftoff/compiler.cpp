@@ -41,24 +41,20 @@ orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
     /*
      * IR Generation
      *   -> Step 1: Optimization
-     *   -> Step 2: Spill across call boundaries
-     *   -> Step 3: Instruction numbering
-     *   -> Step 4: Liveness analysis
-     *   -> Step 5: Register allocation
-     *   -> Step 6: Code generation
+     *   -> Step 2: Instruction numbering
+     *   -> Step 3: Liveness analysis
+     *   -> Step 4: Register allocation
+     *   -> Step 5: Code generation
      */
 
     // Step 1: Optimization (DCE, constant folding, ...)
     Optimizer optimizer(ir, this->level_);
     optimizer.Optimize();
 
-    // Step 2: Insert PUSH/POP pairs for values live across CALL/EXECSUB boundaries
-    Builder(ir).SpillAcrossCallBoundaries();
-
-    // Step 3: Assign final stable instruction offsets on the fully transformed IR
+    // Step 2: Assign final stable instruction offsets on the fully transformed IR
     ir->SlotIndexes();
 
-    // Step 4-5: Compute live intervals and allocate registers
+    // Step 3-4: Compute live intervals and allocate registers
     auto intervals = ir->ComputeLiveIntervals();
     LinearScan(ir, orbiter::kGeneralPurposeRegistersCount).Allocate(intervals);
 
@@ -75,7 +71,7 @@ orbiter::datatype::HCode Compiler::Compile(IRContext *ir) {
         }
     }
 
-    // Step 6: Generate machine code
+    // Step 5: Generate machine code
     auto code = Codegen(ir).Generate();
     if (code) {
         if (ir->GetSubcontextCount() > 0) {

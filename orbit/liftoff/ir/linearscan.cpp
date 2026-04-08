@@ -7,7 +7,7 @@
 
 using namespace liftoff::ir;
 
-LinearScan::LinearScan(IRContext *ir, U16 total_regs) noexcept : builder_(ir),
+LinearScan::LinearScan(IRContext *ir, const U16 total_regs) noexcept : builder_(ir),
                                                                  ir_(ir),
                                                                  total_regs_(total_regs) {
     assert(total_regs >= 2);
@@ -32,6 +32,35 @@ U16 LinearScan::GetFreeStackSlot() {
     return this->stack_offset_++;
 }
 
+std::vector<U32> LinearScan::CallPositionPreScan() const {
+    // Pre-scan: collect the instruction offsets of every CALL and EXECSUB in
+    // program order.  CALL/EXECSUB are caller-clobbered in Orbit's VM — the
+    // callee may overwrite every general-purpose register — so any value that
+    // is live across one of these sites must be saved to the stack beforehand
+    // and reloaded at each use that follows the call.
+    //
+    // We cannot detect calls through the live-interval list alone: a CALL with
+    // no users never appears as an interval.  A dedicated IR walk here is the
+    // only reliable way to find all call sites.
+    std::vector<U32> call_positions;
+
+    for (const auto *block = this->ir_->entry_; block != nullptr; block = block->next) {
+        for (auto *instr = block->instr.head; instr != nullptr; instr = instr->next) {
+            if (instr->type() != ObjectType::INSTRUCTION) continue;
+
+            const auto op = ((PhysInstruction *) instr)->opcode;
+
+            if (op == orbiter::OPCode::CALL || op == orbiter::OPCode::EXECSUB)
+                call_positions.push_back(instr->instr_offset);
+        }
+    }
+
+    return std::move(call_positions);
+}
+
+// Allocates a register that is already pinned by the instruction (e.g. CALL always
+// returns into R13, ITRNXT into R13, etc.). If the register is free, it is simply
+// claimed. If it is occupied by another interval, one or both intervals must be spilled.
 void LinearScan::AllocateSpecificRegister(LiveInterval &interval) {
     const auto find = std::find(this->free_registers_.begin(),
                                 this->free_registers_.end(),
@@ -50,6 +79,8 @@ void LinearScan::AllocateSpecificRegister(LiveInterval &interval) {
         if ((*it)->instr->assigned_reg == interval.instr->assigned_reg) {
             LiveInterval *found = *it;
 
+            // If the conflicting interval ends exactly where the new one starts,
+            // they do not actually overlap — hand the register over directly.
             if (found->end == interval.start) {
                 this->active_.erase(it);
 
@@ -58,6 +89,8 @@ void LinearScan::AllocateSpecificRegister(LiveInterval &interval) {
                 return;
             }
 
+            // True overlap: evict the conflicting interval to the stack, then
+            // also spill the incoming interval if it outlives the evicted one.
             this->SpillToStackAndReloadUses(found->instr);
 
             this->active_.erase(it);
@@ -110,6 +143,10 @@ void LinearScan::ExpireOldIntervals(const U32 position) {
     }
 }
 
+// Called when all registers are occupied and a new interval still needs one.
+// Evicts the interval with the longest remaining lifetime (it is cheapest to
+// keep short-lived values in registers), steals its register for the incoming
+// interval, and emits SKSTR/SKLDR pairs to preserve the evicted value.
 void LinearScan::SpillAndAssignRegister(LiveInterval *interval) {
     const auto longest = *this->active_.rbegin();
 
@@ -123,7 +160,8 @@ void LinearScan::SpillAndAssignRegister(LiveInterval *interval) {
     // Emit instructions to store the spilled value to the stack and update references
     this->SpillToStackAndReloadUses(spilled_instr);
 
-    // If the new interval ends after the longest, spill it to another stack slot
+    // If the incoming interval outlives the evicted one, the incoming interval will
+    // itself need to be on the stack for part of its range — spill it too.
     if (interval->end > longest->end) {
         this->SpillToStackAndReloadUses(interval->instr);
 
@@ -138,44 +176,97 @@ void LinearScan::SpillAndAssignRegister(LiveInterval *interval) {
         this->active_.insert(interval);
 }
 
+// Spills `instruction` to a backing location and replaces all non-adjacent uses
+// with a reload. Called both for register-pressure evictions and cross-call saves.
+//
+// Backing location strategy (store-to-load forwarding):
+//   If the instruction is immediately followed by a STGOFF that stores its result
+//   to a known global offset, that global slot already holds the value — no extra
+//   SKSTR is needed. Post-spill reloads are emitted as LDGOFF from the same offset.
+//   Otherwise the value is saved to a fresh stack slot via SKSTR/SKLDR.
+//
+// If the instruction already has a stack_slot (had_slot == true), it was spilled
+// earlier — the existing slot is reused and no new SKSTR is emitted.
 void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
+    const bool had_slot = instruction->stack_slot >= 0;
+
     int inserted = 0;
 
-    // 2) Iterate through the use-list of the instruction to load the value back from the stack
-    for (auto use = instruction->use_list; use != nullptr; use = use->next) {
-        auto *target = (Instruction *) use->user;
+    // Default reload strategy: stack slot via SKLDR.
+    // Switched to LDGOFF if a companion STGOFF is detected below.
+    auto ld_opcode = orbiter::OPCode::SKLDR;
+    auto ld_offset = (I16) 0;
 
-        // Skip if the target is not an instruction object
+    for (auto use = instruction->use_list; use != nullptr; use = use->next) {
+        auto *target = (PhysInstruction *) use->user;
+
         if (target->type() != ObjectType::INSTRUCTION)
             continue;
 
-        if (target->prev == instruction)
+        // Store-to-load forwarding: if the immediately following instruction is a
+        // STGOFF, the value will already be persisted in a global slot — reuse it
+        // instead of allocating a separate stack spill slot.
+        if (target->opcode == orbiter::OPCode::STGOFF
+            && target->instr_offset - 1 == instruction->instr_offset) {
+            ld_opcode = orbiter::OPCode::LDGOFF;
+            ld_offset = ((OffsetInstruction *) target)->offset;
+        }
+
+        // Skip uses that are immediately adjacent to the producing instruction —
+        // the value is still live in the register at that point, no reload needed.
+        //
+        // The check is split in two because LinearScan inserts new instructions
+        // (SKSTR, SKLDR) into the IR while allocation is in progress. After an
+        // insertion between `instruction` and `target`, target->prev is no longer
+        // `instruction` even though the two are logically adjacent.
+        //
+        //   target->prev == instruction
+        //     Fast path: no insertions have happened between the two yet.
+        //
+        //   target->instr_offset - 1 == instruction->instr_offset
+        //     Fallback: something was inserted in between, but the original offsets
+        //     (assigned by SlotIndexes before LinearScan runs) still reflect the
+        //     original adjacency. This works because newly inserted instructions
+        //     always carry instr_offset = 0 and never shift the offsets of the
+        //     surrounding original instructions.
+        if (target->prev == instruction || target->instr_offset - 1 == instruction->instr_offset)
             continue;
 
-        // Assign a free stack slot to the spilled instruction
-        if (inserted == 0)
-            instruction->stack_slot = (I16) this->GetFreeStackSlot();
+        Instruction *load = nullptr;
+        if (ld_opcode == orbiter::OPCode::SKLDR) {
+            // Allocate a stack slot on the first reload — reused for all subsequent ones.
+            if (inserted == 0 && !had_slot)
+                instruction->stack_slot = (I16) this->GetFreeStackSlot();
 
-        // Generate a load instruction to fetch the value from the stack slot
-        auto *load = this->builder_.GetLoadFromStackOffset(instruction->stack_slot, kBaseStackPointerReg);
+            load = this->builder_.GetLoadFromStackOffset(kBaseStackPointerReg, instruction->stack_slot);
+        } else {
+            // The value lives in a global slot — emit a direct LDGOFF.
+            load = this->builder_.GetLoadFromGlobalOffset(ld_offset);
+        }
+
         load->assigned_reg = instruction->assigned_reg;
 
-        // Insert the load instruction immediately before the target instruction
         IRContext::InsertInstructionBefore(target, load);
 
-        // Update the operand in the target instruction to reference the load instead of the original instruction
+        // Replace the operand reference so the target now consumes the reloaded value.
+        // ReplaceOperand calls DeleteUse, which sets use->next = nullptr — iterating
+        // further via use->next would stop the loop prematurely. Restarting from the
+        // head of the (now shorter) use_list is the only safe approach.
         target->ReplaceOperand(instruction, load);
+        use = instruction->use_list;
 
         inserted++;
     }
 
-    if (inserted == 0)
+    // No SKSTR needed if:
+    //   - no non-adjacent uses were found (nothing to reload)
+    //   - a slot was already present from a previous spill (SKSTR was already emitted)
+    //   - the backing location is a global slot (STGOFF already covers the save)
+    if (inserted == 0 || had_slot || ld_opcode != orbiter::OPCode::SKLDR)
         return;
 
-    // 3) Generate a store instruction to save the value to the specified stack slot
     auto *store = this->builder_.GetStoreToStackOffset(instruction, kBaseStackPointerReg, instruction->stack_slot);
 
-    // Insert the store instruction immediately after the current instruction
     IRContext::InsertInstructionAfter(instruction, store);
 }
 
@@ -184,11 +275,31 @@ void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
 // *********************************************************************************************************************
 
 void LinearScan::Allocate(std::vector<LiveInterval> &intervals) {
+    auto call_positions = this->CallPositionPreScan();
+    auto call_it = call_positions.begin();
+
     for (auto &interval: intervals) {
         if (interval.instr->assigned_reg == kDoNotAllocateReg)
             continue;
 
         this->ExpireOldIntervals(interval.start);
+
+        // For every call site that falls at or before the start of this interval,
+        // spill all register-resident values that outlive the call.
+        // SpillToStackAndReloadUses emits a SKSTR right after the producing
+        // instruction and inserts a SKLDR (or LDGOFF) before each use that
+        // comes after the call, transparently restoring the value into its
+        // original register at each consumption point.
+        // The interval stays in active_ because it keeps its register — only
+        // the backing store and the reload stubs are added.
+        while (call_it != call_positions.end() && *call_it <= interval.start) {
+            for (const auto *active: this->active_) {
+                if (active->end > *call_it)
+                    this->SpillToStackAndReloadUses(active->instr);
+            }
+
+            ++call_it;
+        }
 
         if (interval.instr->assigned_reg > kUninitializedReg) {
             this->AllocateSpecificRegister(interval);

@@ -34,6 +34,8 @@ namespace liftoff::ir {
 
         U16 GetFreeStackSlot();
 
+        [[nodiscard]] std::vector<U32> CallPositionPreScan() const;
+
         void AllocateSpecificRegister(LiveInterval &interval);
 
         void ExpireOldIntervals(U32 position);
