@@ -1183,7 +1183,9 @@ Instruction *IRBuilder::visitNew(const parser::Unary *node) {
 
     auto *clazz = this->visit(func->left);
 
-    auto *ctor = this->builder_.CreateUnaryOp(orbiter::OPCode::LDINIT, clazz);
+    const auto offset = (I16) this->builder_.context->PushUnknownProps(parser::kInitMethodName);
+
+    auto *ctor = this->builder_.LoadObjectProp(clazz, offset, true, false);
 
     auto *self = this->builder_.CreateUnaryOp(orbiter::OPCode::NOBJ, clazz);
 

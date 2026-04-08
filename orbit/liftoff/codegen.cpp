@@ -359,7 +359,6 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
             case orbiter::OPCode::AWAIT:
             case orbiter::OPCode::STRES:
             case orbiter::OPCode::LDMOD:
-            case orbiter::OPCode::LDINIT:
             case orbiter::OPCode::NOBJ:
             case orbiter::OPCode::CHRCV:
             case orbiter::OPCode::GITR:

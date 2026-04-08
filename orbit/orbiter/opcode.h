@@ -214,7 +214,6 @@ namespace orbiter {
         STSBSCR, // Store values into object slice  OPCODE | 4 SRC | 4 START | 4 STOP | 4 END | 4 VALUE | 4 RESERVED
 
         // Class/Trait
-        LDINIT, // Load class initializer           OPCODE | 4 DST | 4 SRC | 16 UNSIGNED OFFSET
         LDOBJP,
         // Load object property             OPCODE | 4 DST | 4 SRC_R(object) | 4 SRC_L(LoadObjectPropFlags) | 12 UNSIGNED OFFSET
         STOBJP,

@@ -981,9 +981,10 @@ ASTHandle<ASTNode *> Parser::ParseANPST() {
         auto call = this->ParseFuncCall(callee);
 
         auto ret = MakeUnary(this->isolate_, TKCUR_LOC, node_type);
-        ret->value = call.release();
         ret->loc.start = start_pos;
         ret->loc.end = call->loc.end;
+
+        ret->value = call.release();
 
         return ret;
     }

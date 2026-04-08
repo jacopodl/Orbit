@@ -1644,20 +1644,6 @@ CATCH_FINALLY:
 
                 DISPATCH;
             }
-            TARGET_OP(LDINIT) {
-                const auto *tp = (TypeInfo *) ACCESS_REG_SRC(instr);
-
-                const auto *init = TIFindLocalProperty(tp, "init");
-                if (init == nullptr) {
-                    // Every Class type always defines 'init'; null here means the
-                    // compiler emitted LDINIT for a non-type value — VM bug.
-                    assert(false);
-                }
-
-                ACCESS_REG_DST(instr) = (PtrSize) init->value;
-
-                DISPATCH;
-            }
             TARGET_OP(LDOBJP) {
                 const auto obj = (OObject *) ACCESS_REG_SRC(instr);
                 const auto flags = (LoadObjectPropFlags) FETCH_R_RSRC(instr);
