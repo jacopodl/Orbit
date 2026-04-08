@@ -290,8 +290,12 @@ U32 orbiter::datatype::GetTypeName(const Isolate *isolate, const OObject *object
             type = isolate->primitive[(int) InstanceType::NUMBER];
         else
             type = isolate->primitive[(int) InstanceType::BOOLEAN];
-    } else
-        type = O_GET_TYPE(object);
+    } else {
+        if (O_GET_RC(object).IsInstance())
+            type = O_GET_TYPE(object);
+        else
+            type = (TypeInfo *) object;
+    }
 
 
     const auto length = (U32) strlen(type->name);
