@@ -7,6 +7,7 @@
 #include <orbit/orbiter/fiber.h>
 
 #include <orbit/orbiter/datatype/function.h>
+#include <orbit/orbiter/datatype/orstring.h>
 #include <orbit/orbiter/datatype/pcheck.h>
 #include <orbit/orbiter/datatype/error.h>
 
@@ -16,19 +17,21 @@ using namespace orbiter::datatype;
 
 RUNTIME_FUNCTION(error_create, create,
                  R"DOC(
-@brief Creates a new error object with the specified atom, message and additional data
+@brief Create a new error object with the specified kind, message, and optional details.
 
-Creates an error instance using the provided atom identifier to categorize the error type, a human-readable message string, and optional contextual data.
+@param kind        Atom that categorises the error type.
+@param reason      Human-readable description of what went wrong.
+@param details?    Additional context attached to the error (defaults to nil).
 
-@param kind Error category identifier atom that defines the error type
-@param reason Human-readable error message describing what went wrong
-@param details Additional contextual information or details about the error condition
+@return A new Error object.
 
-@return New error object
+@panic TypeError  When a parameter has an invalid type.
 
-@panic OOMError When insufficient memory is available for error object allocation
-@panic ValueError When nil is passed to a non-optional parameter
-@panic TypeError When one of the passed parameters has an invalid type
+@see message, with_details
+
+@example
+    Error.create(@IOError, "file not found")
+    Error.create(@NIOError, "connection refused", { url: "..." })
 )DOC", 3, false, false) {
     PCHECK_ENTRIES(params,
                    PCHECK_DEF("kind", false, InstanceType::ATOM),
@@ -45,8 +48,91 @@ Creates an error instance using the provided atom identifier to categorize the e
     return HOObject(std::move(error));
 }
 
+RUNTIME_METHOD(error_is, is,
+               R"DOC(
+@brief Return true if the error's kind matches the given atom.
+
+Because atoms are interned, the comparison is a fast pointer equality check.
+
+@param kind  The atom to compare against the error's kind.
+
+@return true if the error's kind equals `kind`, false otherwise.
+
+@see kind, message
+
+@example
+    let e = Error.create(@IOError, "file not found")
+    e.is(@IOError)   // true
+    e.is(@NIOError)  // false
+)DOC", 2, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("kind", false, InstanceType::ATOM));
+
+    PCHECK_CHECK(params);
+
+    const auto *self = (Error *) argv[0];
+    return HOObject((OObject *) BOOL_TO_OBOOL(self->kind == (Atom *) argv[1]));
+}
+
+RUNTIME_METHOD(error_message, message,
+               R"DOC(
+@brief Return a formatted string combining the error kind and reason.
+
+The returned string has the form `"<kind>: <reason>"` — the atom name followed
+by a colon, a space, and the human-readable reason message.
+
+@return A String of the form `"<kind>: <reason>"`.
+
+@see str, kind, reason
+
+@example
+    let e = Error.create(@IOError, "file not found")
+    e.message()   // "IOError: file not found"
+)DOC", 1, false, false) {
+    const auto *self = (Error *) argv[0];
+
+    auto s = ORStringFormat(O_GET_ISOLATE(_func), "%s: %s",
+                            ORSTRING_TO_CSTR(self->kind->id),
+                            ORSTRING_TO_CSTR(self->reason));
+    if (!s)
+        return {};
+
+    return HOObject(std::move(s));
+}
+
+RUNTIME_METHOD(error_with_details, with_details,
+               R"DOC(
+@brief Return a copy of the error with the details field replaced by `v`.
+
+The original error is not mutated.  `kind` and `reason` are shared with the
+new object; only the `details` field is swapped.
+
+@param v  The new details value (any type, including nil).
+
+@return A new Error with the same kind and reason but with `details` set to `v`.
+
+@see details, create
+
+@example
+    let base = Error.create(@IOError, "read failed")
+    let rich = base.with_details({ path: "/tmp/x" })
+    rich.details   // { path: "/tmp/x" }
+    base.details   // nil  (original unchanged)
+)DOC", 2, false, false) {
+    const auto *self = (Error *) argv[0];
+
+    auto error = ErrorNew(O_GET_ISOLATE(_func), self->kind, self->reason, argv[1]);
+    if (!error)
+        return {};
+
+    return HOObject(std::move(error));
+}
+
 constexpr FunctionDef error_methods[] = {
     error_create,
+    error_is,
+    error_message,
+    error_with_details,
 
     FUNCTIONDEF_SENTINEL
 };
@@ -59,12 +145,13 @@ const OPropertyEntry error_props[] = {
     OPROPERTY_SENTINEL
 };
 
-bool ErrorDtor(Error *self) {
-    O_FAST_DECREF(self->kind);
-    O_FAST_DECREF(self->reason);
-    O_DECREF(self->details);
+bool orbiter::datatype::ErrorTypeSetup(TypeInfo *self) {
+    // No destructor or GC support function is needed here, since this object stores its data in GC-managed slots.
 
-    return true;
+    if (!TIPropertyAdd(self, error_props))
+        return false;
+
+    return TIPropertyAdd(self, error_methods, PropertyFlag::IS_PUBLIC);
 }
 
 HError ErrorNewVA(orbiter::Isolate *isolate, const char *kind, OObject *details, const char *format, va_list args) {
@@ -79,15 +166,6 @@ HError ErrorNewVA(orbiter::Isolate *isolate, const char *kind, OObject *details,
         return {};
 
     return ErrorNew(isolate, atom.get(), reason.get(), details);
-}
-
-bool orbiter::datatype::ErrorTypeSetup(TypeInfo *self) {
-    self->dtor = (DtorFn) ErrorDtor;
-
-    if (!TIPropertyAdd(self, error_props))
-        return false;
-
-    return TIPropertyAdd(self, error_methods, PropertyFlag::IS_PUBLIC);
 }
 
 HError orbiter::datatype::ErrorNew(Isolate *isolate, Atom *kind, ORString *reason, OObject *details) {
@@ -110,7 +188,7 @@ HError orbiter::datatype::ErrorNew(Isolate *isolate, const char *kind, OObject *
 }
 
 HOType orbiter::datatype::ErrorTypeInit(Isolate *isolate) {
-    auto error = MakeType(isolate, "Error", InstanceType::ERROR, 0, 4, 3);
+    auto error = MakeType(isolate, "Error", InstanceType::ERROR, 0, 7, 3);
     return error;
 }
 
