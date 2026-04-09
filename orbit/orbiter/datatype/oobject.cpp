@@ -101,7 +101,7 @@ bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const FunctionDef *bulk, P
     flags &= ~PropertyFlag::IN_OBJECT; // Clear IN_OBJECT flag since it's not applicable in this context
 
     for (auto *cursor = bulk; cursor->name != nullptr; cursor++) {
-        auto fn = FunctionNew(type->isolate, cursor);
+        auto fn = FunctionNew(type->isolate, type, cursor);
         if (!fn)
             return false;
 
@@ -281,12 +281,10 @@ PropertyDescriptor *orbiter::datatype::TIFindProperty(const TypeInfo *type, cons
 }
 
 U32 orbiter::datatype::GetTypeName(const Isolate *isolate, const OObject *object, char *out_str, const U32 out_size) {
-    TypeInfo *type = nullptr;
+    const TypeInfo *type = nullptr;
 
     if (!O_IS_OBJECT(object)) {
-        if (object == nullptr)
-            type = isolate->primitive[(int) InstanceType::NIL];
-        else if (O_IS_SMI(object))
+        if (O_IS_SMI(object))
             type = isolate->primitive[(int) InstanceType::NUMBER];
         else
             type = isolate->primitive[(int) InstanceType::BOOLEAN];
@@ -297,13 +295,16 @@ U32 orbiter::datatype::GetTypeName(const Isolate *isolate, const OObject *object
             type = (TypeInfo *) object;
     }
 
+    auto length = (U32) 3; // 'nil'
 
-    const auto length = (U32) strlen(type->name);
+    if (type != nullptr)
+        length = strlen(type->name);
 
     if (out_str != nullptr) {
         const auto min_length = std::min(length, out_size);
 
-        memory::MemoryCopy(out_str, type->name, min_length);
+        memory::MemoryCopy(out_str, type != nullptr ? type->name : "nil", min_length);
+
         out_str[min_length] = '\0';
     }
 

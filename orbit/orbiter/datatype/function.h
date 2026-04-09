@@ -77,7 +77,7 @@ namespace orbiter::datatype {
         Tuple *defaults;
 
         /// Pointer to the TypeInfo structure that represents the owning type of the function.
-        TypeInfo *owner_type;
+        const TypeInfo *owner_type;
 
         /// Name of the function
         ORString *name;
@@ -203,14 +203,22 @@ namespace orbiter::datatype {
     bool FunctionTypeSetup(TypeInfo *self);
 
     /**
-     * @brief Create a new Function object
+     * @brief Create a new native Function object from a function definition.
      *
-     * @param isolate Pointer to the Isolate
-     * @param def Pointer to the FunctionDef
+     * This factory builds the shared runtime metadata for a native function,
+     * including its name, documentation string, arity and flags
+     * (method / variadic / keyword arguments).
      *
-     * @return Pointer to the newly created Function
+     * When `def->method` is true, the function is marked as a method and associated with `owner`.
+     *
+     * @param isolate Pointer to the Isolate used to allocate the function.
+     * @param owner Pointer to the owning type, used only when the function
+     *        is exported as a method.
+     * @param def Pointer to the native function definition.
+     *
+     * @return Handle to the newly created Function, or an empty handle on failure.
      */
-    HFunction FunctionNew(Isolate *isolate, const FunctionDef *def);
+    HFunction FunctionNew(Isolate *isolate, const TypeInfo *owner, const FunctionDef *def);
 
     /**
      * @brief Creates a new Function object with the specified code, closure, defaults and function kind.
