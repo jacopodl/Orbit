@@ -58,9 +58,9 @@ namespace orbiter::datatype {
 
         List *codes;
 
-        List *unknown_symbols;
-
         List *static_resources;
+
+        List *unknown_symbols;
 
         ORString *name;
 
@@ -101,6 +101,24 @@ namespace orbiter::datatype {
     */
     bool CodeTypeSetup(TypeInfo *self);
 
+    /**
+     * @brief Creates and initializes a new instance of the Code object.
+     *
+     * This function allocates a new Code object, initializes its properties, and associates it with
+     * the provided environment. It sets up the internal code buffer, symbols for resolution, and
+     * associated resources. If the object creation fails, it ensures to return null without
+     * modifying any of the parameters.
+     *
+     * @param isolate Pointer to the Isolate in which the Code object is being created.
+     * @param m_code Pointer to the code buffer that will be assigned to the new Code object.
+     * @param unknown_symbols Pointer to the list of unresolved or unknown symbols required by the code.
+     * @param static_resources Pointer to the list of static resources required by the code.
+     * @param m_size The size of the provided code buffer in bytes.
+     * @param slots_count The number of generic slots defined in the Code object.
+     * @param stack_size The size of the execution stack defined in the Code object.
+     *
+     * @return A handle to the newly created Code object, or null if the creation failed.
+     */
     HCode CodeNew(Isolate *isolate, const unsigned char *m_code, List *unknown_symbols, List *static_resources,
                   U32 m_size, U16 slots_count, U16 stack_size);
 
