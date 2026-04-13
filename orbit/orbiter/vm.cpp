@@ -261,7 +261,7 @@ int CallInit(Fiber *fiber, const Function *func, const unsigned short p_count, c
 
     const auto *fn_shared = func->shared;
 
-    const auto *nargs = (Dict *) regs->r10.reg;
+    auto *nargs = (Dict *) regs->r10.reg;
     auto *rest = (List *) regs->r11.reg;
     auto *kwargs = (Dict *) regs->r12.reg;
 

@@ -5,6 +5,8 @@
 #ifndef ORBIT_ORBITER_DATATYPE_DICT_H_
 #define ORBIT_ORBITER_DATATYPE_DICT_H_
 
+#include <orbit/orbiter/sync/asyncrwlock.h>
+
 #include <orbit/orbiter/datatype/oobject.h>
 #include <orbit/orbiter/datatype/hashmap.h>
 
@@ -12,9 +14,9 @@ namespace orbiter::datatype {
     struct Dict {
         OROBJ_HEAD;
 
-        // TODO: sync?!
-
         ORHMap dict;
+
+        sync::AsyncRWLock lock;
     };
 
     using HDict = Handle<Dict>;
@@ -63,7 +65,7 @@ namespace orbiter::datatype {
      *
      * @return true if the key was found and the value was successfully retrieved, false otherwise
      */
-    bool DictLookup(const Dict *dict, OObject *key, HOObject &out_value);
+    bool DictLookup(Dict *dict, OObject *key, HOObject &out_value);
 
     /**
      * @brief Looks up a value in the dictionary by its key
@@ -78,7 +80,7 @@ namespace orbiter::datatype {
      *
      * @return true if the key was successfully found and the value retrieved, false otherwise
      */
-    bool DictLookup(const Dict *dict, const char *key, HOObject &out_value);
+    bool DictLookup(Dict *dict, const char *key, HOObject &out_value);
 
     /**
      * @brief Removes a key-value pair from the dictionary
@@ -125,6 +127,18 @@ namespace orbiter::datatype {
      */
     bool DictTypeSetup(TypeInfo *self);
 
+    /**
+     * @brief Creates a new dictionary object with an optional initial capacity
+     *
+     * This function creates and initializes a new dictionary object within the specified isolate.
+     * If the `size` parameter is greater than zero, the dictionary will attempt to allocate space
+     * for the specified number of elements. Otherwise, it will use a default initialization strategy.
+     *
+     * @param isolate Pointer to the isolate context in which this dictionary will be created
+     * @param size The initial number of elements for which the dictionary should allocate space, or 0 for default
+     *
+     * @return A handle to the newly created dictionary object, or an empty handle if the creation fails
+     */
     HDict DictNew(Isolate *isolate, U32 size);
 
     inline HDict DictNew(Isolate *isolate) {
