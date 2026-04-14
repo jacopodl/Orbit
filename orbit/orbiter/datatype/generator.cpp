@@ -8,14 +8,41 @@
 
 using namespace orbiter::datatype;
 
+bool GeneratorDtor(const Generator *self) {
+    const orbiter::memory::IsolateAllocator allocator(O_GET_ISOLATE(self));
+
+    allocator.free(self->regs_dump);
+
+    return true;
+}
+
 void GeneratorTrace(const Generator *self, const GCTraceCallback callback, const MSize epoch) {
+    callback((OObject *) self->base, epoch);
+
+    // Trace VM registry dump
     for (auto cursor = self->regs_dump; cursor < self->params; cursor++) {
+        if (O_IS_OBJECT(*cursor))
+            callback(*cursor, epoch);
+    }
+
+    // Trace function parameters (if any)
+    for (auto cursor = self->params; cursor < self->stack; cursor++) {
+        if (O_IS_OBJECT(*cursor))
+            callback(*cursor, epoch);
+    }
+
+    // Trace function stack
+    for (auto i = 0; i < self->stack_size; i++) {
+        auto **cursor = self->stack + i;
         if (O_IS_OBJECT(*cursor))
             callback(*cursor, epoch);
     }
 }
 
 bool orbiter::datatype::GeneratorTypeSetup(TypeInfo *self) {
+    self->dtor = (DtorFn) GeneratorDtor;
+    self->trace = (TraceFn) GeneratorTrace;
+
     return true;
 }
 
@@ -37,7 +64,7 @@ HGenerator orbiter::datatype::GeneratorNew(const Fiber *fiber, Function *base, c
     if (buffer == nullptr)
         return {};
 
-    gen->base = O_FAST_INCREF(base);
+    gen->base = base;
     gen->regs_dump = buffer;
     gen->params = buffer + kGeneralPurposeRegistersCount;
     gen->stack = gen->params + param_size;

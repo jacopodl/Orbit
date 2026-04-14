@@ -7,7 +7,7 @@
 
 #include <atomic>
 
-#include <orbit/orbiter/datatype/oobject.h>
+#include <orbit/orbiter/datatype/function.h>
 
 namespace orbiter::datatype {
     enum class GeneratorState : U8 {
