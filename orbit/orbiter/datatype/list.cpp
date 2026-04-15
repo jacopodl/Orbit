@@ -3,37 +3,46 @@
 // Licensed under the Apache License v2.0
 
 #include <cassert>
+#include <shared_mutex>
 
 #include <orbit/orbiter/datatype/tuple.h>
 #include <orbit/orbiter/datatype/list.h>
 
 using namespace orbiter::datatype;
 
-bool ListCheckSize(List *list, MSize count) {
-    MSize len = list->capacity + count;
-    OObject **tmp;
+bool ListCheckSize(List *list, const MSize count) {
+    if (list->length + count < list->capacity)
+        return true;
 
-    if (count == 0)
-        len = (list->capacity + 1) + ((list->capacity + 1) / 2);
+    MSize len = kListInitialCapacity;
 
-    if (list->length + count > list->capacity) {
-        if (list->objects == nullptr)
-            len = kListInitialCapacity;
+    if (list->objects != nullptr) {
+        const MSize grown = (list->capacity + 1) + ((list->capacity + 1) / 2); // 1.5x
 
-        orbiter::memory::IsolateAllocator allocator(O_GET_TYPE(list)->isolate);
-
-        if ((tmp = allocator.realloc(list->objects, len * sizeof(void *))) == nullptr)
-            return false;
-
-        list->objects = tmp;
-        list->capacity = len;
+        len = grown > list->capacity + count ? grown : list->capacity + count;
     }
+
+    orbiter::memory::IsolateAllocator allocator(O_GET_TYPE(list)->isolate);
+
+    auto **tmp = allocator.realloc(list->objects, len * sizeof(void *));
+    if (tmp == nullptr)
+        return false;
+
+    list->objects = tmp;
+    list->capacity = len;
 
     return true;
 }
 
-void ListTrace(const List *self, GCTraceCallback callback, MSize epoch) {
-    // TODO: Sync?!
+bool ListDtor(const List *self) {
+    const orbiter::memory::IsolateAllocator allocator(O_GET_TYPE(self)->isolate);
+
+    allocator.free(self->objects);
+
+    return true;
+}
+
+void ListTrace(const List *self, GCTraceCallback callback, const MSize epoch) {
     for (auto i = 0; i < self->length; i++) {
         const auto obj = self->objects[i];
 
@@ -42,30 +51,34 @@ void ListTrace(const List *self, GCTraceCallback callback, MSize epoch) {
     }
 }
 
-bool orbiter::datatype::ListTypeSetup(TypeInfo *self) {
-    self->trace = (TraceFn) ListTrace;
-
-    return true;
-}
-
 bool orbiter::datatype::ListAppend(List *list, OObject *object) {
+    std::unique_lock _(list->lock);
+
     if (!ListCheckSize(list, 1))
         return false;
 
-    list->objects[list->length++] = O_INCREF(object);
+    list->objects[list->length++] = object;
 
     return true;
 }
 
-bool orbiter::datatype::ListAppend(List *list, const List *other) {
+bool orbiter::datatype::ListAppend(List *list, List *other) {
+    std::unique_lock _(list->lock);
+
     if (other == nullptr)
         return true;
+
+    std::shared_lock other_lock(other->lock, std::defer_lock);
+
+    if (list != other)
+        other_lock.lock();
 
     if (!ListCheckSize(list, other->length))
         return false;
 
-    for (MSize i = 0; i < other->length; i++)
-        list->objects[list->length++] = O_INCREF(other->objects[i]);
+    const auto src_length = other->length;
+    for (MSize i = 0; i < src_length; i++)
+        list->objects[list->length++] = other->objects[i];
 
     return true;
 }
@@ -75,14 +88,16 @@ bool orbiter::datatype::ListExtend(List *list, OObject *other) {
         return ListAppend(list, other);
 
     if (O_IS_TYPE(other, InstanceType::TUPLE)) {
-        auto **objects = ((Tuple *) other)->objects;
+        std::unique_lock _(list->lock);
+
         const auto count = ((Tuple *) other)->length;
+        auto **objects = ((Tuple *) other)->objects;
 
         if (!ListCheckSize(list, count))
             return false;
 
         for (auto i = 0; i < count; i++)
-            list->objects[list->length + i] = O_INCREF(objects[i]);
+            list->objects[list->length + i] = objects[i];
 
         list->length += count;
 
@@ -93,42 +108,53 @@ bool orbiter::datatype::ListExtend(List *list, OObject *other) {
 }
 
 bool orbiter::datatype::ListInsert(List *list, OObject *object, MSSize index) {
-    if (index < 0)
-        index = ((MSSize) list->length) + index;
+    std::unique_lock _(list->lock);
 
-    if (index > list->length) {
+    if (list->length == 0 || index >= (MSSize) list->length) {
         if (!ListCheckSize(list, 1))
             return false;
 
-        list->objects[list->length++] = O_INCREF(object);
+        list->objects[list->length++] = object;
 
         return true;
     }
 
-    list->objects[index] = O_INCREF(object);
+    index = ((index % (MSSize) list->length) + (MSSize) list->length) % (MSSize) list->length;
+
+    list->objects[index] = object;
 
     return true;
 }
 
 bool orbiter::datatype::ListPrepend(List *list, OObject *object) {
+    std::unique_lock _(list->lock);
+
     if (!ListCheckSize(list, 1))
         return false;
 
     for (MSize i = list->length; i > 0; i--)
         list->objects[i] = list->objects[i - 1];
 
-    list->objects[0] = O_INCREF(object);
+    list->objects[0] = object;
 
     list->length++;
 
     return true;
 }
 
-HList orbiter::datatype::ListNew(Isolate *isolate, MSize capacity) {
+bool orbiter::datatype::ListTypeSetup(TypeInfo *self) {
+    self->dtor = (DtorFn) ListDtor;
+    self->trace = (TraceFn) ListTrace;
+
+    return true;
+}
+
+HList orbiter::datatype::ListNew(Isolate *isolate, const MSize capacity) {
     auto *list = MakeObject<List>(isolate, InstanceType::LIST);
     if (list == nullptr)
         return {};
 
+    new(&list->lock)std::shared_mutex;
     list->objects = nullptr;
     list->capacity = capacity;
     list->length = 0;
@@ -148,24 +174,18 @@ HList orbiter::datatype::ListNew(Isolate *isolate, MSize capacity) {
 }
 
 HOObject orbiter::datatype::ListGet(List *list, bool *success, MSSize index) {
+    std::shared_lock _(list->lock);
+
     *success = false;
 
-    if (index < 0) {
-        const auto old = list->length;
+    if (list->length == 0 || index >= (MSSize) list->length)
+        return {};
 
-        index = (MSSize) old + index;
+    index = ((index % (MSSize) list->length) + (MSSize) list->length) % (MSSize) list->length;
 
-        if (index > old)
-            return {};
-    }
+    *success = true;
 
-    if (index >= 0 && index < list->length) {
-        *success = true;
-
-        return HOObject(list->objects[index]);
-    }
-
-    return {};
+    return HOObject(list->objects[index]);
 }
 
 HOType orbiter::datatype::ListTypeInit(Isolate *isolate) {
@@ -174,13 +194,12 @@ HOType orbiter::datatype::ListTypeInit(Isolate *isolate) {
 }
 
 void orbiter::datatype::ListRemove(List *list, MSSize index) {
-    if (index < 0)
-        index = ((MSSize) list->length) + index;
+    std::unique_lock _(list->lock);
 
-    if (index >= list->length)
+    if (list->length == 0 || index >= (MSSize) list->length)
         return;
 
-    O_DECREF(list->objects[index]);
+    index = ((index % (MSSize) list->length) + (MSSize) list->length) % (MSSize) list->length;
 
     // Move items back
     for (auto i = index + 1; i < list->length; i++)

@@ -5,6 +5,8 @@
 #ifndef ORBIT_ORBITER_DATATYPE_LIST_H_
 #define ORBIT_ORBITER_DATATYPE_LIST_H_
 
+#include <orbit/orbiter/sync/asyncrwlock.h>
+
 #include <orbit/orbiter/datatype/oobject.h>
 
 namespace orbiter::datatype {
@@ -13,32 +15,16 @@ namespace orbiter::datatype {
     struct List {
         OROBJ_HEAD;
 
-        // TODO: sync?!
-
         OObject **objects;
 
         MSize capacity;
 
         MSize length;
+
+        sync::AsyncRWLock lock;
     };
 
     using HList = Handle<List>;
-
-    /**
-    * @brief Set up additional features and properties for the specified type
-    *
-    * This function enriches the previously created type with various functionalities.
-    * It typically performs the following tasks:
-    * - Adds default methods to the type
-    * - Adds required properties to the type
-    *
-    * This function is called immediately after the type's Init function to complete its setup.
-    *
-    * @param self Pointer to TypeInfo created by %type%Init call
-    *
-    * @return true if setup was successful, false otherwise
-    */
-    bool ListTypeSetup(TypeInfo *self);
 
     /**
      * @brief Append object to the list.
@@ -65,7 +51,7 @@ namespace orbiter::datatype {
      * @return true if the appending was successful or if the `other` list is null,
      * false if the destination list lacks sufficient capacity to store the new elements.
      */
-    bool ListAppend(List *list, const List *other);
+    bool ListAppend(List *list, List *other);
 
     /**
      * @brief Extends the contents of a list by appending elements from another container object
@@ -99,14 +85,20 @@ namespace orbiter::datatype {
     bool ListPrepend(List *list, OObject *object);
 
     /**
-     * @brief Get element from the list at specified index.
-     *
-     * @param list List object.
-     * @param success Pointer to bool that will be set to true on success, false on failure.
-     * @param index Location from which to get the object.
-     * @return Retrieved object on success, in case of error empty HOObject will be returned and success will be set to false.
-     */
-    HOObject ListGet(List *list, bool *success, MSSize index);
+    * @brief Set up additional features and properties for the specified type
+    *
+    * This function enriches the previously created type with various functionalities.
+    * It typically performs the following tasks:
+    * - Adds default methods to the type
+    * - Adds required properties to the type
+    *
+    * This function is called immediately after the type's Init function to complete its setup.
+    *
+    * @param self Pointer to TypeInfo created by %type%Init call
+    *
+    * @return true if setup was successful, false otherwise
+    */
+    bool ListTypeSetup(TypeInfo *self);
 
     /**
      * @brief Creates a new list instance with the specified capacity
@@ -135,6 +127,16 @@ namespace orbiter::datatype {
     inline HList ListNew(Isolate *isolate) {
         return ListNew(isolate, kListInitialCapacity);
     }
+
+    /**
+     * @brief Get element from the list at specified index.
+     *
+     * @param list List object.
+     * @param success Pointer to bool that will be set to true on success, false on failure.
+     * @param index Location from which to get the object.
+     * @return Retrieved object on success, in case of error empty HOObject will be returned and success will be set to false.
+     */
+    HOObject ListGet(List *list, bool *success, MSSize index);
 
     /**
      * @brief Initialize and create the specified type
