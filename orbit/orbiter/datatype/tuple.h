@@ -92,6 +92,18 @@ namespace orbiter::datatype {
      */
     HTuple TupleNew(Isolate *isolate, MSize count);
 
+    /**
+     * @brief Creates a new tuple from the provided object.
+     *
+     * This function creates and returns a new tuple based on the type of the given object.
+     * For unsupported object types or invalid inputs, the function returns an empty tuple handle.
+     *
+     * @param object Pointer to an OObject used as the base for creating the tuple.
+     *
+     * @return A handle to the newly created tuple. Returns an empty handle if the operation fails
+     *         or if the input type is unsupported.
+     */
+    HTuple TupleNew(OObject *object);
 
     /**
      * @brief Creates a new Tuple object from the given list of objects

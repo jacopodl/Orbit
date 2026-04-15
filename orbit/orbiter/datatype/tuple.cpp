@@ -2,24 +2,34 @@
 //
 // Licensed under the Apache License v2.0
 
-#include <orbit/orbiter/datatype/oobject.h>
+#include <orbit/orbiter/datatype/dict.h>
 
 #include <orbit/orbiter/datatype/tuple.h>
 
 using namespace orbiter::datatype;
 
 bool TupleDtor(const Tuple *self) {
-    for (auto i = 0; i < self->length; i++)
-        O_DECREF(self->objects[i]);
+    const orbiter::memory::IsolateAllocator allocator(O_GET_ISOLATE(self));
+
+    allocator.free(self->objects);
 
     return true;
+}
+
+void TupleTrace(const Tuple *self, const GCTraceCallback callback, const MSize epoch) {
+    for (int i = 0; i < self->length; i++) {
+        const auto obj = self->objects[i];
+
+        if (O_IS_OBJECT(obj))
+            callback(obj, epoch);
+    }
 }
 
 bool orbiter::datatype::TupleAppend(Tuple *tuple, OObject *item) {
     if (tuple->length == tuple->capacity)
         return false;
 
-    tuple->objects[tuple->length] = O_INCREF(item);
+    tuple->objects[tuple->length] = item;
 
     tuple->length += 1;
 
@@ -28,6 +38,7 @@ bool orbiter::datatype::TupleAppend(Tuple *tuple, OObject *item) {
 
 bool orbiter::datatype::TupleTypeSetup(TypeInfo *self) {
     self->dtor = (DtorFn) TupleDtor;
+    self->trace = (TraceFn) TupleTrace;
 
     return true;
 }
@@ -37,7 +48,7 @@ HOType orbiter::datatype::TupleTypeInit(Isolate *isolate) {
     return tuple;
 }
 
-HTuple orbiter::datatype::TupleNew(Isolate *isolate, MSize count) {
+HTuple orbiter::datatype::TupleNew(Isolate *isolate, const MSize count) {
     auto *tuple = MakeObject<Tuple>(isolate, InstanceType::TUPLE);
 
     if (tuple != nullptr) {
@@ -55,9 +66,37 @@ HTuple orbiter::datatype::TupleNew(Isolate *isolate, MSize count) {
         tuple->hash = 0;
     }
 
-    // Since tuple objects are immutable and their contents have their reference count incremented (IncRef),
-    // this is treated as a non-container object for garbage collection purposes
-    O_GC_TRACK_RETURN(isolate, tuple, false);
+    O_GC_TRACK_RETURN(isolate, tuple, true);
+}
+
+HTuple orbiter::datatype::TupleNew(OObject *object) {
+    if (O_IS_SMI(object))
+        return {};
+
+    auto *isolate = O_GET_ISOLATE(object);
+
+    if (O_IS_TYPE(object, InstanceType::DICT)) {
+        auto list = (HList) DictKeys((Dict *) object);
+        return TupleNewFromList(list);
+    }
+
+    if (O_IS_TYPE(object, InstanceType::TUPLE)) {
+        const auto *other = (Tuple *) object;
+        auto tuple = TupleNew(isolate, other->length);
+
+        for (auto i = 0; i < other->length; i++)
+            tuple->objects[i] = other->objects[i];
+
+        tuple->length = other->length;
+
+        return tuple;
+    }
+
+    if (O_IS_TYPE(object, InstanceType::LIST)) {
+        assert(false);
+    }
+
+    return {};
 }
 
 HTuple orbiter::datatype::TupleNewFromList(HList &list) {
@@ -78,5 +117,5 @@ HTuple orbiter::datatype::TupleNewFromList(HList &list) {
         list.reset();
     }
 
-    O_GC_TRACK_RETURN(isolate, tuple, false);
+    O_GC_TRACK_RETURN(isolate, tuple, true);
 }
