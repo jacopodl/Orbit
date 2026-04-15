@@ -291,21 +291,7 @@ RUNTIME_METHOD(dict_keys, keys,
 @example
     { a: 1, b: 2 }.keys()    // ["a", "b"]
 )DOC", 1, false, false) {
-    auto *self = (Dict *) argv[0];
-    auto *isolate = O_GET_ISOLATE(self);
-
-    std::shared_lock _(self->lock);
-
-    auto list = ListNew(isolate, self->dict.length);
-    if (!list)
-        return {};
-
-    for (const auto *cur = self->dict.iter_begin; cur != nullptr; cur = cur->iter_next) {
-        if (!ListAppend(list.get(), cur->key))
-            return {};
-    }
-
-    return HOObject(std::move(list));
+    return DictKeys((Dict *) argv[0]);
 }
 
 RUNTIME_METHOD(dict_length, length,
@@ -631,6 +617,23 @@ HDict orbiter::datatype::DictNew(OObject *object) {
     }
 
     assert(false);
+}
+
+HOObject orbiter::datatype::DictKeys(Dict *dict) {
+    auto *isolate = O_GET_ISOLATE(dict);
+
+    std::shared_lock _(dict->lock);
+
+    auto list = ListNew(isolate, dict->dict.length);
+    if (!list)
+        return {};
+
+    for (const auto *cur = dict->dict.iter_begin; cur != nullptr; cur = cur->iter_next) {
+        if (!ListAppend(list.get(), cur->key))
+            return {};
+    }
+
+    return HOObject(std::move(list));
 }
 
 HOType orbiter::datatype::DictTypeInit(Isolate *isolate) {

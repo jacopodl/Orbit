@@ -159,6 +159,19 @@ namespace orbiter::datatype {
     HDict DictNew(OObject *object);
 
     /**
+     * @brief Return all keys of the dictionary as a List in insertion order
+     *
+     * Acquires a shared read lock on the dictionary for the duration of the
+     * iteration.  The returned List is a snapshot — subsequent mutations to
+     * the dictionary are not reflected in it.
+     *
+     * @param dict Pointer to the dictionary to read
+     *
+     * @return A handle to a new List of keys, or an empty handle if allocation fails
+     */
+    HOObject DictKeys(Dict *dict);
+
+    /**
      * @brief Initialize and create the specified type
      *
      * This function creates a new TypeInfo object representing the specific type.
