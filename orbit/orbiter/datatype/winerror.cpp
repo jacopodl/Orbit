@@ -9,6 +9,11 @@
 #include <Windows.h>
 
 #undef ERROR
+#undef CONST
+#undef FALSE
+#undef TRUE
+#undef STRICT
+#undef IN
 
 #include <orbit/orbiter/datatype/error.h>
 
