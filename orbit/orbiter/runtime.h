@@ -250,9 +250,7 @@ namespace orbiter {
 
         datatype::HFuture EvalAsync(datatype::Function *func, const unsigned char *stack_begin, U16 size) noexcept;
 
-        static Orbiter *GetInstance() noexcept {
-            return orbiter_;
-        }
+        static Orbiter *GetInstance() noexcept;
 
         void PushFiber(Fiber *fiber) noexcept {
             if (ost_self == nullptr || ost_self->current == nullptr) {

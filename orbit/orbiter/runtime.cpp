@@ -573,6 +573,10 @@ HFuture Orbiter::EvalAsync(Function *func, const unsigned char *stack_begin, con
     return future;
 }
 
+Orbiter *Orbiter::GetInstance() noexcept {
+    return orbiter_;
+}
+
 void Orbiter::RuntimeDiscardPanic(Isolate *isolate) {
     auto *fiber = Fiber::Current();
     if (fiber != nullptr) {
