@@ -153,11 +153,14 @@ add_shadow:
     ; The 32-byte shadow space is mandatory regardless of argument count
     add rax, 32
 
-    ; RSP must be 16-byte aligned at the CALL site. We pushed an odd number of
-    ; registers in the prologue (rbp + rbx + r12 + r13 = 4, even), so the
-    ; alignment requirement is met by aligning rax to 16 directly.
+    ; RSP must be 16-byte aligned at the CALL site. At this point RSP is already
+    ; offset by 40 bytes from the pre-call aligned value: 8 (return address pushed
+    ; by our caller) + 4 * 8 (push rbp/rbx/r12/r13). 40 mod 16 = 8, so RSP is
+    ; misaligned by 8. We round rax up to the next multiple of 16 and then add 8
+    ; to compensate, ensuring (RSP - rax) mod 16 = 0 at the call site.
     add rax, 15
     and rax, -16
+    add rax, 8
 
     sub rsp, rax                ; carve out shadow space (+ optional stack args)
 
