@@ -181,6 +181,23 @@ static int StrCompare(const OObject *left, const OObject *right) {
     return ORStringCompare((const ORString *) left, (const ORString *) right);
 }
 
+/// Membership test: `"ab" in "xabc"` — requires a String operand.
+static bool StrContains(const OObject *container, const OObject *value, bool &result) {
+    if (!O_IS_OBJECT(value) || !O_IS_TYPE(value, InstanceType::STRING)) {
+        ErrorSetWithObjType(O_GET_ISOLATE(container),
+                            TypeError::Details[TypeError::Reason::ID],
+                            TypeError::Details[TypeError::Reason::MISMATCH],
+                            O_GET_TYPE(container)->name,
+                            value);
+
+        return false;
+    }
+
+    result = ORStringContains((const ORString *) container, (const ORString *) value);
+
+    return true;
+}
+
 // *********************************************************************************************************************
 // TYPE OPS — ARITHMETIC
 // *********************************************************************************************************************
@@ -354,12 +371,7 @@ RUNTIME_METHOD(string_contains, contains,
                    PCHECK_DEF("sub", false, InstanceType::STRING));
     PCHECK_CHECK(params);
 
-    const auto *self = (ORString *) argv[0];
-    const auto *sub = (ORString *) argv[1];
-
-    const auto idx = support::Search(STR_BUF(self), STR_LEN(self), STR_BUF(sub), STR_LEN(sub));
-
-    return HOObject((OObject *) BOOL_TO_OBOOL(idx >= 0));
+    return HOObject((OObject *) BOOL_TO_OBOOL(ORStringContains((ORString *) argv[0], (ORString *) argv[1])));
 }
 
 RUNTIME_METHOD(string_count, count,
@@ -977,6 +989,7 @@ bool orbiter::datatype::ORStringTypeSetup(TypeInfo *self) {
     auto &ops = ((TypeInfoOps *) self)->ops;
 
     ops.compare = StrCompare;
+    ops.contains = StrContains;
     ops.equal = (EqualFn) StrEqual;
     ops.add = StrAdd;
     ops.mul = StrMul;
@@ -1027,6 +1040,10 @@ int orbiter::datatype::ORStringCompare(const char *left, const ORString *right, 
     }
 
     return compare;
+}
+
+bool orbiter::datatype::ORStringContains(const ORString *self, const ORString *sub) {
+    return support::Search(STR_BUF(self), STR_LEN(self), STR_BUF(sub), STR_LEN(sub)) >= 0;
 }
 
 HORString orbiter::datatype::ORStringFormat(Isolate *isolate, const char *format, ...) {

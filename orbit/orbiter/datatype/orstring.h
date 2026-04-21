@@ -152,6 +152,19 @@ namespace orbiter::datatype {
     }
 
     /**
+     * @brief Test whether @p self contains @p sub as a substring.
+     *
+     * Performs a non-overlapping exact byte match — the empty @p sub is always
+     * considered present.
+     *
+     * @param self Haystack string.
+     * @param sub  Needle string.
+     *
+     * @return true if @p sub occurs anywhere in @p self, false otherwise.
+     */
+    bool ORStringContains(const ORString *self, const ORString *sub);
+
+    /**
      * @brief Formats a string with specified arguments and returns it as an ORString handle
      *
      *
