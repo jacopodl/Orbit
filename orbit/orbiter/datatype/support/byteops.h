@@ -263,6 +263,100 @@ namespace orbiter::datatype::support {
         return -1;
     }
 
+    /**
+     * @brief Return true if @p c is an ASCII whitespace character.
+     *
+     * Recognized set:
+     *   ' ' (0x20), '\t' (0x09), '\n' (0x0a), '\v' (0x0b), '\f' (0x0c), '\r' (0x0d).
+     */
+    inline bool IsAsciiWhitespace(const unsigned char c) {
+        return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\v' || c == '\f';
+    }
+
+    /**
+     * @brief Find the first newline terminator in @p buf.
+     *
+     * When @p universal is true, recognizes the three line terminators:
+     *   - "\r\n" (2-byte CRLF)
+     *   - "\n"   (LF)
+     *   - "\r"   (lone CR)
+     *
+     * When @p universal is false, only "\n" is a terminator.
+     *
+     * @tparam T  Byte-sized element type (sizeof(T) must be 1).
+     *
+     * @param buf          Buffer to scan.
+     * @param blen         Length of the buffer in elements.
+     * @param universal    Enable universal (Java-style) newline recognition.
+     * @param out_sep_len  On match, receives the terminator length (1 or 2).
+     *                     Undefined when no match is found.
+     *
+     * @return Offset of the terminator's first byte, or -1 if no terminator is found.
+     */
+    template<typename T>
+    MSSize FindNewLine(const T *buf, const MSize blen, const bool universal, MSize *out_sep_len) {
+        static_assert(sizeof(T) == 1, "FindNewLine requires a byte-sized element type");
+
+        for (MSize i = 0; i < blen; i++) {
+            const auto c = (unsigned char) buf[i];
+
+            if (c == '\n') {
+                *out_sep_len = 1;
+
+                return (MSSize) i;
+            }
+
+            if (universal && c == '\r') {
+                if (i + 1 < blen && (unsigned char) buf[i + 1] == '\n')
+                    *out_sep_len = 2;
+                else
+                    *out_sep_len = 1;
+
+                return (MSSize) i;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * @brief Count the number of newline terminators in @p buf.
+     *
+     * Useful for sizing a result List before a splitlines pass.
+     *
+     * @tparam T  Byte-sized element type (sizeof(T) must be 1).
+     *
+     * @param buf        Buffer to scan.
+     * @param blen       Length of the buffer in elements.
+     * @param universal  Enable universal (Java-style) newline recognition.
+     * @param cap        Maximum count to return. Negative = unlimited (default).
+     *
+     * @return Number of terminators encountered (capped at @p cap when non-negative).
+     */
+    template<typename T>
+    MSize CountNewLines(const T *buf, const MSize blen, const bool universal, const MSSize cap = -1) {
+        static_assert(sizeof(T) == 1, "CountNewLines requires a byte-sized element type");
+
+        MSize count = 0;
+
+        for (MSize i = 0; i < blen; i++) {
+            if (cap >= 0 && count >= (MSize) cap)
+                break;
+
+            const auto c = (unsigned char) buf[i];
+
+            if (c == '\n') {
+                count++;
+            } else if (universal && c == '\r') {
+                count++;
+                if (i + 1 < blen && (unsigned char) buf[i + 1] == '\n')
+                    i++; // skip LF of CRLF
+            }
+        }
+
+        return count;
+    }
+
 } // namespace orbiter::datatype::support
 
 #endif // !ORBIT_ORBITER_DATATYPE_SUPPORT_BYTEOPS_H_
