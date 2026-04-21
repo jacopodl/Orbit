@@ -101,6 +101,13 @@ static bool DictEqual(const OObject *left, const OObject *right) {
     return true;
 }
 
+/// Membership test: `key in dict` — checks key presence regardless of value type.
+static bool DictOpContains(const OObject *container, const OObject *value, bool &result) {
+    result = DictContains((Dict *) container, (OObject *) value);
+
+    return true;
+}
+
 // *********************************************************************************************************************
 // TYPE OPS — CONVERSION
 // *********************************************************************************************************************
@@ -258,9 +265,7 @@ RUNTIME_METHOD(dict_has, has,
 )DOC", 2, nullptr, false, false) {
     auto *self = (Dict *) argv[0];
 
-    HOObject dummy;
-
-    return HOObject((OObject *) BOOL_TO_OBOOL(DictLookup(self, argv[1], dummy)));
+    return HOObject((OObject *) BOOL_TO_OBOOL(DictContains(self, argv[1])));
 }
 
 RUNTIME_METHOD(dict_is_empty, is_empty,
@@ -497,6 +502,16 @@ constexpr FunctionDef dict_methods[] = {
 // PUBLIC API
 // *********************************************************************************************************************
 
+bool orbiter::datatype::DictContains(Dict *dict, OObject *key) {
+    std::shared_lock _(dict->lock);
+
+    ORHEntry *entry = nullptr;
+
+    dict->dict.Lookup(key, &entry);
+
+    return entry != nullptr;
+}
+
 bool orbiter::datatype::DictInsert(Dict *dict, OObject *key, OObject *value) {
     std::unique_lock _(dict->lock);
 
@@ -558,12 +573,13 @@ bool orbiter::datatype::DictRemove(Dict *dict, const char *key) {
 }
 
 bool orbiter::datatype::DictTypeSetup(TypeInfo *self) {
-    self->dtor  = (DtorFn)  DictDtor;
+    self->dtor = (DtorFn) DictDtor;
     self->trace = (TraceFn) DictTrace;
 
     auto &ops = ((TypeInfoOps *) self)->ops;
 
-    ops.equal   = DictEqual;
+    ops.contains = DictOpContains;
+    ops.equal = DictEqual;
     ops.to_bool = DictToBool;
 
     return TIPropertyAdd(self, dict_methods, PropertyFlag::IS_PUBLIC);

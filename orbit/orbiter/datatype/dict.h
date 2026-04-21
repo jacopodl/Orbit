@@ -83,6 +83,19 @@ namespace orbiter::datatype {
     bool DictLookup(Dict *dict, const char *key, HOObject &out_value);
 
     /**
+     * @brief Test whether the dictionary contains the given key.
+     *
+     * Thin wrapper over DictLookup that discards the resolved value — use this
+     * when you only care about membership, not the associated value.
+     *
+     * @param dict Pointer to the dictionary to test.
+     * @param key  Pointer to the key object to look up.
+     *
+     * @return true if @p key is present in @p dict, false otherwise.
+     */
+    bool DictContains(Dict *dict, OObject *key);
+
+    /**
      * @brief Removes a key-value pair from the dictionary
      *
      * This function removes a key and its associated value from the specified dictionary.
