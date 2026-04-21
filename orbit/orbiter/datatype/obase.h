@@ -26,7 +26,7 @@ namespace orbiter::datatype {
     constexpr auto kOddBallSentinel = 0x21u | kOddBallMask;
 
 #define BOOL_TO_OBOOL(value) ((value) ? kOddBallTRUE : kOddBallFALSE)
-#define OBOOL_TO_BOOL(value) ((value) == kOddBallTRUE)
+#define OBOOL_TO_BOOL(value) (((MSize)value) == kOddBallTRUE)
 
     // Orbit uses signed SMI (Small Integers) by default
     constexpr auto kSMIBit = (sizeof(MSize) * 8) - 1;
@@ -331,9 +331,10 @@ namespace orbiter::datatype {
 #define O_IS_OBJECT(object)                 ((object != nullptr) && ((!O_IS_SMI(object)) && (((MSize)object & orbiter::datatype::kOddBallMask) != orbiter::datatype::kOddBallMask)))
 #define O_TO_SMI(num)                       ((MSize)(((MSize)(MSSize)(num) << 1u) | 0x01u))
 
-#define O_IS_FALSE(object)                  (O_IS_ODDBALL(object) && ((object & orbiter::datatype::kOddBallFALSE) == orbiter::datatype::kOddBallFALSE))
-#define O_IS_TRUE(object)                   (O_IS_ODDBALL(object) && ((object & orbiter::datatype::kOddBallTRUE) == orbiter::datatype::kOddBallTRUE))
+#define O_IS_FALSE(object)                  ((MSize)(object) == orbiter::datatype::kOddBallFALSE)
+#define O_IS_TRUE(object)                   ((MSize)(object) == orbiter::datatype::kOddBallTRUE)
 #define O_IS_NIL(object)                    (object == orbiter::datatype::kOddBallNIL)
+#define O_IS_SENTINEL(object)               ((MSize)(object) == orbiter::datatype::kOddBallSentinel)
 #define O_IS_TYPE(object, type)             (O_GET_TYPE(object)->i_type == type)
 
 #define O_DECREF(object)                    (O_IS_OBJECT(object) ? (O_GET_RC(object).DecStrong(), object) : object)

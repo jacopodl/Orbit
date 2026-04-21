@@ -732,29 +732,48 @@ Whitespace is determined by std::isspace (ASCII only).
 
 RUNTIME_METHOD(string_split, split,
                R"DOC(
-@brief Split the string by sep and return a list of substrings.
+@brief Split the string and return a list of substrings.
 
-@param sep  The separator string. Must not be empty.
+When called without a separator (or with nil), splits on runs of ASCII whitespace
+(` `, `\t`, `\n`, `\v`, `\f`, `\r`) and drops empty leading/trailing/interior segments.
+
+When called with an explicit separator, performs exact (non-overlapping) matching
+and preserves empty leading/trailing segments; "aaaa".split("aa") → ["", "", ""].
+
+@param sep?  The separator string, or nil for whitespace split. Must not be empty
+             when provided.
 
 @return A new List of Strings.
 
-@panic TypeError   When `sep` is not a String.
-@panic ValueError  When `sep` is empty.
+@panic TypeError   When `sep` is neither a String nor nil.
+@panic ValueError  When `sep` is the empty string.
 
-@see replace, find
+@see splitlines, replace, find
 
 @example
-    "a,b,c".split(",")    // ["a", "b", "c"]
-    "hello".split("l")    // ["he", "", "o"]
-)DOC", 2, nullptr, false, false) {
+    "a,b,c".split(sep=",")        // ["a", "b", "c"]
+    "hello".split(sep="l")        // ["he", "", "o"]
+    "  hello   world ".split()   // ["hello", "world"]
+    "a\tb\nc".split()         // ["a", "b", "c"]
+)DOC", 1, "sep", false, false) {
     PCHECK_ENTRIES(params,
                    PCHECK_DEF("self", false, InstanceType::STRING),
-                   PCHECK_DEF("sep", false, InstanceType::STRING));
+                   PCHECK_DEF("sep", true, InstanceType::STRING, InstanceType::NIL));
     PCHECK_CHECK(params);
 
     const auto *self = (ORString *) argv[0];
-    const auto *sep = (ORString *) argv[1];
     auto *isolate = O_GET_ISOLATE(_func);
+
+    // Whitespace split when sep is omitted or explicitly nil
+    if (O_IS_SENTINEL(argv[1]) || O_IS_NIL(argv[1])) {
+        auto list = support::SplitWhitespace<ORString>(isolate, STR_BUF(self), STR_LEN(self), ORStringNew);
+        if (!list)
+            return {};
+
+        return HOObject(std::move(list));
+    }
+
+    const auto *sep = (ORString *) argv[1];
 
     if (STR_LEN(sep) == 0) {
         ErrorSet(isolate,
@@ -765,8 +784,60 @@ RUNTIME_METHOD(string_split, split,
         return {};
     }
 
-    auto list = support::Split<ORString>(isolate,STR_BUF(self), STR_LEN(self),STR_BUF(sep), STR_LEN(sep), ORStringNew);
+    auto list = support::Split<ORString>(isolate, STR_BUF(self), STR_LEN(self), STR_BUF(sep),
+                                         STR_LEN(sep), ORStringNew);
+    if (!list)
+        return {};
 
+    return HOObject(std::move(list));
+}
+
+RUNTIME_METHOD(string_splitlines, splitlines,
+               R"DOC(
+@brief Split the string on line terminators and return a list of lines.
+
+By default, recognizes the three universal line terminators:
+  - `\n`   (LF)
+  - `\r\n` (CRLF)
+  - `\r`   (lone CR)
+
+A trailing single terminator is swallowed, so `"a\n"` → `["a"]`; consecutive
+terminators produce empty lines, so `"a\n\nb"` → `["a", "", "b"]`. Empty input
+returns an empty list.
+
+@param keepends?   When true, retain the terminator in each returned line
+                   (defaults to false).
+@param universal?  When true, treat `\r\n` and `\r` as terminators in addition
+                   to `\n` (defaults to true). Disable for strict LF-only
+                   splitting.
+
+@return A new List of Strings.
+
+@panic TypeError  When `keepends` or `universal` is neither a Bool.
+
+@see split
+
+@example
+    "a\nb\nc".splitlines()                                  // ["a", "b", "c"]
+    "a\r\nb\rc".splitlines()                                // ["a", "b", "c"]
+    "a\nb\n".splitlines()                                   // ["a", "b"]
+    "a\nb".splitlines(keepends=true)                        // ["a\n", "b"]
+    "a\r\nb".splitlines(keepends=false, universal=false)    // ["a\r", "b"]
+)DOC", 1, "keepends, universal", false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::STRING),
+                   PCHECK_DEF("keepends", true, InstanceType::BOOLEAN),
+                   PCHECK_DEF("universal", true, InstanceType::BOOLEAN));
+    PCHECK_CHECK(params);
+
+    const auto *self = (ORString *) argv[0];
+    auto *isolate = O_GET_ISOLATE(_func);
+
+    // Defaults: keepends = false, universal = true
+    const bool keepends = O_IS_SENTINEL(argv[1]) ? false : OBOOL_TO_BOOL(argv[1]);
+    const bool universal = O_IS_SENTINEL(argv[2]) ? true : OBOOL_TO_BOOL(argv[2]);
+
+    auto list = support::SplitLines<ORString>(isolate, STR_BUF(self), STR_LEN(self), ORStringNew, keepends, universal);
     if (!list)
         return {};
 
@@ -892,6 +963,7 @@ constexpr FunctionDef string_methods[] = {
     string_rfind,
     string_rstrip,
     string_split,
+    string_splitlines,
     string_starts_with,
     string_strip,
     string_upper,
@@ -1152,7 +1224,7 @@ HOType orbiter::datatype::ORStringTypeInit(Isolate *isolate) {
         return {};
     }
 
-    auto string = MakeType(isolate, "String", InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 15, 0);
+    auto string = MakeType(isolate, "String", InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 16, 0);
     if (!string) {
         allocator.FreeObject(gst);
 
