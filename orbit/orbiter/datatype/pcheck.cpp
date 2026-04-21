@@ -23,38 +23,39 @@ bool orbiter::datatype::CheckParameter(const Parameter *parameters, OObject **ar
     for (auto *cursor = parameters; cursor->name != nullptr; cursor++) {
         bool ok = false;
 
-        if (index >= argc && !cursor->optional) {
-            ErrorSet(isolate,
-                     ValueError::Details[ValueError::Reason::ID],
-                     nullptr,
-                     ValueError::Details[ValueError::Reason::MISSING_PARAMETER],
-                     cursor->name,
-                     index);
-
-            return false;
-        }
+        if (index >= argc)
+            assert(false);
 
         const auto *value = argv[index];
 
         if (value != nullptr) {
-            if (O_IS_OBJECT(value)) {
-                if ((cursor->types >> (U32) O_GET_TYPE(value)->i_type) & 1)
+            if (O_IS_OBJECT(value))
+                ok = (cursor->types >> (U32) O_GET_TYPE(value)->i_type) & 1;
+            else {
+                if (O_IS_SMI(value) && ((cursor->types >> (U32) InstanceType::NUMBER) & 1))
                     ok = true;
-            } else {
-                if ((cursor->types >> (U32) InstanceType::NUMBER) & 1) {
-                    if (O_IS_SMI(value))
-                        ok = true;
-                }
 
-                if ((cursor->types >> (U32) InstanceType::BOOLEAN) & 1) {
-                    if (O_IS_ODDBALL(value))
-                        ok = true;
-                }
+                if (O_IS_ODDBALL(value) && ((cursor->types >> (U32) InstanceType::BOOLEAN) & 1))
+                    ok = true;
             }
-        } else if (cursor->optional)
-            ok = true;
+        }
 
-        if (!ok) {
+        if (!ok && O_IS_SENTINEL(value)) {
+            if (!cursor->optional) {
+                ErrorSet(isolate,
+                         ValueError::Details[ValueError::Reason::ID],
+                         nullptr,
+                         ValueError::Details[ValueError::Reason::MISSING_PARAMETER],
+                         cursor->name,
+                         index);
+
+                return false;
+            }
+
+            ok = true;
+        }
+
+        if (!ok && cursor->types != 0) {
             GetTypeName(isolate, value, type_name, sizeof(type_name));
             ErrorSet(isolate,
                      TypeError::Details[TypeError::Reason::ID],
