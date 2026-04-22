@@ -200,6 +200,7 @@ namespace orbiter::datatype {
 
     // --- Arithmetic & Bitwise ---
     using BinaryFn = bool(*)(const OObject *, const OObject *, OObject *&result);
+    using TernaryFn = bool(*)(const OObject *, const OObject *, const OObject *);
     using UnaryFn = bool (*)(const OObject *, OObject *&result);
 
     // --- Iteration ---
@@ -283,6 +284,10 @@ namespace orbiter::datatype {
         BinaryFn bit_xor;
         BinaryFn lshift;
         BinaryFn rshift;
+
+        // --- Index ---
+        BinaryFn load_index;
+        TernaryFn store_index;
 
         // --- Unary ---
         UnaryFn neg;

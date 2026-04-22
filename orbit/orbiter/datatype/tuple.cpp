@@ -100,6 +100,45 @@ static bool TupleAdd(const OObject *left, const OObject *right, OObject *&result
 }
 
 // *********************************************************************************************************************
+// TYPE OPS — INDEX
+// *********************************************************************************************************************
+
+/// `tuple[index]`: integer indexing with negative-wrap semantics. Out-of-range raises
+/// IndexError; a non-integer index raises TypeError.
+static bool TupleLoadIndex(const OObject *self, const OObject *index, OObject *&result) {
+    auto *isolate = O_GET_ISOLATE(self);
+
+    IntegerUnderlying i;
+    if (!NumberExtract(index, i)) {
+        ErrorSetWithObjType(isolate,
+                            TypeError::Details[TypeError::Reason::ID],
+                            TypeError::Details[TypeError::Reason::MISMATCH],
+                            isolate->primitive[(int) InstanceType::NUMBER]->name,
+                            index);
+
+        return false;
+    }
+
+    const auto *t = (const Tuple *) self;
+
+    if (t->length == 0 || i >= (IntegerUnderlying) t->length) {
+        ErrorSet(isolate,
+                 IndexError::Details[IndexError::Reason::ID],
+                 nullptr,
+                 IndexError::Details[IndexError::Reason::OUT_OF_RANGE],
+                 O_GET_TYPE(self)->name, (long long) i, (long long) t->length);
+
+        return false;
+    }
+
+    i = ((i % (IntegerUnderlying) t->length) + (IntegerUnderlying) t->length) % (IntegerUnderlying) t->length;
+
+    result = t->objects[i];
+
+    return true;
+}
+
+// *********************************************************************************************************************
 // TYPE OPS — CONVERSION
 // *********************************************************************************************************************
 
@@ -222,52 +261,6 @@ Uses structural equality (==) for comparison.
     return HOObject(std::move(result));
 }
 
-RUNTIME_METHOD(tuple_get, get,
-               R"DOC(
-@brief Return the element at the given index.
-
-Supports negative indices: -1 refers to the last element.
-
-@param index  Integer position. Must be in [-length, length).
-
-@return The element at that position.
-
-@panic ValueError  When `index` is out of range.
-@panic TypeError   When `index` is not an integer.
-
-@see length, index
-
-@example
-    (10, 20, 30).get(0)     // 10
-    (10, 20, 30).get(-1)    // 30
-)DOC", 2, nullptr, false, false) {
-    PCHECK_ENTRIES(params,
-                   PCHECK_DEF("index", false, InstanceType::NUMBER)
-    );
-    PCHECK_CHECK(params);
-
-    const auto *self = (const Tuple *) argv[0];
-    auto *isolate = O_GET_ISOLATE(self);
-
-    IntegerUnderlying index;
-    NumberExtract(argv[1], index);
-
-    if (index < 0)
-        index += (IntegerUnderlying) self->length;
-
-    if (index < 0 || index >= (IntegerUnderlying) self->length) {
-        ErrorSet(isolate,
-                 ValueError::Details[ValueError::Reason::ID],
-                 nullptr,
-                 "tuple index %lld out of range [0, %lld)",
-                 (long long) index, (long long) self->length);
-
-        return {};
-    }
-
-    return HOObject(self->objects[index]);
-}
-
 RUNTIME_METHOD(tuple_index, index,
                R"DOC(
 @brief Return the index of the first occurrence of a value.
@@ -331,7 +324,6 @@ RUNTIME_METHOD(tuple_length, length,
 constexpr FunctionDef tuple_methods[] = {
     tuple_contains,
     tuple_count,
-    tuple_get,
     tuple_index,
     tuple_length,
 
@@ -361,6 +353,7 @@ bool orbiter::datatype::TupleTypeSetup(TypeInfo *self) {
 
     ops.equal = TupleEqual;
     ops.add = TupleAdd;
+    ops.load_index = TupleLoadIndex;
     ops.to_bool = TupleToBool;
     ops.to_string = (ToStrFn) TupleToString;
     ops.hash = TupleHash;

@@ -131,6 +131,7 @@ namespace orbiter::datatype {
             PANIC,
             NON_CALLABLE,
             NON_ITERABLE,
+            NON_SUBSCRIPTABLE,
             GENERATOR_INVALID_CALL,
             INVALID_NATIVE_TYPE,
             GENERATOR_SPAWN,
@@ -146,6 +147,7 @@ namespace orbiter::datatype {
             (const char *) "panic expect type '%s'",
             (const char *) "invalid call to a non-callable object('%s')",
             (const char *) "'%s' object is not iterable",
+            (const char *) "'%s' object is not subscriptable",
             (const char *) "cannot pass arguments when resuming a generator",
             (const char *) "invalid call: native functions can only be called within their defining module by directly "
             "invoking the symbol (indirect calls are not allowed)",
@@ -200,6 +202,34 @@ namespace orbiter::datatype {
 
             (const char *) "unexpected '%s' value for '%s' parameter(%d)",
             (const char *) "missing required parameter '%s' at position %d"
+        };
+    };
+
+    struct IndexError {
+        enum Reason : U8 {
+            ID,
+
+            OUT_OF_RANGE,
+        };
+
+        static constexpr const char *Details[] = {
+            (const char *) "IndexError",
+
+            (const char *) "%s index %lld out of range [0, %lld)",
+        };
+    };
+
+    struct KeyError {
+        enum Reason : U8 {
+            ID,
+
+            NOT_FOUND,
+        };
+
+        static constexpr const char *Details[] = {
+            (const char *) "KeyError",
+
+            (const char *) "key not found in %s",
         };
     };
 

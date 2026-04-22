@@ -159,6 +159,43 @@ static bool ListAdd(const OObject *left, const OObject *right, OObject *&result)
 }
 
 // *********************************************************************************************************************
+// TYPE OPS — INDEX
+// *********************************************************************************************************************
+
+/// `list[index]`: integer indexing with negative-wrap semantics. Out-of-range raises
+/// IndexError; a non-integer index raises TypeError.
+static bool ListLoadIndex(const OObject *self, const OObject *index, OObject *&result) {
+    auto *isolate = O_GET_ISOLATE(self);
+
+    IntegerUnderlying i;
+    if (!NumberExtract(index, i)) {
+        ErrorSetWithObjType(isolate,
+                            TypeError::Details[TypeError::Reason::ID],
+                            TypeError::Details[TypeError::Reason::MISMATCH],
+                            isolate->primitive[(int) InstanceType::NUMBER]->name,
+                            index);
+
+        return false;
+    }
+
+    bool success;
+    const auto value = ListGet((List *) self, &success, i);
+    if (!success) {
+        ErrorSet(isolate,
+                 IndexError::Details[IndexError::Reason::ID],
+                 nullptr,
+                 IndexError::Details[IndexError::Reason::OUT_OF_RANGE],
+                 O_GET_TYPE(self)->name, (long long) i, (long long) ((const List *) self)->length);
+
+        return false;
+    }
+
+    result = value.get();
+
+    return true;
+}
+
+// *********************************************************************************************************************
 // TYPE OPS — CONVERSION
 // *********************************************************************************************************************
 
@@ -359,51 +396,6 @@ RUNTIME_METHOD(list_extend, extend,
     return HOObject(kOddBallNIL);
 }
 
-RUNTIME_METHOD(list_get, get,
-               R"DOC(
-@brief Return the element at the given index.
-
-Supports negative indices: -1 refers to the last element.
-
-@param index  Integer position. Must be in [-length, length).
-
-@return The element at that position.
-
-@panic ValueError  When `index` is out of range.
-@panic TypeError   When `index` is not an integer.
-
-@see length, insert, remove
-
-@example
-    [10, 20, 30].get(0)     // 10
-    [10, 20, 30].get(-1)    // 30
-)DOC", 2, nullptr, false, false) {
-    PCHECK_ENTRIES(params,
-                   PCHECK_DEF("self", false, InstanceType::LIST),
-                   PCHECK_DEF("index", false, InstanceType::NUMBER));
-    PCHECK_CHECK(params);
-
-    auto *self = (List *) argv[0];
-    auto *isolate = O_GET_ISOLATE(self);
-
-    IntegerUnderlying index;
-    NumberExtract(argv[1], index);
-
-    bool success;
-    auto result = ListGet(self, &success, index);
-    if (!success) {
-        ErrorSet(isolate,
-                 ValueError::Details[ValueError::Reason::ID],
-                 nullptr,
-                 "list index %lld out of range [0, %lld)",
-                 (long long) index, (long long) self->length);
-
-        return {};
-    }
-
-    return result;
-}
-
 RUNTIME_METHOD(list_index, index,
                R"DOC(
 @brief Return the index of the first occurrence of a value.
@@ -564,7 +556,6 @@ constexpr FunctionDef list_methods[] = {
     list_contains,
     list_count,
     list_extend,
-    list_get,
     list_index,
     list_insert,
     list_length,
@@ -677,6 +668,7 @@ bool orbiter::datatype::ListTypeSetup(TypeInfo *self) {
 
     ops.equal = ListEqual;
     ops.add = ListAdd;
+    ops.load_index = ListLoadIndex;
     ops.to_bool = ListToBool;
     ops.to_string = (ToStrFn) ListToString;
 

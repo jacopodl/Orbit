@@ -111,6 +111,32 @@ static bool DictOpContains(const OObject *container, const OObject *value, bool 
 }
 
 // *********************************************************************************************************************
+// TYPE OPS — INDEX
+// *********************************************************************************************************************
+
+/// `dict[key]`: looks up `key` and returns the bound value. A missing key raises
+/// ValueError; no type restriction on the key (any hashable is accepted, with
+/// hashability enforced by the underlying hashmap).
+static bool DictLoadIndex(const OObject *self, const OObject *key, OObject *&result) {
+    auto *isolate = O_GET_ISOLATE(self);
+
+    HOObject value;
+    if (!DictLookup((Dict *) self, (OObject *) key, value)) {
+        ErrorSet(isolate,
+                 KeyError::Details[KeyError::Reason::ID],
+                 nullptr,
+                 KeyError::Details[KeyError::Reason::NOT_FOUND],
+                 "dict");
+
+        return false;
+    }
+
+    result = value.get();
+
+    return true;
+}
+
+// *********************************************************************************************************************
 // TYPE OPS — CONVERSION
 // *********************************************************************************************************************
 
@@ -638,6 +664,7 @@ bool orbiter::datatype::DictTypeSetup(TypeInfo *self) {
 
     ops.contains = DictOpContains;
     ops.equal = DictEqual;
+    ops.load_index = DictLoadIndex;
     ops.to_bool = DictToBool;
     ops.to_string = (ToStrFn) DictToString;
 
