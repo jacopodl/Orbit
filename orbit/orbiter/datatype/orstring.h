@@ -269,6 +269,23 @@ namespace orbiter::datatype {
     }
 
     /**
+     * @brief Creates a new ORString instance from a StringBuilder object
+     *
+     * This function constructs an ORString object using the data provided by the StringBuilder.
+     * It extracts the string buffer, its length, code point count, and string kind from the builder,
+     * then creates and returns an ORString instance with the extracted data. If the StringBuilder
+     * fails to generate a valid buffer or the ORString creation fails, an empty handle is returned.
+     * The function ensures proper resource management by releasing resources associated
+     * with the StringBuilder after the ORString is successfully created.
+     *
+     * @param isolate Pointer to the Isolate
+     * @param builder Reference to a StringBuilder object containing the string data to be used
+     *
+     * @return A handle to the newly created ORString object, or an empty handle if creation fails
+     */
+    HORString ORStringNew(Isolate *isolate, class StringBuilder &builder);
+
+    /**
      * @brief Create a new string object using the buffer parameter as an internal buffer
      *
      * Ownership of the buffer is transferred to the new string object **only if the function

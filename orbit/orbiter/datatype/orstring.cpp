@@ -1200,6 +1200,24 @@ HORString orbiter::datatype::ORStringNew(Isolate *isolate, const unsigned char *
     return str;
 }
 
+HORString orbiter::datatype::ORStringNew(Isolate *isolate, StringBuilder &builder) {
+    MSize len;
+    MSize cp_len;
+    StringKind kind;
+
+    auto *buf = builder.BuildString(nullptr, &len, &cp_len, &kind);
+    if (buf == nullptr)
+        return {};
+
+    const auto s = ORStringNew(isolate, buf, len, cp_len, kind);
+    if (!s)
+        return {};
+
+    builder.Release();
+
+    return s;
+}
+
 HORString orbiter::datatype::ORStringNewHoldBuffer(Isolate *isolate, unsigned char *buffer, const MSize length) {
     assert(buffer[length] == '\0');
 
