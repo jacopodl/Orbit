@@ -152,6 +152,22 @@ bool Call(Fiber *fiber, Function *func, const U16 total_args) {
     return true;
 }
 
+bool LoadFromIndex(const Fiber *fiber, OObject *object, const OObject *index, PtrSize &dst) {
+    if (O_IS_OBJECT(object)) {
+        const auto &ops = O_GET_TYPE_OPS(object);
+        if (ops.load_index != nullptr)
+            return ops.load_index(object, index, (OObject *&) dst);
+    }
+
+    ErrorSetWithObjType(fiber->isolate,
+                        TypeError::Details[TypeError::Reason::ID],
+                        TypeError::Details[TypeError::Reason::NON_SUBSCRIPTABLE],
+                        nullptr,
+                        object);
+
+    return false;
+}
+
 bool UnwindStack(Fiber *fiber) {
     const auto *context = &fiber->context;
     auto *regs = &fiber->vm.regs;
@@ -222,7 +238,7 @@ bool UnwindStack(Fiber *fiber) {
 
 bool VMGetIter(const Fiber *fiber, OObject *object, PtrSize *dst) {
     if (O_IS_OBJECT(object)) {
-        const auto type = (TypeInfoOps *) O_GET_TYPE(object);
+        const auto *type = (TypeInfoOps *) O_GET_TYPE(object);
 
         // Generator fast path
         if (type->type.i_type == InstanceType::GENERATOR) {
@@ -515,7 +531,7 @@ int VMGetIterNext(Fiber *fiber, OObject *object, PtrSize *dst) {
         const auto type = (TypeInfoOps *) O_GET_TYPE(object);
 
         if (type->ops.iter_next != nullptr)
-            return type->ops.iter_next(object, (OObject **) &dst);
+            return type->ops.iter_next(object, (OObject **) dst);
     }
 
     ErrorSetWithObjType(fiber->isolate,
@@ -1663,6 +1679,20 @@ CATCH_FINALLY:
                 else
                     assert(false);
 
+                DISPATCH;
+            }
+            TARGET_OP(LDIDX) {
+                dst = FETCH_R_DST(instr);
+                src = FETCH_R_SRC(instr);
+
+                if (!LoadFromIndex(fiber, (OObject *) REG_N(FETCH_R_SRC(instr)),
+                                   (OObject *) REG_N(FETCH_R_RSRC(instr)),
+                                   *REGISTER_PTR(regs, FETCH_R_DST(instr))))
+                    goto ERROR;
+
+                DISPATCH;
+            }
+            TARGET_OP(STIDX) {
                 DISPATCH;
             }
             TARGET_OP(LDOBJP) {
