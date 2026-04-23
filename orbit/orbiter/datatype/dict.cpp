@@ -10,6 +10,7 @@
 #include <orbit/orbiter/datatype/list.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/orstring.h>
+#include <orbit/orbiter/datatype/pcheck.h>
 #include <orbit/orbiter/datatype/rguard.h>
 #include <orbit/orbiter/datatype/stringbuilder.h>
 #include <orbit/orbiter/datatype/tuple.h>
@@ -105,10 +106,21 @@ static bool DictEqual(const OObject *left, const OObject *right) {
 }
 
 /// Membership test: `key in dict` — checks key presence regardless of value type.
+/// Propagates hash errors from the key (e.g., unhashable types) without coercing
+/// them into a false "not found".
 static bool DictOpContains(const OObject *container, const OObject *value, bool &result) {
-    result = DictContains((Dict *) container, (OObject *) value);
+    switch (DictContains((Dict *) container, (OObject *) value)) {
+        case LookupResult::OK:
+            result = true;
+            return true;
+        case LookupResult::NOT_FOUND:
+            result = false;
+            return true;
+        case LookupResult::ERROR:
+            return false;
+    }
 
-    return true;
+    return false;
 }
 
 // *********************************************************************************************************************
@@ -116,25 +128,29 @@ static bool DictOpContains(const OObject *container, const OObject *value, bool 
 // *********************************************************************************************************************
 
 /// `dict[key]`: looks up `key` and returns the bound value. A missing key raises
-/// ValueError; no type restriction on the key (any hashable is accepted, with
-/// hashability enforced by the underlying hashmap).
+/// KeyError; hash errors (e.g., unhashable key) are propagated as-is without
+/// being shadowed by KeyError.
 static bool DictLoadIndex(const OObject *self, const OObject *key, OObject *&result) {
     auto *isolate = O_GET_ISOLATE(self);
 
     HOObject value;
-    if (!DictLookup((Dict *) self, (OObject *) key, value)) {
-        ErrorSet(isolate,
-                 KeyError::Details[KeyError::Reason::ID],
-                 nullptr,
-                 KeyError::Details[KeyError::Reason::NOT_FOUND],
-                 "dict");
+    switch (DictLookup((Dict *) self, (OObject *) key, value)) {
+        case LookupResult::OK:
+            result = value.get();
+            return true;
+        case LookupResult::NOT_FOUND:
+            ErrorSet(isolate,
+                     KeyError::Details[KeyError::Reason::ID],
+                     nullptr,
+                     KeyError::Details[KeyError::Reason::NOT_FOUND],
+                     O_GET_TYPE(self)->name);
 
-        return false;
+            return false;
+        case LookupResult::ERROR:
+            return false;
     }
 
-    result = value.get();
-
-    return true;
+    return false;
 }
 
 // *********************************************************************************************************************
@@ -265,7 +281,16 @@ RUNTIME_METHOD(dict_delete, delete,
 )DOC", 2, nullptr, false, false) {
     auto *self = (Dict *) argv[0];
 
-    return HOObject((OObject *) BOOL_TO_OBOOL(DictRemove(self, argv[1])));
+    switch (DictRemove(self, argv[1])) {
+        case LookupResult::OK:
+            return HOObject((OObject *) BOOL_TO_OBOOL(true));
+        case LookupResult::NOT_FOUND:
+            return HOObject((OObject *) BOOL_TO_OBOOL(false));
+        case LookupResult::ERROR:
+            return {};
+    }
+
+    return {};
 }
 
 RUNTIME_METHOD(dict_entries, entries,
@@ -319,18 +344,29 @@ RUNTIME_METHOD(dict_get, get,
 
 @example
     let d = { x: 10 }
-    d.get("x")          // 10
-    d.get("y")          // nil
-    d.get("y", 0)       // 0
-)DOC", 3, nullptr, false, false) {
+    d.get("x")                  // 10
+    d.get("y")                  // nil
+    d.get("y", default=0)       // 0
+)DOC", 2, "default", false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::DICT),
+                   PCHECK_DEF("default", true));
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
 
     HOObject value;
-    if (DictLookup(self, argv[1], value))
-        return value;
+    switch (DictLookup(self, argv[1], value)) {
+        case LookupResult::OK:
+            return value;
+        case LookupResult::NOT_FOUND:
+            // argv[2] is nil when the optional default was not supplied.
+            return HOObject(O_IS_SENTINEL(argv[2]) ? kOddBallNIL : argv[2]);
+        case LookupResult::ERROR:
+            return {};
+    }
 
-    // argv[2] is nil when the optional default was not supplied.
-    return HOObject(argv[2]);
+    return {};
 }
 
 RUNTIME_METHOD(dict_has, has,
@@ -350,7 +386,16 @@ RUNTIME_METHOD(dict_has, has,
 )DOC", 2, nullptr, false, false) {
     auto *self = (Dict *) argv[0];
 
-    return HOObject((OObject *) BOOL_TO_OBOOL(DictContains(self, argv[1])));
+    switch (DictContains(self, argv[1])) {
+        case LookupResult::OK:
+            return HOObject((OObject *) BOOL_TO_OBOOL(true));
+        case LookupResult::NOT_FOUND:
+            return HOObject((OObject *) BOOL_TO_OBOOL(false));
+        case LookupResult::ERROR:
+            return {};
+    }
+
+    return {};
 }
 
 RUNTIME_METHOD(dict_is_empty, is_empty,
@@ -587,16 +632,6 @@ constexpr FunctionDef dict_methods[] = {
 // PUBLIC API
 // *********************************************************************************************************************
 
-bool orbiter::datatype::DictContains(Dict *dict, OObject *key) {
-    std::shared_lock _(dict->lock);
-
-    ORHEntry *entry = nullptr;
-
-    dict->dict.Lookup(key, &entry);
-
-    return entry != nullptr;
-}
-
 bool orbiter::datatype::DictInsert(Dict *dict, OObject *key, OObject *value) {
     std::unique_lock _(dict->lock);
 
@@ -608,51 +643,6 @@ bool orbiter::datatype::DictInsert(Dict *dict, const char *key, OObject *value) 
 
     if (okey)
         return DictInsert(dict, (OObject *) okey.get(), value);
-
-    return false;
-}
-
-bool orbiter::datatype::DictLookup(Dict *dict, OObject *key, HOObject &out_value) {
-    std::shared_lock _(dict->lock);
-
-    ORHEntry *entry;
-
-    if (dict->dict.Lookup(key, &entry) == LookupResult::OK) {
-        out_value = Handle(entry->value);
-
-        return true;
-    }
-
-    return false;
-}
-
-bool orbiter::datatype::DictLookup(Dict *dict, const char *key, HOObject &out_value) {
-    auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
-
-    if (okey)
-        return DictLookup(dict, (OObject *) okey.get(), out_value);
-
-    return false;
-}
-
-bool orbiter::datatype::DictRemove(Dict *dict, OObject *key) {
-    std::unique_lock _(dict->lock);
-
-    ORHEntry *out;
-
-    if (dict->dict.Remove(key, &out) != LookupResult::OK)
-        return false;
-
-    dict->dict.FreeHEntry(out);
-
-    return true;
-}
-
-bool orbiter::datatype::DictRemove(Dict *dict, const char *key) {
-    const auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
-
-    if (okey)
-        return DictRemove(dict, (OObject *) okey.get());
 
     return false;
 }
@@ -742,4 +732,54 @@ HOObject orbiter::datatype::DictKeys(Dict *dict) {
 HOType orbiter::datatype::DictTypeInit(Isolate *isolate) {
     auto dict = MakeType(isolate, "Dict", InstanceType::DICT, sizeof(Dict) - sizeof(OObject), 13, 0);
     return dict;
+}
+
+LookupResult orbiter::datatype::DictContains(Dict *dict, OObject *key) {
+    std::shared_lock _(dict->lock);
+
+    ORHEntry *entry = nullptr;
+
+    return dict->dict.Lookup(key, &entry);
+}
+
+LookupResult orbiter::datatype::DictLookup(Dict *dict, OObject *key, HOObject &out_value) {
+    std::shared_lock _(dict->lock);
+
+    ORHEntry *entry;
+
+    const auto status = dict->dict.Lookup(key, &entry);
+    if (status == LookupResult::OK)
+        out_value = Handle(entry->value);
+
+    return status;
+}
+
+LookupResult orbiter::datatype::DictLookup(Dict *dict, const char *key, HOObject &out_value) {
+    auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
+
+    if (okey)
+        return DictLookup(dict, (OObject *) okey.get(), out_value);
+
+    return LookupResult::ERROR;
+}
+
+LookupResult orbiter::datatype::DictRemove(Dict *dict, OObject *key) {
+    std::unique_lock _(dict->lock);
+
+    ORHEntry *out;
+
+    const auto status = dict->dict.Remove(key, &out);
+    if (status == LookupResult::OK)
+        dict->dict.FreeHEntry(out);
+
+    return status;
+}
+
+LookupResult orbiter::datatype::DictRemove(Dict *dict, const char *key) {
+    const auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
+
+    if (okey)
+        return DictRemove(dict, (OObject *) okey.get());
+
+    return LookupResult::ERROR;
 }

@@ -41,8 +41,14 @@ DLHandle Loader::LoadLibrary(ORString *name, bool &closable) {
         library = ORSTRING_TO_CSTR(name);
 
         HOObject out_value_;
-        if (DictLookup(this->lib_cache_.get(), (OObject *) name, out_value_))
-            return (DLHandle) ((RawPtr *) out_value_.get())->ptr.load(std::memory_order_relaxed);
+        switch (DictLookup(this->lib_cache_.get(), (OObject *) name, out_value_)) {
+            case LookupResult::OK:
+                return (DLHandle) ((RawPtr *) out_value_.get())->ptr.load(std::memory_order_relaxed);
+            case LookupResult::ERROR:
+                return DLHandleError;
+            case LookupResult::NOT_FOUND:
+                break;
+        }
     }
 
     auto lib = OpenLibrary(this->isolate_, library);
@@ -58,8 +64,14 @@ DLHandle Loader::LoadLibrary(ORString *name, bool &closable) {
         library = ORSTRING_TO_CSTR(name);
 
         HOObject out_value_;
-        if (DictLookup(this->lib_cache_.get(), (OObject *) name, out_value_))
-            return (DLHandle) ((RawPtr *) out_value_.get())->ptr.load(std::memory_order_relaxed);
+        switch (DictLookup(this->lib_cache_.get(), (OObject *) name, out_value_)) {
+            case LookupResult::OK:
+                return (DLHandle) ((RawPtr *) out_value_.get())->ptr.load(std::memory_order_relaxed);
+            case LookupResult::ERROR:
+                return DLHandleError;
+            case LookupResult::NOT_FOUND:
+                break;
+        }
 
         lib = OpenLibrary(this->isolate_, library);
         if (lib == DLHandleError)
@@ -85,8 +97,14 @@ HOObject Loader::Load(NativeBinding *binding) {
     const auto key = this->MakeKey(binding->library, binding->symbol, binding->binding_type);
 
     HOObject out_value_;
-    if (DictLookup(this->cache_.get(), (OObject *) key.get(), out_value_))
-        return out_value_;
+    switch (DictLookup(this->cache_.get(), (OObject *) key.get(), out_value_)) {
+        case LookupResult::OK:
+            return out_value_;
+        case LookupResult::ERROR:
+            return {};
+        case LookupResult::NOT_FOUND:
+            break;
+    }
 
     auto ret = binding->binding_type == NativeBindingType::FUNC
                    ? LoadFunction(binding)

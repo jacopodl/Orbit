@@ -388,13 +388,13 @@ int CallInit(Fiber *fiber, const Function *func, const unsigned short p_count, c
 
             total_args += 1;
 
-            if (call_mode_is_nargs && DictLookup(nargs, defaults->objects[i], out)) {
+            if (call_mode_is_nargs && DictLookup(nargs, defaults->objects[i], out) == LookupResult::OK) {
                 fiber->vm.Push(out.get());
 
                 continue;
             }
 
-            if (call_mode_is_kwarg && DictLookup(kwargs, defaults->objects[i], out)) {
+            if (call_mode_is_kwarg && DictLookup(kwargs, defaults->objects[i], out) == LookupResult::OK) {
                 fiber->vm.Push(out.get());
 
                 continue;

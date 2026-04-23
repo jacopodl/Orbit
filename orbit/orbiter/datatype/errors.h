@@ -132,6 +132,7 @@ namespace orbiter::datatype {
             NON_CALLABLE,
             NON_ITERABLE,
             NON_SUBSCRIPTABLE,
+            UNHASHABLE,
             GENERATOR_INVALID_CALL,
             INVALID_NATIVE_TYPE,
             GENERATOR_SPAWN,
@@ -148,6 +149,7 @@ namespace orbiter::datatype {
             (const char *) "invalid call to a non-callable object('%s')",
             (const char *) "'%s' object is not iterable",
             (const char *) "'%s' object is not subscriptable",
+            (const char *) "unhashable type: '%s'",
             (const char *) "cannot pass arguments when resuming a generator",
             (const char *) "invalid call: native functions can only be called within their defining module by directly "
             "invoking the symbol (indirect calls are not allowed)",
