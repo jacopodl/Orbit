@@ -153,6 +153,13 @@ static bool DictLoadIndex(const OObject *self, const OObject *key, OObject *&res
     return false;
 }
 
+/// `dict[key] = value`: inserts or updates the entry associated with `key`.
+/// Errors from the underlying hashmap (unhashable key, allocation failure)
+/// are propagated as-is with the fiber error already set.
+static bool DictStoreIndex(const OObject *self, const OObject *key, const OObject *value) {
+    return DictInsert((Dict *) self, (OObject *) key, (OObject *) value);
+}
+
 // *********************************************************************************************************************
 // TYPE OPS — CONVERSION
 // *********************************************************************************************************************
@@ -639,10 +646,10 @@ bool orbiter::datatype::DictInsert(Dict *dict, OObject *key, OObject *value) {
 }
 
 bool orbiter::datatype::DictInsert(Dict *dict, const char *key, OObject *value) {
-    auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
+    auto ok = ORStringNew(O_GET_ISOLATE(dict), key);
 
-    if (okey)
-        return DictInsert(dict, (OObject *) okey.get(), value);
+    if (ok)
+        return DictInsert(dict, (OObject *) ok.get(), value);
 
     return false;
 }
@@ -656,6 +663,7 @@ bool orbiter::datatype::DictTypeSetup(TypeInfo *self) {
     ops.contains = DictOpContains;
     ops.equal = DictEqual;
     ops.load_index = DictLoadIndex;
+    ops.store_index = DictStoreIndex;
     ops.to_bool = DictToBool;
     ops.to_string = (ToStrFn) DictToString;
 
@@ -755,10 +763,10 @@ LookupResult orbiter::datatype::DictLookup(Dict *dict, OObject *key, HOObject &o
 }
 
 LookupResult orbiter::datatype::DictLookup(Dict *dict, const char *key, HOObject &out_value) {
-    auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
+    auto ok = ORStringNew(O_GET_ISOLATE(dict), key);
 
-    if (okey)
-        return DictLookup(dict, (OObject *) okey.get(), out_value);
+    if (ok)
+        return DictLookup(dict, (OObject *) ok.get(), out_value);
 
     return LookupResult::ERROR;
 }
@@ -776,10 +784,10 @@ LookupResult orbiter::datatype::DictRemove(Dict *dict, OObject *key) {
 }
 
 LookupResult orbiter::datatype::DictRemove(Dict *dict, const char *key) {
-    const auto okey = ORStringNew(O_GET_ISOLATE(dict), key);
+    const auto ok = ORStringNew(O_GET_ISOLATE(dict), key);
 
-    if (okey)
-        return DictRemove(dict, (OObject *) okey.get());
+    if (ok)
+        return DictRemove(dict, (OObject *) ok.get());
 
     return LookupResult::ERROR;
 }
