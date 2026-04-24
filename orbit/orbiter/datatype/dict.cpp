@@ -242,6 +242,9 @@ RUNTIME_METHOD(dict_clear, clear,
     d.clear()
     d.is_empty()    // true
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
 
     std::unique_lock _(self->lock);
@@ -249,26 +252,6 @@ RUNTIME_METHOD(dict_clear, clear,
     self->dict.Clear(nullptr);
 
     return HOObject(kOddBallNIL);
-}
-
-RUNTIME_METHOD(dict_copy, copy,
-               R"DOC(
-@brief Return a shallow copy of the dictionary.
-
-Keys and values are not deep-copied; both the original and the copy
-reference the same objects.
-
-@return A new Dict with the same entries as self.
-
-@see merge
-
-@example
-    let a = { x: 1 }
-    let b = a.copy()
-    b.set("y", 2)
-    a.has("y")    // false
-)DOC", 1, nullptr, false, false) {
-    return HOObject(DictNew(argv[0]));
 }
 
 RUNTIME_METHOD(dict_delete, delete,
@@ -286,6 +269,9 @@ RUNTIME_METHOD(dict_delete, delete,
     d.delete("a")    // true
     d.delete("a")    // false (already gone)
 )DOC", 2, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
 
     switch (DictRemove(self, argv[1])) {
@@ -314,6 +300,9 @@ The order matches the insertion order of the dictionary.
     let d = { a: 1, b: 2 }
     d.entries()    // [("a", 1), ("b", 2)]
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
     auto *isolate = O_GET_ISOLATE(self);
 
@@ -391,6 +380,12 @@ RUNTIME_METHOD(dict_has, has,
     d.has("a")    // true
     d.has("b")    // false
 )DOC", 2, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::DICT),
+                   PCHECK_DEF("key", false)
+    );
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
 
     switch (DictContains(self, argv[1])) {
@@ -417,6 +412,9 @@ RUNTIME_METHOD(dict_is_empty, is_empty,
     ({}).is_empty()         // true
     ({ a: 1 }).is_empty()   // false
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     const auto *self = (const Dict *) argv[0];
 
     return HOObject((OObject *) BOOL_TO_OBOOL(self->dict.length == 0));
@@ -433,6 +431,9 @@ RUNTIME_METHOD(dict_keys, keys,
 @example
     { a: 1, b: 2 }.keys()    // ["a", "b"]
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     return DictKeys((Dict *) argv[0]);
 }
 
@@ -448,6 +449,9 @@ RUNTIME_METHOD(dict_length, length,
     { a: 1, b: 2 }.length()    // 2
     ({}).length()               // 0
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     const auto *self = (const Dict *) argv[0];
 
     auto n = IntNew(O_GET_ISOLATE(self), (IntegerUnderlying) self->dict.length);
@@ -475,6 +479,12 @@ Entries from other take precedence when the same key exists in both.
     { a: 1 }.merge({ b: 2 })        // { a: 1, b: 2 }
     { a: 1 }.merge({ a: 99, b: 2 }) // { a: 99, b: 2 }
 )DOC", 2, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::DICT),
+                   PCHECK_DEF("other", false, InstanceType::DICT)
+    );
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
     auto *isolate = O_GET_ISOLATE(self);
 
@@ -529,6 +539,13 @@ created.
     d.set("x", 42)
     d.get("x")    // 42
 )DOC", 3, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::DICT),
+                   PCHECK_DEF("key", false),
+                   PCHECK_DEF("value", false)
+    );
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
 
     if (!DictInsert(self, argv[1], argv[2]))
@@ -558,6 +575,12 @@ No-op when other is self.
     d.get("a")    // 99
     d.get("b")    // 2
 )DOC", 2, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::DICT),
+                   PCHECK_DEF("other", false, InstanceType::DICT)
+    );
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
     auto *isolate = O_GET_ISOLATE(self);
 
@@ -600,6 +623,9 @@ RUNTIME_METHOD(dict_values, values,
 @example
     { a: 1, b: 2 }.values()    // [1, 2]
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::DICT));
+    PCHECK_CHECK(params);
+
     auto *self = (Dict *) argv[0];
     auto *isolate = O_GET_ISOLATE(self);
 
@@ -619,7 +645,6 @@ RUNTIME_METHOD(dict_values, values,
 
 constexpr FunctionDef dict_methods[] = {
     dict_clear,
-    dict_copy,
     dict_delete,
     dict_entries,
     dict_get,
@@ -738,7 +763,7 @@ HOObject orbiter::datatype::DictKeys(Dict *dict) {
 }
 
 HOType orbiter::datatype::DictTypeInit(Isolate *isolate) {
-    auto dict = MakeType(isolate, "Dict", InstanceType::DICT, sizeof(Dict) - sizeof(OObject), 13, 0);
+    auto dict = MakeType(isolate, "Dict", InstanceType::DICT, sizeof(Dict) - sizeof(OObject), 12, 0);
     return dict;
 }
 
