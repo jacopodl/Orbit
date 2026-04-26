@@ -278,7 +278,10 @@ void GC::Sweep() noexcept {
     }
 }
 
-void GC::Trace(OObject *object, MSize epoch) noexcept {
+void GC::Trace(OObject *object, const MSize epoch) noexcept {
+    if (object == nullptr)
+        return;
+
     const auto *info = O_GET_TYPE(object);
 
     assert(info != nullptr);
