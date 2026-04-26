@@ -82,7 +82,7 @@ namespace orbiter::datatype {
         Tuple *defaults;
 
         /// Pointer to the TypeInfo structure that represents the owning type of the function.
-        const TypeInfo *owner_type;
+        TypeInfo *owner_type;
 
         /// Name of the function
         ORString *name;
@@ -171,6 +171,18 @@ namespace orbiter::datatype {
         [[nodiscard]] bool IsVariadic() const {
             return ENUMBITMASK_ISTRUE(this->kind, FunctionKind::REST);
         }
+
+        /**
+         * @brief Increments the reference count for the shared function data
+         * and returns the current instance.
+         *
+         * @return A pointer to the current `FuncShared` instance with the incremented reference count.
+         */
+        [[nodiscard]] FuncShared *GetRef() {
+            this->refs.fetch_add(1);
+
+            return this;
+        }
     };
 
     /**
@@ -223,7 +235,7 @@ namespace orbiter::datatype {
      *
      * @return Handle to the newly created Function, or an empty handle on failure.
      */
-    HFunction FunctionNew(Isolate *isolate, const TypeInfo *owner, const FunctionDef *def);
+    HFunction FunctionNew(Isolate *isolate, TypeInfo *owner, const FunctionDef *def);
 
     /**
      * @brief Creates a new Function object with the specified code, closure, defaults and function kind.
