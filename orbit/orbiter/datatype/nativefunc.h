@@ -57,7 +57,7 @@ namespace orbiter::datatype {
      *
      * @return A handle to the newly created NativeFunc object, or an empty handle if the creation fails
      */
-    HNativeFunc NativeFuncNew(Isolate *isolate, native::NativeBinding *binding, native::DLHandle handle);
+    HNativeFunc NativeFuncNew(Isolate *isolate, const native::NativeBinding *binding, native::DLHandle handle);
 
     /**
      * @brief Initialize and create the specified type

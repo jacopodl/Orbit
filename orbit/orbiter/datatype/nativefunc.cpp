@@ -61,6 +61,10 @@ void NativeFuncTrace(const NativeFunc *self, const GCTraceCallback callback, con
         callback((OObject *) self->params[i].name, epoch);
 }
 
+// *********************************************************************************************************************
+// PUBLIC API
+// *********************************************************************************************************************
+
 bool orbiter::datatype::NativeFuncTypeSetup(TypeInfo *self) {
     self->dtor = (DtorFn) NativeFuncDtor;
     self->trace = (TraceFn) NativeFuncTrace;
@@ -70,12 +74,11 @@ bool orbiter::datatype::NativeFuncTypeSetup(TypeInfo *self) {
     ops.equal = NativeFuncEqual;
     ops.to_bool = NativeFuncToBool;
     ops.to_string = NativeFuncToString;
-    ops.to_repr = NativeFuncToString;
 
     return true;
 }
 
-HNativeFunc orbiter::datatype::NativeFuncNew(Isolate *isolate, native::NativeBinding *binding,
+HNativeFunc orbiter::datatype::NativeFuncNew(Isolate *isolate, const native::NativeBinding *binding,
                                              native::DLHandle handle) {
     memory::IsolateAllocator allocator(isolate);
 
@@ -101,7 +104,7 @@ HNativeFunc orbiter::datatype::NativeFuncNew(Isolate *isolate, native::NativeBin
         func->params[i].type = binding->params.params[i].type;
     }
 
-    O_GC_TRACK_RETURN(isolate, func, false);
+    O_GC_TRACK_RETURN(isolate, func, true);
 }
 
 HOType orbiter::datatype::NativeFuncTypeInit(Isolate *isolate) {
