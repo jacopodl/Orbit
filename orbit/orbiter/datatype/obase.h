@@ -244,6 +244,8 @@ namespace orbiter::datatype {
 
         TraceFn trace;
 
+        OObject *ctor;
+
         /// Trait Method Resolution Order
         OObject *mro;
 

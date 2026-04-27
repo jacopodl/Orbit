@@ -218,6 +218,25 @@ namespace orbiter::datatype {
      * @return true if setup was successful, false otherwise
      */
     bool FunctionTypeSetup(TypeInfo *self);
+    
+    /**
+     * @brief Look up the Function instance registered on a type from its definition.
+     *
+     * Scans the type's properties for a native Function whose underlying
+     * implementation matches `def.func` and returns the first match.
+     *
+     * Intended to be called after the type's methods have been registered via
+     * `TIPropertyAdd`, when you need to reference one of those Function objects
+     * directly — for example to bind it as the type's constructor (`ctor`)
+     * without allocating a second Function for the same definition.
+     *
+     * @param type Pointer to the TypeInfo whose properties will be searched.
+     * @param def  Pointer to the native function definition to match against.
+     *
+     * @return Handle to the matching Function, or an empty handle if no
+     *         registered Function wraps `def.func`.
+     */
+    HFunction FunctionFromDef(const TypeInfo *type, const FunctionDef &def);
 
     /**
      * @brief Create a new native Function object from a function definition.

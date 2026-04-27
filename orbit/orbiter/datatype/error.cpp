@@ -157,7 +157,16 @@ bool orbiter::datatype::ErrorTypeSetup(TypeInfo *self) {
     if (!TIPropertyAdd(self, error_props))
         return false;
 
-    return TIPropertyAdd(self, error_methods, PropertyFlag::IS_PUBLIC);
+    const auto ok = TIPropertyAdd(self, error_methods, PropertyFlag::IS_PUBLIC);
+    if (ok) {
+        const auto ctor = FunctionFromDef(self, error_create);
+        if (!ctor)
+            return false;
+
+        self->ctor = (OObject *) ctor.get();
+    }
+
+    return ok;
 }
 
 HError ErrorNewVA(orbiter::Isolate *isolate, const char *kind, OObject *details, const char *format, va_list args) {

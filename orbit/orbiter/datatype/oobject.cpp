@@ -184,6 +184,8 @@ HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, const char
 
     ti->isolate = isolate;
     ti->trace = nullptr;
+    ti->ctor = nullptr;
+    ti->dtor = nullptr;
     ti->mro = nullptr;
 
     ti->aux.data = nullptr;

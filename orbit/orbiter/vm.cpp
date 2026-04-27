@@ -271,18 +271,24 @@ bool VMGetIter(const Fiber *fiber, OObject *object, PtrSize *dst) {
     return false;
 }
 
-int CallInit(Fiber *fiber, const Function *func, const unsigned short p_count, const CallMode mode) {
+int CallInit(Fiber *fiber, Function *&func, const unsigned short p_count, const CallMode mode) {
     auto *regs = &fiber->vm.regs;
     auto *stack = &fiber->vm.stack;
 
-    if (!O_IS_TYPE(func, InstanceType::FUNCTION)) {
-        ErrorSetWithObjType(fiber->isolate,
-                            TypeError::Details[TypeError::Reason::ID],
-                            TypeError::Details[TypeError::Reason::NON_CALLABLE],
-                            nullptr,
-                            (OObject *) func);
+    if (!O_IS_OBJECT(func) || !O_IS_TYPE(func, InstanceType::FUNCTION)) {
+        if (!O_IS_OBJECT(func)
+            || !O_IS_TYPE(func, InstanceType::TYPE)
+            || ((TypeInfo *) func)->ctor == nullptr) {
+            ErrorSetWithObjType(fiber->isolate,
+                                TypeError::Details[TypeError::Reason::ID],
+                                TypeError::Details[TypeError::Reason::NON_CALLABLE],
+                                nullptr,
+                                (OObject *) func);
 
-        return (int) CallResult::ERROR;
+            return (int) CallResult::ERROR;
+        }
+
+        func = (Function *) ((TypeInfo *) func)->ctor;
     }
 
     const auto *fn_shared = func->shared;
@@ -1140,7 +1146,7 @@ CATCH_FINALLY:
                 const auto p_count = FETCH_IMM(instr);
                 const auto SP = regs->SP.reg;
 
-                const auto func = (Function *) ACCESS_REG_SRC(instr);
+                auto func = (Function *) ACCESS_REG_SRC(instr);
 
                 int res;
 
@@ -1219,7 +1225,7 @@ CATCH_FINALLY:
                 const auto flags = FETCH_F_DST(CallMode, instr);
                 const auto p_count = FETCH_IMM(instr);
 
-                const auto func = (Function *) ACCESS_REG_SRC(instr);
+                auto func = (Function *) ACCESS_REG_SRC(instr);
 
                 if (func != nullptr && O_IS_TYPE(func, InstanceType::GENERATOR)) {
                     ErrorSet(fiber->isolate,
@@ -1249,7 +1255,7 @@ CATCH_FINALLY:
                 const auto flags = FETCH_F_DST(CallMode, instr);
                 const auto p_count = FETCH_IMM(instr);
 
-                const auto func = (Function *) ACCESS_REG_SRC(instr);
+                auto func = (Function *) ACCESS_REG_SRC(instr);
 
                 const auto res = CallInit(fiber, func, p_count, flags);
                 if (res == (int) CallResult::ERROR)
@@ -1423,15 +1429,16 @@ CATCH_FINALLY:
                 HOObject out;
 
                 // Before checking the context, VM attempts to load data from the module itself (if it exists)
-                if (fiber->context.module != nullptr) {
+                /* FIXME
+                 *if (fiber->context.module != nullptr) {
                     result = LoadFromObjectProp(fiber, nullptr, (OObject *) fiber->context.module, {},
                                                 FETCH_IMM(instr));
                     if (result != nullptr) {
                         ACCESS_REG_DST(instr) = (PtrSize) result;
-                
+
                         DISPATCH;
                     }
-                }
+                }*/
 
                 if (!ContextLookup(fiber->context.context,
                                    (ORString *) code->unknown_symbols->objects[FETCH_IMM(instr)],

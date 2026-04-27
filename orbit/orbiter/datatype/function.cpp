@@ -34,7 +34,7 @@ FuncShared *FunSharedNew(orbiter::Isolate *isolate, const char *name, const char
     orbiter::memory::IsolateAllocator allocator(isolate);
     auto *shared = allocator.calloc<FuncShared>(sizeof(FuncShared));
     if (shared != nullptr) {
-        new (&shared->refs) std::atomic_uint(1);
+        new(&shared->refs) std::atomic_uint(1);
 
         shared->name = s_name.release();
         shared->doc = s_doc.release();
@@ -125,6 +125,19 @@ bool orbiter::datatype::FunctionTypeSetup(TypeInfo *self) {
     self->trace = (TraceFn) FunctionTrace;
 
     return true;
+}
+
+HFunction orbiter::datatype::FunctionFromDef(const TypeInfo *type, const FunctionDef &def) {
+    for (auto i = 0; i < type->properties.count; i++) {
+        auto *property = type->properties.p_array + i;
+
+        if (O_IS_OBJECT(property->value)
+            && O_IS_TYPE(property->value, InstanceType::FUNCTION)
+            && ((Function *) property->value)->shared->func == def.func)
+            return HFunction((Function *) property->value);
+    }
+
+    return {};
 }
 
 HFunction orbiter::datatype::FunctionNew(Isolate *isolate, TypeInfo *owner, const FunctionDef *def) {
