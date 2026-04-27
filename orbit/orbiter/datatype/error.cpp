@@ -69,7 +69,7 @@ Because atoms are interned, the comparison is a fast pointer equality check.
     e.is(@NIOError)  // false
 )DOC", 2, nullptr, false, false) {
     PCHECK_ENTRIES(params,
-                   PCHECK_DEF("self", false, InstanceType::ATOM),
+                   PCHECK_DEF("self", false, InstanceType::ERROR),
                    PCHECK_DEF("kind", false, InstanceType::ATOM)
     );
     PCHECK_CHECK(params);
@@ -98,7 +98,7 @@ new object; only the `details` field is swapped.
     base.details   // nil  (original unchanged)
 )DOC", 2, nullptr, false, false) {
     PCHECK_ENTRIES(params,
-                   PCHECK_DEF("self", false, InstanceType::ATOM),
+                   PCHECK_DEF("self", false, InstanceType::ERROR),
                    PCHECK_DEF("details", false)
     );
     PCHECK_CHECK(params);

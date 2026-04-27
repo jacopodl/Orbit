@@ -502,6 +502,9 @@ RUNTIME_METHOD(string_is_ascii, is_ascii,
     "hello".is_ascii()    // true
     "héllo".is_ascii()    // false
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     return HOObject((OObject *) BOOL_TO_OBOOL(((ORString *) argv[0])->kind == StringKind::ASCII));
 }
 
@@ -519,6 +522,9 @@ For ASCII strings this equals the byte length.
     "hello".length()    // 5
     "".length()         // 0
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     const auto *self = (ORString *) argv[0];
 
     auto result = IntNew(O_GET_ISOLATE(self), (IntegerUnderlying) self->cp_length);
@@ -542,6 +548,9 @@ Non-ASCII bytes are passed through unchanged.
     "Hello World".lower()    // "hello world"
     "ABC123".lower()         // "abc123"
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     const auto *self = (ORString *) argv[0];
     auto *isolate = O_GET_ISOLATE(_func);
 
@@ -578,6 +587,9 @@ Whitespace is determined by std::isspace (ASCII only).
     "  hello  ".lstrip()    // "hello  "
     "hello".lstrip()        // "hello"
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     const auto *self = (ORString *) argv[0];
     auto *isolate = O_GET_ISOLATE(_func);
 
@@ -719,6 +731,9 @@ Whitespace is determined by std::isspace (ASCII only).
     "  hello  ".rstrip()    // "  hello"
     "hello".rstrip()        // "hello"
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     const auto *self = (ORString *) argv[0];
     auto *isolate = O_GET_ISOLATE(_func);
 
@@ -902,6 +917,9 @@ Whitespace is determined by std::isspace (ASCII only).
     "  hello  ".strip()    // "hello"
     "hello".strip()        // "hello"
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     const auto *self = (ORString *) argv[0];
     auto *isolate = O_GET_ISOLATE(_func);
 
@@ -940,6 +958,9 @@ Non-ASCII bytes are passed through unchanged.
     "Hello World".upper()    // "HELLO WORLD"
     "abc123".upper()         // "ABC123"
 )DOC", 1, nullptr, false, false) {
+    PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::STRING));
+    PCHECK_CHECK(params);
+
     const auto *self = (ORString *) argv[0];
     auto *isolate = O_GET_ISOLATE(_func);
 

@@ -193,6 +193,12 @@ RUNTIME_METHOD(rawptr_read_bytes, read_bytes,
 
 @see read_i8, read_i64
 )DOC", 2, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::RAWPTR),
+                   PCHECK_DEF("size", false, InstanceType::NUMBER)
+    );
+    PCHECK_CHECK(params);
+
     // TODO: implement once Bytes type is available
     assert(false);
 }
