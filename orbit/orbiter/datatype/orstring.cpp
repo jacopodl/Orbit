@@ -983,6 +983,10 @@ constexpr FunctionDef string_methods[] = {
     FUNCTIONDEF_SENTINEL
 };
 
+// *********************************************************************************************************************
+// PUBLIC API
+// *********************************************************************************************************************
+
 bool orbiter::datatype::ORStringTypeSetup(TypeInfo *self) {
     self->dtor = (DtorFn) StrDtor;
 
