@@ -15,6 +15,8 @@
 #include <orbit/orbiter/datatype/stringbuilder.h>
 #include <orbit/orbiter/datatype/tuple.h>
 
+#include <orbit/orbiter/datatype/support/slice.h>
+
 #include <orbit/orbiter/datatype/list.h>
 
 using namespace orbiter::datatype;
@@ -213,6 +215,45 @@ static bool ListStoreIndex(const OObject *self, const OObject *index, OObject *v
     }
 
     return ListInsert((List *) self, value, i);
+}
+
+// *********************************************************************************************************************
+// TYPE OPS — SLICE
+// *********************************************************************************************************************
+
+/// `list[start:stop:step]`: returns a new list with the selected elements.
+/// Bound validation is delegated to support::ResolveSliceBounds (handles TypeError / ValueError outside the lock).
+static bool ListLoadSlice(const OObject *self, const OObject *start, const OObject *stop, const OObject *step,
+                          OObject *&result) {
+    auto *isolate = O_GET_ISOLATE(self);
+    auto *list = (List *) self;
+
+    // Type-check bounds and reject step == 0 before touching the list — keeps
+    // the error path off the critical section.
+    support::SliceArgs args{};
+    if (!support::ResolveSliceBounds(isolate, start, stop, step, args))
+        return false;
+
+    std::shared_lock _(list->lock);
+
+    const auto s = support::NormalizeSlice((MSSize) list->length, args);
+
+    const auto out = ListNew(isolate, s.count);
+    if (!out)
+        return false;
+
+    auto idx = s.start;
+    for (MSize n = 0; n < s.count; n++) {
+        out->objects[n] = list->objects[idx];
+
+        idx += s.step;
+    }
+
+    out->length = s.count;
+
+    result = (OObject *) out.get();
+
+    return true;
 }
 
 // *********************************************************************************************************************
@@ -704,6 +745,7 @@ bool orbiter::datatype::ListTypeSetup(TypeInfo *self) {
     ops.add = ListAdd;
     ops.load_index = ListLoadIndex;
     ops.store_index = ListStoreIndex;
+    ops.load_slice = ListLoadSlice;
     ops.to_bool = ListToBool;
     ops.to_string = (ToStrFn) ListToString;
 
