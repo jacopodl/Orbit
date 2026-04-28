@@ -1064,7 +1064,7 @@ Instruction *IRBuilder::visitLiteral(parser::Literal *node) {
         if ((MSize) node->literal == orbiter::datatype::kOddBallTRUE)
             return this->builder_.LoadTrueValue();
 
-        return this->builder_.LoadImmediate((MachineSize) node->literal);
+        return this->builder_.LoadImmediate(O_FROM_SMI(node->literal));
     }
 
     return this->builder_.LoadConstant(node->literal);

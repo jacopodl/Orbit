@@ -280,7 +280,6 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                                                             ((ir::OffsetInstruction *) instr)->offset);
                 break;
             case orbiter::OPCode::NERROR:
-            case orbiter::OPCode::LDSBSCR:
                 *(orbiter::MachineWord *) m_code = EMIT_DSSS(instr->opcode,
                                                              instr->assigned_reg,
                                                              ((Instruction *)instr->operands[0].value)->assigned_reg,
@@ -348,12 +347,20 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                                                             ((Instruction*)instr->operands[0].value)->assigned_reg,
                                                             ((Instruction*)instr->operands[1].value)->assigned_reg);
                 break;
-            case orbiter::OPCode::STSBSCR:
+            case orbiter::OPCode::LDSBSCR:
                 *(orbiter::MachineWord *) m_code = EMIT_DSSSS(instr->opcode,
                                                               instr->assigned_reg,
                                                               ((Instruction *)instr->operands[0].value)->assigned_reg,
                                                               ((Instruction *)instr->operands[1].value)->assigned_reg,
                                                               ((Instruction *) instr->operands[2].value)->assigned_reg,
+                                                              ((Instruction *) instr->operands[3].value)->assigned_reg);
+                break;
+            case orbiter::OPCode::STSBSCR:
+                *(orbiter::MachineWord *) m_code = EMIT_DSSSS(instr->opcode,
+                                                              ((Instruction *)instr->operands[0].value)->assigned_reg,
+                                                              ((Instruction *)instr->operands[1].value)->assigned_reg,
+                                                              ((Instruction *) instr->operands[2].value)->assigned_reg,
+                                                              ((Instruction *) instr->operands[3].value)->assigned_reg,
                                                               ((Instruction *) instr->operands[3].value)->assigned_reg);
                 break;
             case orbiter::OPCode::AWAIT:
