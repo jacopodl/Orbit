@@ -217,6 +217,13 @@ namespace orbiter::datatype {
     using TernaryFn = bool(*)(const OObject *, const OObject *, OObject *);
     using UnaryFn = bool (*)(const OObject *, OObject *&result);
 
+    // --- Slice ---
+    using SliceLoadFn = bool (*)(const OObject *self, const OObject *start, const OObject *stop, const OObject *step,
+                                 OObject *&result);
+
+    using SliceStoreFn = bool (*)(const OObject *self, const OObject *start, const OObject *stop, const OObject *step,
+                                  OObject *value);
+
     // --- Iteration ---
     using GetIterFn = OObject *(*)(OObject *);
     using IterNextFn = CallResult (*)(OObject *, OObject **);
@@ -304,6 +311,10 @@ namespace orbiter::datatype {
         // --- Index ---
         BinaryFn load_index;
         TernaryFn store_index;
+
+        // --- Slice ---
+        SliceLoadFn load_slice;
+        SliceStoreFn store_slice;
 
         // --- Unary ---
         UnaryFn neg;

@@ -160,6 +160,23 @@ bool LoadFromIndex(const Fiber *fiber, OObject *object, const OObject *index, Pt
     return false;
 }
 
+bool LoadFromSlice(const Fiber *fiber, OObject *object, const OObject *start, const OObject *stop, const OObject *step,
+                   PtrSize &dst) {
+    if (O_IS_OBJECT(object)) {
+        const auto &ops = O_GET_TYPE_OPS(object);
+        if (ops.load_slice != nullptr)
+            return ops.load_slice(object, start, stop, step, (OObject *&) dst);
+    }
+
+    ErrorSetWithObjType(fiber->isolate,
+                        TypeError::Details[TypeError::Reason::ID],
+                        TypeError::Details[TypeError::Reason::NON_SUBSCRIPTABLE],
+                        nullptr,
+                        object);
+
+    return false;
+}
+
 bool StoreToIndex(const Fiber *fiber, OObject *object, const OObject *index, OObject *value) {
     if (O_IS_OBJECT(object)) {
         const auto &ops = O_GET_TYPE_OPS(object);
@@ -538,8 +555,8 @@ int CallInit(Fiber *fiber, Function *&func, const unsigned short p_count, const 
 
         if (!rest_edited) {
             const auto excess_on_stack = ctx.stack_args > ctx.fn_shared->arity
-                                         ? ctx.stack_args - ctx.fn_shared->arity
-                                         : 0;
+                                             ? ctx.stack_args - ctx.fn_shared->arity
+                                             : 0;
 
             const auto rest_len = ctx.call_mode_is_rest ? ctx.rest->length : 0;
 
@@ -553,7 +570,7 @@ int CallInit(Fiber *fiber, Function *&func, const unsigned short p_count, const 
                 ListExtend(tmp.get(), args, excess_on_stack);
 
                 ctx.regs->SP.reg -= excess_on_stack * sizeof(void *);
-                ctx.stack_args   -= excess_on_stack;
+                ctx.stack_args -= excess_on_stack;
             }
 
             if (ctx.call_mode_is_rest)
@@ -1444,7 +1461,7 @@ CATCH_FINALLY:
 
                 dst = FETCH_R_DST(instr);
 
-                REG_N(dst) = shift == 0 ? imm : REG_N(dst) | (imm << (16 * shift));
+                REG_N(dst) = shift == 0 ? O_TO_SMI(imm) : O_TO_SMI(O_FROM_SMI(REG_N(dst)) | (imm << (16 * shift)));
 
                 DISPATCH;
             }
@@ -1836,6 +1853,17 @@ CATCH_FINALLY:
                                   (OObject *) REG_N(FETCH_R_RSRC(instr))))
                     goto ERROR;
 
+
+                DISPATCH;
+            }
+            TARGET_OP(LDSBSCR) {
+                if (!LoadFromSlice(fiber,
+                                   (OObject *) REG_N(FETCH_R_SRC(instr)),
+                                   (OObject *) REG_N(FETCH_R_RSRC(instr)),
+                                   (OObject *) REG_N(((instr >> 8) & 0xFu)),
+                                   (OObject *) REG_N(((instr >> 4) & 0xFu)),
+                                   *REGISTER_PTR(regs, FETCH_R_DST(instr))))
+                    goto ERROR;
 
                 DISPATCH;
             }
