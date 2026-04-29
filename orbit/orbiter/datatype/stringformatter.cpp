@@ -2,6 +2,8 @@
 //
 // Licensed under the Apache License v2.0
 
+#include <cctype>
+
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/stringbuilder.h>

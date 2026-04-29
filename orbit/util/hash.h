@@ -5,6 +5,8 @@
 #ifndef ORBIT_UTIL_HASH_H_
 #define ORBIT_UTIL_HASH_H_
 
+#include <limits>
+
 #include <orbit/util/macros.h>
 
 #include <orbit/datatype.h>
