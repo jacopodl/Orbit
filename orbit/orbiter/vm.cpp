@@ -503,6 +503,7 @@ int CallInit(Fiber *fiber, Function *&func, const unsigned short p_count, const 
             const auto args = (OObject **) ((ctx.stack->stack + ctx.regs->SP.reg) - (ctx.stack_args * sizeof(void *)));
 
             ctx.regs->RR.reg = (PtrSize) FunctionNew(func, args, ctx.stack_args).get();
+            ctx.regs->SP.reg -= ctx.stack_args * sizeof(void *);
 
             return (int) CallResult::DONE;
         }
