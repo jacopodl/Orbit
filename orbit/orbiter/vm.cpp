@@ -1999,17 +1999,13 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(ITRNXT) {
-                dst = FETCH_R_DST(instr);
-                const auto jmp = FETCH_IMM(instr);
-
-                auto res = (CallResult)
-                        VMGetIterNext(fiber, (OObject *) ACCESS_REG_SRC(instr), REGISTER_PTR(regs, dst));
+                auto res = (CallResult) VMGetIterNext(fiber, (OObject *) ACCESS_REG_SRC(instr), &regs->RR.reg);
                 if (res == CallResult::ERROR)
                     goto ERROR;
                 if (res == CallResult::CONTINUE)
                     goto BEGIN;
                 if (res == CallResult::EXHAUST) {
-                    JMP_TO(jmp);
+                    JMP_TO(FETCH_IMM(instr));
 
                     continue;
                 }
