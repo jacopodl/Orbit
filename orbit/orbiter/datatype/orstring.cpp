@@ -13,6 +13,7 @@
 #include <orbit/orbiter/datatype/errors.h>
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/hashmap.h>
+#include <orbit/orbiter/datatype/iterator.h>
 #include <orbit/orbiter/datatype/list.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/pcheck.h>
@@ -291,6 +292,76 @@ static bool StrMod(const OObject *left, const OObject *right, OObject *&result) 
     result = (OObject *) s.get();
 
     return true;
+}
+
+// *********************************************************************************************************************
+// TYPE OPS — ITERATION
+// *********************************************************************************************************************
+
+/// Decode the byte length of a single UTF-8 codepoint from its lead byte.
+/// Returns 1..4 on success, 0 if the byte is not a valid UTF-8 lead.
+static MSize StrUtf8LeadByteCount(const unsigned char c) {
+    if ((c & 0x80) == 0x00) return 1; // 0xxxxxxx — ASCII
+    if ((c & 0xE0) == 0xC0) return 2; // 110xxxxx
+    if ((c & 0xF0) == 0xE0) return 3; // 1110xxxx
+    if ((c & 0xF8) == 0xF0) return 4; // 11110xxx
+
+    return 0;
+}
+
+/// Walk the string one codepoint at a time, yielding each codepoint as a fresh single-codepoint ORString.
+///
+/// Allocation policy:
+///   - 1-byte (ASCII) codepoints go through `ORStringIntern`, which reuses
+///     the per-isolate pool — repeated occurrences of the same character
+///     all return the same ORString instance, no per-step allocation.
+///   - Multi-byte codepoints go through `ORStringNew`, which copies the
+///     2..4 bytes into a fresh buffer.
+static CallResult StrIterStep(Iterator *self, OObject **out) {
+    const auto *src = (const ORString *) self->source;
+    auto *isolate = O_GET_ISOLATE(src);
+
+    if (self->state.str.byte >= STR_LEN(src))
+        return CallResult::EXHAUST;
+
+    const auto offset = self->state.str.byte;
+    const unsigned char *p = STR_BUF(src) + offset;
+
+    const auto cp_bytes = StrUtf8LeadByteCount(*p);
+    if (cp_bytes == 0 || offset + cp_bytes > STR_LEN(src)) {
+        // Defensive: a well-formed ORString never reaches this branch.
+        ErrorSet(isolate,
+                 UnicodeError::Details[UnicodeError::Reason::ID],
+                 nullptr,
+                 UnicodeError::Details[UnicodeError::Reason::INVALID_START_BYTE],
+                 (unsigned int) *p);
+
+        return CallResult::ERROR;
+    }
+
+    const HORString cp_str = (cp_bytes == 1) ? ORStringIntern(isolate, p, 1) : ORStringNew(isolate, p, cp_bytes);
+    if (!cp_str)
+        return CallResult::ERROR;
+
+    self->state.str.byte += cp_bytes;
+    self->state.str.cp += 1;
+
+    *out = (OObject *) cp_str.get();
+
+    return CallResult::DONE;
+}
+
+/// Build a fresh iterator over @p self. ORString is immutable, so we leave
+/// `snapshot_length` at 0 — the step never checks it.
+static OObject *StrGetIter(OObject *self) {
+    const auto iter = IteratorNew(O_GET_ISOLATE(self), self, StrIterStep);
+    if (!iter)
+        return nullptr;
+
+    iter->state.str.byte = 0;
+    iter->state.str.cp = 0;
+
+    return (OObject *) iter.get();
 }
 
 // *********************************************************************************************************************
@@ -1020,6 +1091,7 @@ bool orbiter::datatype::ORStringTypeSetup(TypeInfo *self) {
     ops.add = StrAdd;
     ops.mul = StrMul;
     ops.mod = StrMod;
+    ops.get_iter = StrGetIter;
     ops.to_bool = StrToBool;
     ops.to_string = StrToString;
     ops.to_repr = (ToStrFn) StrToRepr;
