@@ -79,7 +79,8 @@ namespace orbiter::datatype {
             NATIVE_UNLOAD_LIBRARY,
             ITER_NEXT_NOT_IMPLEMENTED,
             ZERO_DIVISION,
-            NEGATIVE_SHIFT_COUNT
+            NEGATIVE_SHIFT_COUNT,
+            CONCURRENT_MODIFICATION,
         };
 
         static constexpr const char *Details[] = {
@@ -90,7 +91,8 @@ namespace orbiter::datatype {
             (const char *) "failed to unload native library '%s': %s",
             (const char *) "'%s' object passed iterator check but does not implement iter_next",
             (const char *) "division by zero",
-            (const char *) "negative shift count"
+            (const char *) "negative shift count",
+            (const char *) "%s changed size during iteration",
         };
     };
 

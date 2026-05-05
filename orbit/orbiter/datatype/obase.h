@@ -128,6 +128,7 @@ namespace orbiter::datatype {
         FUNCTION,
         FUTURE,
         GENERATOR,
+        ITERATOR,
         LIST,
         MODULE,
         NAMESPACE,
@@ -143,7 +144,7 @@ namespace orbiter::datatype {
         TUPLE
     };
 
-    constexpr int kInstanceTypeCount = 28;
+    constexpr int kInstanceTypeCount = 29;
 
     enum class NativeType {
         BOOL,

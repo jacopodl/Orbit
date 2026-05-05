@@ -15,6 +15,7 @@
 #include <orbit/orbiter/datatype/function.h>
 #include <orbit/orbiter/datatype/future.h>
 #include <orbit/orbiter/datatype/generator.h>
+#include <orbit/orbiter/datatype/iterator.h>
 #include <orbit/orbiter/datatype/list.h>
 #include <orbit/orbiter/datatype/module.h>
 #include <orbit/orbiter/datatype/nativefunc.h>
@@ -97,6 +98,7 @@ Isolate *Isolate::New() {
     INIT_TYPE(InstanceType::FUNCTION, FunctionTypeInit);
     INIT_TYPE(InstanceType::FUTURE, FutureTypeInit);
     INIT_TYPE(InstanceType::GENERATOR, GeneratorTypeInit);
+    INIT_TYPE(InstanceType::ITERATOR, IteratorTypeInit);
     INIT_TYPE(InstanceType::LIST, ListTypeInit);
     INIT_TYPE(InstanceType::MODULE, ModuleInit);
     INIT_TYPE(InstanceType::NATIVE_FUNC, NativeFuncTypeInit);
@@ -124,6 +126,7 @@ Isolate *Isolate::New() {
     SETUP_TYPE(InstanceType::FUNCTION, FunctionTypeSetup);
     SETUP_TYPE(InstanceType::FUTURE, FutureTypeSetup);
     SETUP_TYPE(InstanceType::GENERATOR, GeneratorTypeSetup);
+    SETUP_TYPE(InstanceType::ITERATOR, IteratorTypeSetup);
     SETUP_TYPE(InstanceType::LIST, ListTypeSetup);
     SETUP_TYPE(InstanceType::MODULE, ModuleSetup);
     SETUP_TYPE(InstanceType::NATIVE_FUNC, NativeFuncTypeSetup);
