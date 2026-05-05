@@ -2,12 +2,12 @@
 //
 // Licensed under the Apache License v2.0
 
-#include <cassert>
 #include <shared_mutex>
 
 #include <orbit/orbiter/datatype/error.h>
 #include <orbit/orbiter/datatype/errors.h>
 #include <orbit/orbiter/datatype/function.h>
+#include <orbit/orbiter/datatype/iterator.h>
 #include <orbit/orbiter/datatype/number.h>
 #include <orbit/orbiter/datatype/orstring.h>
 #include <orbit/orbiter/datatype/pcheck.h>
@@ -214,6 +214,63 @@ static bool SetOpBitXor(const OObject *left, const OObject *right, OObject *&res
 
     result = (OObject *) out.get();
     return true;
+}
+
+// *********************************************************************************************************************
+// TYPE OPS — ITERATION
+// *********************************************************************************************************************
+
+/// Walk the set's iter chain one element at a time, yielding each element directly.
+///
+/// Lock is acquired in shared mode for the single step and released before
+/// returning, so a parked iter never holds the lock across yields.
+///
+/// Fail-fast: any change in `set.length` since iteration start raises
+/// ConcurrentModificationError.
+static CallResult SetIterStep(Iterator *self, OObject **out) {
+    auto *set = (Set *) self->source;
+
+    std::shared_lock _(set->lock);
+
+    if (self->snapshot_length != set->set.length) {
+        ErrorSet(O_GET_ISOLATE(set),
+                 RuntimeError::Details[RuntimeError::Reason::ID],
+                 nullptr,
+                 RuntimeError::Details[RuntimeError::Reason::CONCURRENT_MODIFICATION],
+                 O_GET_TYPE(set)->name);
+
+        return CallResult::ERROR;
+    }
+
+    const auto *entry = (const ORHEntry *) self->state.entry;
+    if (entry == nullptr)
+        return CallResult::EXHAUST;
+
+    *out = entry->key;
+
+    self->state.entry = entry->iter_next;
+
+    return CallResult::DONE;
+}
+
+/// Build a fresh iterator over @p self. Snapshots both the current length
+/// (for fail-fast) and the head of the iter chain under a shared lock so
+/// we observe a consistent starting point.
+static OObject *SetGetIter(OObject *self) {
+    auto *set = (Set *) self;
+
+    const auto iter = IteratorNew(O_GET_ISOLATE(self), self, SetIterStep);
+    if (!iter)
+        return nullptr;
+
+    std::shared_lock lock(set->lock);
+
+    iter->snapshot_length = set->set.length;
+    iter->state.entry = set->set.iter_begin;
+
+    lock.unlock();
+
+    return (OObject *) iter.get();
 }
 
 // *********************************************************************************************************************
@@ -992,6 +1049,7 @@ bool orbiter::datatype::SetTypeSetup(TypeInfo *self) {
 
     ops.contains = SetOpContains;
     ops.equal = SetEqual;
+    ops.get_iter = SetGetIter;
     ops.to_bool = SetToBool;
     ops.to_string = (ToStrFn) SetToString;
 
