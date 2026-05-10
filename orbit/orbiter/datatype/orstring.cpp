@@ -945,8 +945,13 @@ and preserves empty leading/trailing segments; "aaaa".split("aa") → ["", "", "
         return {};
     }
 
-    auto list = support::Split<ORString>(isolate, STR_BUF(self), STR_LEN(self), STR_BUF(sep),
-                                         STR_LEN(sep), ORStringNew);
+    auto list = support::Split(isolate,
+                                         STR_BUF(self), STR_LEN(self),
+                                         STR_BUF(sep),
+                                         STR_LEN(sep),
+                                         [](orbiter::Isolate *isolate, const unsigned char *buffer, const MSize length) {
+                                             return ORStringNew(isolate, buffer, length);
+                                         });
     if (!list)
         return {};
 

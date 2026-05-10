@@ -51,11 +51,11 @@ namespace orbiter::datatype::support {
      *
      * @return A new HList, empty on allocation/factory failure.
      */
-    template<typename T>
+    template<typename ChunkNew>
     HList Split(Isolate *isolate,
                 const unsigned char *buffer, const MSize blen,
                 const unsigned char *pattern, const MSize plen,
-                const ChunkFn<T> chunk_new,
+                ChunkNew chunk_new,
                 const MSSize maxsplit = -1) {
         assert(pattern != nullptr && plen > 0);
 
