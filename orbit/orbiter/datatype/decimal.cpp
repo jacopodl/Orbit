@@ -54,16 +54,20 @@ static bool DecimalExtract(const OObject *obj, DecimalUnderlying &out) {
 // TYPE OPS — COMPARISON
 // *********************************************************************************************************************
 
-static int DecimalCompare(const OObject *left, const OObject *right) {
+static bool DecimalCompare(const OObject *left, const OObject *right, int &result) {
     DecimalUnderlying a, b;
 
     if (!DecimalExtract(left, a) || !DecimalExtract(right, b))
-        return 0;
+        return false;
 
-    if (a < b) return -1;
-    if (a > b) return 1;
+    result = 0;
 
-    return 0;
+    if (a < b)
+        result = -1;
+    else if (a > b)
+        result = 1;
+
+    return true;
 }
 
 static bool DecimalEqual(const OObject *left, const OObject *right) {

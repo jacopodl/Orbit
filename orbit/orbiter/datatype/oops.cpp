@@ -5,6 +5,8 @@
 #include <cassert>
 #include <cmath>
 
+#include <orbit/orbiter/fiber.h>
+
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/error.h>
 #include <orbit/orbiter/datatype/errors.h>
@@ -338,6 +340,68 @@ bool ObjectContains(orbiter::Isolate *isolate, const OObject *container, const O
 // PUBLIC
 // *********************************************************************************************************************
 
+int orbiter::datatype::Compare(const OObject *left, const OObject *right, const ComparisonMode mode) {
+    auto real_mode = mode;
+    auto delta = 0;
+    auto ok = false;
+
+    if (left == right && ENUMBITMASK_ISTRUE(mode, ComparisonMode::EQ))
+        return 1;
+
+    if (O_IS_OBJECT(left)) {
+        const auto &ops = O_GET_TYPE_OPS(left);
+        if (ops.compare != nullptr)
+            ok = ops.compare(left, right, delta);
+    } else if (O_IS_OBJECT(right)) {
+        const auto &ops = O_GET_TYPE_OPS(right);
+        if (ops.compare != nullptr) {
+            if (ENUMBITMASK_ISTRUE(real_mode, ComparisonMode::LT))
+                real_mode = (real_mode & (~ComparisonMode::LT)) | ComparisonMode::GT;
+            else
+                real_mode = (real_mode & (~ComparisonMode::GT)) | ComparisonMode::LT;
+
+            ok = ops.compare(right, left, delta);
+        }
+    } else {
+        delta = O_FROM_SMI(left) - O_FROM_SMI(right);
+
+        ok = true;
+    }
+
+    if (!ok) {
+        auto *isolate = Fiber::Current()->isolate;
+
+        // Operator symbol from the caller's point of view (`left op right`),
+        // so we use `mode` rather than the internally-swapped `real_mode`.
+        const char *op_sym = ENUMBITMASK_ISTRUE(mode, ComparisonMode::EQ) ? "<=" : "<";
+        if (ENUMBITMASK_ISTRUE(mode, ComparisonMode::GT))
+            op_sym = ENUMBITMASK_ISTRUE(mode, ComparisonMode::EQ) ? ">=" : ">";
+
+        char lname[24];
+        char rname[24];
+
+        GetTypeName(isolate, left, lname, sizeof(lname));
+        GetTypeName(isolate, right, rname, sizeof(rname));
+
+        ErrorSet(isolate,
+                 NotImplementedError::Details[NotImplementedError::Reason::ID],
+                 nullptr,
+                 NotImplementedError::Details[NotImplementedError::Reason::OPERATOR],
+                 op_sym,
+                 lname,
+                 rname);
+
+        return -1;
+    }
+
+    const bool eq = ENUMBITMASK_ISTRUE(real_mode, ComparisonMode::EQ);
+
+    if (ENUMBITMASK_ISTRUE(real_mode, ComparisonMode::LT))
+        return (eq ? delta <= 0 : delta < 0) ? 1 : 0;
+
+    return (eq ? delta >= 0 : delta > 0) ? 1 : 0;
+}
+
 bool orbiter::datatype::Equal(const OObject *left, const OObject *right) {
     if (left == right)
         return true;
@@ -563,10 +627,10 @@ MSize orbiter::datatype::Hash(const OObject *obj) {
         const auto hash = ops.hash(obj);
         if (hash == HASH_ERROR) {
             ErrorSetWithObjType(O_GET_ISOLATE(obj),
-                    TypeError::Details[TypeError::Reason::ID],
-                    TypeError::Details[TypeError::Reason::UNHASHABLE],
-                    nullptr,
-                    obj);
+                                TypeError::Details[TypeError::Reason::ID],
+                                TypeError::Details[TypeError::Reason::UNHASHABLE],
+                                nullptr,
+                                obj);
         }
 
         return hash;

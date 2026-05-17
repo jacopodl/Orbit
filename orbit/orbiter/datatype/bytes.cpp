@@ -232,11 +232,13 @@ static bool BytesOpEqual(const OObject *left, const OObject *right) {
 }
 
 /// `< / <= / > / >=`: lexicographic byte-wise comparison.
-static int BytesOpCompare(const OObject *left, const OObject *right) {
+static bool BytesOpCompare(const OObject *left, const OObject *right, int &result) {
     if (!O_IS_OBJECT(right) || !O_IS_TYPE(right, InstanceType::BYTES))
-        return 0;
+        return false;
 
-    return BytesCompare((const Bytes *) left, (const Bytes *) right);
+    result = BytesCompare((const Bytes *) left, (const Bytes *) right);
+
+    return true;
 }
 
 /// `b in B`: substring containment. A non-Bytes needle raises TypeError.

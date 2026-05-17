@@ -114,6 +114,25 @@ namespace orbiter::datatype {
     // *****************************************************************************************************************
 
     /**
+     * @brief Compare two objects based on a specified comparison mode
+     *
+     * This method determines the relationship between two objects as specified by
+     * the provided comparison mode. If the objects are of compatible types and a
+     * comparison operation is defined, it uses that operation to compute the result.
+     * If the operation cannot be performed, an error is reported.
+     *
+     * @param left Pointer to the first object involved in the comparison
+     * @param right Pointer to the second object involved in the comparison
+     * @param mode The comparison mode, which specifies the type of comparison (e.g., less than, greater than)
+     *
+     * @return An integer representing the result of the comparison:
+     *         1 if the comparison condition is satisfied,
+     *         0 if not satisfied,
+     *        -1 if the comparison cannot be performed.
+     */
+    int Compare(const OObject *left, const OObject *right, ComparisonMode mode);
+
+    /**
      * @brief Check equality between two objects
      *
      * Calls the type's equal operation if defined. If neither type defines equal,

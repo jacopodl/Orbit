@@ -34,16 +34,20 @@ static IntegerUnderlying NumberVal(const OObject *obj) {
 // TYPE OPS — COMPARISON
 // *********************************************************************************************************************
 
-static int NumberCompare(const OObject *left, const OObject *right) {
+static bool NumberCompare(const OObject *left, const OObject *right, int &result) {
     IntegerUnderlying a, b;
 
     if (!NumberExtract(left, a) || !NumberExtract(right, b))
-        return 0;
+        return false;
 
-    if (a < b) return -1;
-    if (a > b) return 1;
+    result = 0;
 
-    return 0;
+    if (a < b)
+        result = -1;
+    else if (a > b)
+        result = 1;
+
+    return true;
 }
 
 static bool NumberEqual(const OObject *left, const OObject *right) {

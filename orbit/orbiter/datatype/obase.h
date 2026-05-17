@@ -210,7 +210,7 @@ namespace orbiter::datatype {
     using TypeInfoAUXDtor = bool (*)(struct TypeInfo *self);
 
     // --- Comparison ---
-    using CompareFn = int (*)(const OObject *, const OObject *);
+    using CompareFn = bool (*)(const OObject *, const OObject *, int &);
     using ContainsFn = bool (*)(const OObject *, const OObject *, bool &);
     using EqualFn = bool (*)(const OObject *, const OObject *);
 

@@ -176,11 +176,13 @@ MSize StrHash(const unsigned char *buffer, const MSize length) {
 // TYPE OPS — COMPARISON
 // *********************************************************************************************************************
 
-static int StrCompare(const OObject *left, const OObject *right) {
+static bool StrCompare(const OObject *left, const OObject *right, int &result) {
     if (!O_IS_OBJECT(right) || !O_IS_TYPE(right, InstanceType::STRING))
-        return 0;
+        return false;
 
-    return ORStringCompare((const ORString *) left, (const ORString *) right);
+    result = ORStringCompare((const ORString *) left, (const ORString *) right);
+
+    return true;
 }
 
 /// Membership test: `"ab" in "xabc"` — requires a String operand.

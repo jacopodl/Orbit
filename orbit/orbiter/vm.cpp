@@ -1176,6 +1176,19 @@ CATCH_FINALLY:
 
                 DISPATCH;
             }
+            TARGET_OP(CMP) {
+                const auto src_l = FETCH_R_SRC(instr);
+                const auto src_r = FETCH_R_RSRC(instr);
+                const auto flags = (ComparisonMode) ((instr >> 8) & 0xFu);
+
+                auto res = Compare((const OObject *) REG_N(src_l), (const OObject *) REG_N(src_r), flags);
+                if (res < 0)
+                    goto ERROR;
+
+                ACCESS_REG_DST(instr) = BOOL_TO_OBOOL(res>0);
+
+                DISPATCH;
+            }
             TARGET_OP(EQ) {
                 const auto src_l = FETCH_R_SRC(instr);
                 const auto src_r = FETCH_R_RSRC(instr);
