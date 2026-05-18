@@ -28,6 +28,7 @@
 #include <orbit/orbiter/datatype/type.h>
 #include <orbit/orbiter/datatype/tuple.h>
 
+#include <orbit/orbiter/import/importer.h>
 #include <orbit/orbiter/import/importspec.h>
 
 #include <orbit/orbiter/memory/gc.h>
@@ -45,6 +46,7 @@ Isolate::~Isolate() {
     delete this->dpool_;
     delete this->fpool_;
     delete this->gc;
+    delete this->importer_;
     delete this->loader_;
 
     this->allocator_->Finalize();
@@ -149,7 +151,7 @@ Isolate *Isolate::New() {
     // *** IMPORT TYPES
     SETUP_TYPE(InstanceType::IMPORT_SPEC, import::ImportSpecTypeSetup);
 
-    // Build Error instance for OOMError
+    // *** Build Error instance for OOMError
     isolate->oom_error_ = (OObject *) ErrorNew(isolate,
                                                MemoryError::Details[MemoryError::Reason::ID],
                                                nullptr,
@@ -157,8 +159,14 @@ Isolate *Isolate::New() {
     if (isolate->oom_error_ == nullptr)
         goto ERROR;
 
+    // *** Initialize native loader
     isolate->loader_ = new native::Loader(isolate);
     if (!isolate->loader_->Initialize())
+        goto ERROR;
+
+    // *** Initialize Import machinery
+    isolate->importer_ = new import::Importer(isolate);
+    if (!isolate->importer_->Initialize())
         goto ERROR;
 
     return isolate;

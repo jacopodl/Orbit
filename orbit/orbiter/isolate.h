@@ -22,6 +22,9 @@
             return handle_; } while (0)
 
 namespace orbiter {
+    namespace import {
+        class Importer;
+    }
     namespace native {
         class Loader;
     }
@@ -40,6 +43,9 @@ namespace orbiter {
 
         class DeferPool *dpool_;
         class FiberPool *fpool_;
+
+        import::Importer *importer_;
+
         native::Loader *loader_;
 
         datatype::TypeInfo *primitive[datatype::kInstanceTypeCount];
