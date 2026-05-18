@@ -28,6 +28,8 @@
 #include <orbit/orbiter/datatype/type.h>
 #include <orbit/orbiter/datatype/tuple.h>
 
+#include <orbit/orbiter/import/importspec.h>
+
 #include <orbit/orbiter/memory/gc.h>
 
 #include <orbit/orbiter/native/loader.h>
@@ -112,6 +114,9 @@ Isolate *Isolate::New() {
     INIT_TYPE(InstanceType::TRAIT, TraitTypeInit);
     INIT_TYPE(InstanceType::TUPLE, TupleTypeInit);
 
+    // *** IMPORT TYPES
+    INIT_TYPE(InstanceType::IMPORT_SPEC, import::ImportSpecTypeInit);
+
     // *****************************************************************************************************************
 
     SETUP_TYPE(InstanceType::TYPE, TypeSetup);
@@ -140,6 +145,9 @@ Isolate *Isolate::New() {
     SETUP_TYPE(InstanceType::STRING, ORStringTypeSetup);
     SETUP_TYPE(InstanceType::TRAIT, TraitTypeSetup);
     SETUP_TYPE(InstanceType::TUPLE, TupleTypeSetup);
+
+    // *** IMPORT TYPES
+    SETUP_TYPE(InstanceType::IMPORT_SPEC, import::ImportSpecTypeSetup);
 
     // Build Error instance for OOMError
     isolate->oom_error_ = (OObject *) ErrorNew(isolate,
