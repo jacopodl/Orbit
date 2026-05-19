@@ -1575,7 +1575,7 @@ HOType orbiter::datatype::ORStringTypeInit(Isolate *isolate) {
     return string;
 }
 
-MSize orbiter::datatype::ORStringHash(ORString *string) {
+MSize orbiter::datatype::ORStringHash(ORString *string) noexcept{
     if (string->hash != 0)
         return string->hash;
 
