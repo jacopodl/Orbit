@@ -41,15 +41,15 @@ bool orbiter::datatype::IsTypeExtends(const TypeInfo *type, const TypeInfo *targ
     return cursor != nullptr;
 }
 
-bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, U16 slot, PropertyFlag flags) {
-    auto orname = ORStringIntern(type->isolate, name);
+bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, const char *name, OObject *value, const U16 slot, const PropertyFlag flags) {
+    const auto orname = ORStringIntern(type->isolate, name);
     if (!orname)
         return false;
 
     return TIPropertyAdd(type, (OObject *) orname.get(), value, slot, flags);
 }
 
-bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *value, U16 slot, PropertyFlag flags) {
+bool orbiter::datatype::TIPropertyAdd(TypeInfo *type, OObject *name, OObject *value, const U16 slot, const PropertyFlag flags) {
     PropertyDescriptor tmp{};
 
     auto *orname = (ORString *) name;
@@ -160,6 +160,7 @@ HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, const char
         ti->name = (char *) allocator.Alloc(slen + 1);
         if (ti->name == nullptr) {
             isolate->gc->RawFree((OObject *) ti, false);
+
             return {};
         }
 
