@@ -141,6 +141,57 @@ namespace orbiter::import {
          */
         ModuleEntry *Insert(ORString *key, bool *was_inserted);
 
+        /**
+         * @brief Attach @p module and @p spec to a LOADING entry.
+         *
+         * Called once by the loader **before** running the module's top-level,
+         * so that re-entrant imports from the same fiber observe the
+         * partial module and `__spec__` is available throughout loading.
+         * The module object itself is populated in place as the top-level runs;
+         * the pointer set here is the same one that `Commit` will eventually mark as LOADED.
+         *
+         * It is a programming error to call Prepare on an entry that is
+         * not LOADING, or on one that already has `module`/`spec` set —
+         * both caught by assertion.
+         *
+         * @param entry   The LOADING entry obtained from a prior `Insert`.
+         * @param module  The (typically empty) module to attach. INCREF'd.
+         * @param spec    The public `ImportSpec`. INCREF'd.
+         */
+        void Prepare(ModuleEntry *entry, OObject *module, ImportSpec *spec);
+
+        /**
+         * @brief Mark @p entry as LOADED.
+         *
+         * Transitions a LOADING entry to LOADED under the cache unique
+         * lock. `module` and `spec` are *not* attached here — they were
+         * set by `Prepare` before the top-level ran; this call simply
+         * publishes the entry as fully initialized so subsequent `Lookup`s
+         * see LOADED.
+         *
+         * It is a programming error to call Commit on an entry that is not
+         * LOADING — caught by assertion.
+         *
+         * @param entry  The LOADING entry obtained from a prior `Insert`.
+         */
+        void Commit(ModuleEntry *entry);
+
+        /**
+         * @brief Drop a failed entry, allowing a future retry.
+         *
+         * Removes @p entry from the cache under the unique lock and
+         * releases it (DECREF of every held Orbit reference, free). Used
+         * when a module's top-level raises: per README "FAILED → removal
+         * + retry consentito", a poisoned half-initialized entry must
+         * never linger.
+         *
+         * The pointer is **consumed**: do not reference it after Fail
+         * returns.
+         *
+         * @param entry  The LOADING entry obtained from a prior `Insert`.
+         */
+        void Fail(ModuleEntry *entry);
+
         [[nodiscard]] Isolate *GetIsolate() const noexcept {
             return this->isolate_;
         }

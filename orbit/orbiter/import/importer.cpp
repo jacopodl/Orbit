@@ -2,6 +2,7 @@
 //
 // Licensed under the Apache License v2.0
 
+#include <cassert>
 #include <shared_mutex>
 
 #include <orbit/orbiter/datatype/error.h>
@@ -269,4 +270,46 @@ ModuleEntry *Importer::Insert(ORString *key, bool *was_inserted) {
         *was_inserted = true;
 
     return entry;
+}
+
+void Importer::Prepare(ModuleEntry *entry, OObject *module, ImportSpec *spec) {
+    assert(entry != nullptr && entry->state == ModuleState::LOADING);
+    assert(entry->module == nullptr && entry->spec == nullptr);
+
+    std::unique_lock guard(this->cache_lock_);
+
+    entry->module = O_FAST_INCREF(module);
+    entry->spec = O_FAST_INCREF(spec);
+}
+
+void Importer::Commit(ModuleEntry *entry) {
+    assert(entry != nullptr && entry->state == ModuleState::LOADING);
+    // module/spec must have been attached via `Prepare` before the
+    // top-level ran — Commit only publishes the entry as LOADED.
+    assert(entry->module != nullptr && entry->spec != nullptr);
+
+    std::unique_lock guard(this->cache_lock_);
+
+    entry->state = ModuleState::LOADED;
+}
+
+void Importer::Fail(ModuleEntry *entry) {
+    if (entry == nullptr)
+        return;
+
+    std::unique_lock guard(this->cache_lock_);
+
+    assert(entry->state == ModuleState::LOADING);
+
+    ModuleMap::HEntry *hentry = nullptr;
+    if (this->modules_.Remove(entry->name, &hentry) != LookupResult::OK)
+        return;
+
+    O_FAST_DECREF(hentry->key);
+
+    this->modules_.FreeHEntry(hentry);
+
+    guard.unlock();
+
+    ModuleEntryDel(this->isolate_, entry);
 }
