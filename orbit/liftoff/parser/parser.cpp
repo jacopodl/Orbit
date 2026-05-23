@@ -1910,7 +1910,7 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 if (this->context_->Check(ContextType::CLASS) || this->context_->Check(ContextType::TRAIT))
                     stmt = this->ParseFunction(start, true, access);
                 else
-                    stmt = this->ParseExpression(); // Use expression version
+                    stmt = this->ParseFunction(start, false, access);
                 break;
             }
             case TokenType::KW_IF:
@@ -2446,7 +2446,7 @@ void Parser::CheckSetImportAlias(HORString alias, Import *imp) const {
     if (!imp->alias)
         throw SymbolTableException();
 
-    imp->alias->flags |= SymbolFlags::CONST;
+    imp->alias->flags |= SymbolFlags::CONST | SymbolFlags::INITIALIZED;
 }
 
 void Parser::ClassCheck(const Construct *clazz) const {
