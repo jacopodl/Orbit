@@ -57,7 +57,7 @@ AcquireOutcome Importer::Acquire(ORString *key, ModuleEntry * &out) noexcept {
     }
 
     // Miss — insert a fresh LOADING entry owned by the calling fiber.
-    out = this->Insert(key, nullptr);
+    out = this->Insert(key);
     if (out == nullptr)
         return AcquireOutcome::ERROR;
 
