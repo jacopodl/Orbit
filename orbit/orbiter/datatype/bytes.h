@@ -58,6 +58,7 @@ namespace orbiter::datatype {
         std::unique_lock<sync::AsyncRWLock> lock_;
 
         unsigned char *data_;
+
     public:
         /**
          * @brief Acquire write access on `[offset, offset + length)` of @p bytes.
@@ -76,23 +77,29 @@ namespace orbiter::datatype {
         BytesWriteGuard(Bytes *bytes, MSize offset, MSize length) noexcept;
 
         BytesWriteGuard(const BytesWriteGuard &) = delete;
+
         BytesWriteGuard(BytesWriteGuard &&) = delete;
 
         BytesWriteGuard &operator=(const BytesWriteGuard &) = delete;
+
         BytesWriteGuard &operator=(BytesWriteGuard &&) = delete;
 
-        [[nodiscard]] bool ok() const noexcept {
+        [[nodiscard]] bool Ok() const noexcept {
             return this->data_ != nullptr;
         }
 
         [[nodiscard]] explicit operator bool() const noexcept {
-            return this->ok();
+            return this->Ok();
         }
 
         /// Pointer to the first byte of the writable range. Valid only
         /// while the guard is alive AND `ok()` is true.
-        [[nodiscard]] unsigned char *data() const noexcept {
+        [[nodiscard]] unsigned char *Data() const noexcept {
             return this->data_;
+        }
+
+        void Release() noexcept {
+            this->lock_.unlock();
         }
     };
 
@@ -183,7 +190,7 @@ namespace orbiter::datatype {
      */
     HBytes BytesNew(const Bytes *src, MSize start, MSize length) noexcept;
 
-    HBytes BytesNew(Isolate *isolate,  OObject *object) noexcept;
+    HBytes BytesNew(Isolate *isolate, OObject *object) noexcept;
 
     /**
      * @brief Initialize and create the specified type

@@ -10,6 +10,8 @@
 #include <orbit/orbiter/datatype/module.h>
 #include <orbit/orbiter/datatype/orstring.h>
 
+#include <orbit/orbiter/module/modules.h>
+
 #include <orbit/orbiter/import/importer.h>
 #include <orbit/orbiter/import/locator.h>
 
@@ -20,10 +22,9 @@ using namespace orbiter::import;
 // INTERNAL
 // *********************************************************************************************************************
 
-/// Fixed builtin table, sentinel-terminated. New builtins go above the
-/// sentinel as they are implemented.
-static constexpr ModuleInit *kBuiltins[] = {
-    nullptr
+/// Fixed builtin table.
+static const ModuleInit *const kBuiltins[] = {
+    orbiter::module::module_io_
 };
 
 /// True if @p path names an existing regular file.
