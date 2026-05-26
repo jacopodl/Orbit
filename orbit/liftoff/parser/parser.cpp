@@ -121,7 +121,7 @@ ASTHandle<ASTNode *> Parser::InjectInit(Loc loc) const {
     return func;
 }
 
-ASTHandle<ASTNode *> Parser::ParseClassTrait() {
+ASTHandle<ASTNode *> Parser::ParseClassTrait(const AccessModifier access) {
     Context isolate(this, TKCUR_TYPE == TokenType::KW_CLASS ? ContextType::CLASS : ContextType::TRAIT);
 
     auto ct = MakeConstruct(this->isolate_,
@@ -141,14 +141,15 @@ ASTHandle<ASTNode *> Parser::ParseClassTrait() {
     if (ct->name == nullptr)
         throw DatatypeException();
 
-    if (!this->sym_t_->DeclareSymbolScope(
+    auto *sym = this->sym_t_->DeclareSymbolScope(
         ct->name,
-        ct->node_type == NodeType::CLASS
-            ? SymbolType::CLASS
-            : SymbolType::TRAIT,
+        ct->node_type == NodeType::CLASS ? SymbolType::CLASS : SymbolType::TRAIT,
         tk_s_offset,
-        tk_s_line))
+        tk_s_line);
+    if (sym == nullptr)
         throw SymbolTableException();
+
+    sym->access = access;
 
     this->Eat(true);
 
@@ -1897,7 +1898,7 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 return this->ParseDecorator();
             case TokenType::KW_CLASS:
             case TokenType::KW_TRAIT:
-                return this->ParseClassTrait();
+                return this->ParseClassTrait(access);
             case TokenType::KW_CLEANUP:
             case TokenType::KW_INIT:
                 return this->ParseCleanupInit(start, access);

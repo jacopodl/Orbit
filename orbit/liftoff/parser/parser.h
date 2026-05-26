@@ -237,7 +237,7 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<ASTNode *> InjectInit(scanner::Loc loc) const;
 
-        [[nodiscard]] ASTHandle<ASTNode *> ParseClassTrait();
+        [[nodiscard]] ASTHandle<ASTNode *> ParseClassTrait(AccessModifier access);
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseDecorator();
 
