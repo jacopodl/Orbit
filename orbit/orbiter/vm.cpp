@@ -2073,7 +2073,7 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JF) {
-                const auto offset = instr & 0x1FFFFF;
+                const auto offset = instr & 0xFFFFF;
 
                 if (REG_N(FETCH_J_SRC(instr)) == kOddBallFALSE) {
                     JMP_TO(offset);

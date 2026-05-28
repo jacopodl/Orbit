@@ -31,7 +31,7 @@ using namespace liftoff::ir;
 
 // Emit macro specific to conditional jump instructions with opcode, src register and offset
 #define EMIT_C_JMP(opcode, src, offset) \
-    (((U32)(opcode) << 24) | ((src) << 20) |(offset & 0x1FFFFF))
+    (((U32)(opcode) << 24) | ((src) << 20) |(offset & 0xFFFFF))
 
 // ============================================================================
 // Emit Macros with Destination and Immediate
