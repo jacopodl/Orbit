@@ -27,6 +27,8 @@ namespace liftoff::ir {
 
         friend class CTContext;
 
+        Instruction *BinaryAndOr(const parser::Binary *binary);
+
         Instruction *BinaryOP(const parser::Binary *binary);
 
         Instruction *CreateCall(const parser::Call *node, Instruction *f_src);

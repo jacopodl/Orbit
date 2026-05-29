@@ -105,7 +105,29 @@ orbiter::datatype::NativeType NativeTypeFromTokenType(const scanner::TokenType t
     }
 }
 
+Instruction *IRBuilder::BinaryAndOr(const parser::Binary *binary) {
+    auto opcode = orbiter::OPCode::JF;
+
+    if (binary->token_type == scanner::TokenType::OR)
+        opcode = orbiter::OPCode::JT;
+
+    auto *end = this->builder_.CreateBasicBlock();
+
+    auto *left = this->visit(binary->left);
+
+    this->builder_.CreateBranch(opcode, left, nullptr, end);
+
+    auto *right = this->visit(binary->right);
+
+    this->builder_.AppendBasicBlock(end);
+
+    return this->builder_.CreatePhi()->AddTarget(left)->AddTarget(right);
+}
+
 Instruction *IRBuilder::BinaryOP(const parser::Binary *binary) {
+    if (binary->token_type == scanner::TokenType::AND || binary->token_type == scanner::TokenType::OR)
+        return this->BinaryAndOr(binary);
+
     const auto *nr = (parser::Binary *) binary->right;
 
     Instruction *left;
