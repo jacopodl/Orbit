@@ -879,6 +879,105 @@ An empty needle is contained in every Bytes.
     return HOObject((OObject *) BOOL_TO_OBOOL(BytesContains((Bytes *) argv[0], (Bytes *) argv[1])));
 }
 
+RUNTIME_METHOD(bytes_copy, copy,
+               R"DOC(
+@brief Copy `length` bytes from `src` into this Bytes in place.
+
+Overwrites the bytes `[dest_offset, dest_offset + length)` of self with
+the bytes `[src_offset, src_offset + length)` of `src`. The destination
+range must already fit inside `self.length` — `copy` does NOT grow self.
+
+Self-copy with overlapping ranges is supported: the implementation
+behaves like `memmove`, so `b.copy(b, 0, 1, n)` (shift right) and
+`b.copy(b, 1, 0, n)` (shift left) both produce the expected result.
+
+@param src         Source Bytes to read from.
+@param src_offset  Starting byte index in `src`.
+@param dest_offset Starting byte index in self.
+@param length      Number of bytes to copy.
+
+@return Self.
+
+@panic TypeError   When `src` is not a Bytes, or any of `src_offset`,
+                   `dest_offset`, `length` is not an Int.
+@panic ValueError  When self is frozen, when any offset/length is
+                   negative, when `src_offset + length` exceeds
+                   `src.length`, or when `dest_offset + length` exceeds
+                   `self.length`.
+
+@see clone, extend, replace
+
+@example
+    let a = Bytes.from(b"Hello World!")
+    let b = Bytes.from(b"xxxxx")
+    a.copy(b, 0, 6, 5)             // a now b"Hello xxxxx!"
+
+    let c = Bytes.from(b"abcdef")
+    c.copy(c, 0, 2, 4)             // overlap shift right → b"ababcd"
+)DOC", 5, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::BYTES),
+                   PCHECK_DEF("src", false, InstanceType::BYTES),
+                   PCHECK_DEF("src_offset", false, InstanceType::NUMBER),
+                   PCHECK_DEF("dest_offset", false, InstanceType::NUMBER),
+                   PCHECK_DEF("length", false, InstanceType::NUMBER));
+    PCHECK_CHECK(params);
+
+    auto *self = (Bytes *) argv[0];
+    auto *src = (Bytes *) argv[1];
+    auto *isolate = O_GET_ISOLATE(self);
+
+    IntegerUnderlying src_off, dest_off, length;
+    if (!NumberExtract(argv[2], src_off))
+        return {};
+    if (!NumberExtract(argv[3], dest_off))
+        return {};
+    if (!NumberExtract(argv[4], length))
+        return {};
+
+    if (src_off < 0 || dest_off < 0 || length < 0) {
+        ErrorSet(isolate,
+                 ValueError::Details[ValueError::Reason::ID],
+                 nullptr,
+                 "Bytes.copy: offsets and length must be non-negative");
+
+        return {};
+    }
+
+    std::unique_lock self_lock(self->shared->rwlock, std::defer_lock);
+    std::shared_lock src_lock(src->shared->rwlock, std::defer_lock);
+    LockTwoSelfUnique(self->shared, src->shared, self_lock, src_lock);
+
+    if (!CheckMutable(self))
+        return {};
+
+    if ((MSize) src_off > src->length || (MSize) length > src->length - (MSize) src_off) {
+        ErrorSet(isolate,
+                 ValueError::Details[ValueError::Reason::ID],
+                 nullptr,
+                 "Bytes.copy: source range out of bounds");
+
+        return {};
+    }
+
+    if ((MSize) dest_off > self->length || (MSize) length > self->length - (MSize) dest_off) {
+        ErrorSet(isolate,
+                 ValueError::Details[ValueError::Reason::ID],
+                 nullptr,
+                 "Bytes.copy: destination range out of bounds");
+
+        return {};
+    }
+
+    auto *dst_ptr = self->shared->buffer + self->start + (MSize) dest_off;
+    const auto *src_ptr = src->shared->buffer + src->start + (MSize) src_off;
+
+    // memmove handles overlap safely.
+    std::memmove(dst_ptr, src_ptr, length);
+
+    return HOObject(argv[0]);
+}
+
 RUNTIME_METHOD(bytes_count, count,
                R"DOC(
 @brief Return the number of non-overlapping occurrences of `sub` in self.
@@ -1766,6 +1865,7 @@ constexpr FunctionDef bytes_methods[] = {
     bytes_clone,
     bytes_compact,
     bytes_contains,
+    bytes_copy,
     bytes_count,
     bytes_ends_with,
     bytes_extend,
@@ -2048,7 +2148,7 @@ HBytes orbiter::datatype::BytesNew(Isolate *isolate, OObject *object) noexcept {
 }
 
 HOType orbiter::datatype::BytesTypeInit(Isolate *isolate) {
-    return MakeType(isolate, "Bytes", InstanceType::BYTES, sizeof(Bytes) - sizeof(OObject), 26, 0);
+    return MakeType(isolate, "Bytes", InstanceType::BYTES, sizeof(Bytes) - sizeof(OObject), 27, 0);
 }
 
 int orbiter::datatype::BytesCompare(const Bytes *left, const Bytes *right) noexcept {
