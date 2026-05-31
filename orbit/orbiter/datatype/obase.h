@@ -271,6 +271,8 @@ namespace orbiter::datatype {
         } aux;
 
         struct {
+            PtrSize origin;
+
             /* Array of property descriptors for this type */
             PropertyDescriptor *p_array;
 

@@ -192,8 +192,9 @@ HOType orbiter::datatype::MakeType(Isolate *isolate, TypeInfo *super, const char
     ti->aux.data = nullptr;
     ti->aux.dtor = nullptr;
 
-    ti->properties.count = 0;
     ti->properties.p_array = nullptr;
+    ti->properties.count = 0;
+    ti->properties.origin = 0;
 
     if (!TIPropertiesInit(isolate, ti, props)) {
         allocator.free((char *) ti->name);

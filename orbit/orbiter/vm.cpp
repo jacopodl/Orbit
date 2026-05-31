@@ -742,7 +742,7 @@ OObject *LoadFromObjectProp(const Fiber *fiber, const Function *func, OObject *o
         return nullptr;
     }
 
-    if (ENUMBITMASK_ISFALSE(prop->detail, PropertyFlag::IS_PUBLIC)) {
+    if (ENUMBITMASK_ISFALSE(prop->detail, PropertyFlag::IS_PUBLIC) && type->properties.origin != (PtrSize) code) {
         if (func == nullptr
             || func->shared->owner_type == nullptr
             || (ENUMBITMASK_ISFALSE(prop->detail, PropertyFlag::IS_PROTECTED)

@@ -132,10 +132,12 @@ HOType orbiter::datatype::ClassTypeNew(const Code *code, TypeInfo *super, TypeIn
     if (!clazz)
         return {};
 
+    clazz->properties.origin = (PtrSize) code;
+
     if (!PushProperties(clazz.get(), code->exported.symbols, code->exported.length))
         return {};
 
-    linearization::C3 c3(clazz.get());
+    const linearization::C3 c3(clazz.get());
     if (!c3.BuildMRO(traits, traits_count))
         return {};
 
@@ -155,10 +157,12 @@ HOType orbiter::datatype::TraitTypeNew(const Code *code, TypeInfo **traits, cons
     auto trait = MakeTypeExtended(isolate, ORSTRING_TO_CSTR(code->name), InstanceType::TRAIT, 0, code->exported.length,
                                   0);
     if (trait) {
+        trait->properties.origin = (PtrSize) code;
+
         if (!PushProperties(trait.get(), code->exported.symbols, code->exported.length))
             return {};
 
-        linearization::C3 c3(trait.get());
+        const linearization::C3 c3(trait.get());
         if (!c3.BuildMRO(traits, traits_count))
             return {};
     }
