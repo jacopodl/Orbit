@@ -320,7 +320,12 @@ bool CallNormalizeMethodCall(Isolate *isolate, CallCtx &ctx) {
 
     // Check object is instance
     const auto args = *((OObject **) ((ctx.stack->stack + ctx.regs->SP.reg) - (ctx.stack_args * sizeof(void *))));
-    if (O_IS_OBJECT(args) && !O_GET_RC(args).IsInstance()) {
+    const auto *type = GetTypeInfoFromObject(isolate, args);
+
+    if (O_IS_OBJECT(args) && !O_GET_RC(args).IsInstance())
+        type = O_GET_TYPE(type);
+
+    if (!IsTypeExtends(type,ctx.fn_shared->owner_type)) {
         ErrorSetWithObjType(isolate,
                             TypeError::Details[TypeError::Reason::ID],
                             TypeError::Details[TypeError::Reason::METHOD_RECEIVER],
@@ -717,16 +722,20 @@ int VMGetIterNext(Fiber *fiber, OObject *object, PtrSize *dst) {
 OObject *LoadFromObjectProp(const Fiber *fiber, const Function *func, OObject *obj, const LoadObjectPropFlags flags,
                             const U16 offset) {
     const auto *code = fiber->context.code;
-    const auto *type = GetTypeInfoFromObject(fiber->isolate, obj);
-
     const auto *key = (ORString *) code->unknown_symbols->objects[offset];
-    const PropertyDescriptor *prop = nullptr;
+
+    const bool obj_is_type = O_IS_OBJECT(obj) && !O_GET_RC(obj).IsInstance();
+
+    const auto *type = obj_is_type ? O_GET_TYPE(obj) : GetTypeInfoFromObject(fiber->isolate, obj);
+
+    const TypeInfo *target_type = nullptr;
+    auto prop = TIFindProperty(type, &target_type, (const char *) key->buffer);
+    if (prop == nullptr && obj_is_type)
+        prop = TIFindProperty((TypeInfo *) obj, &target_type, (const char *) key->buffer);
 
     if (ENUMBITMASK_ISTRUE(flags, LoadObjectPropFlags::SUPER))
         type = O_GET_TYPE(type);
 
-    const TypeInfo *target_type = nullptr;
-    prop = TIFindProperty(type, &target_type, (const char *) key->buffer);
     if (prop == nullptr) {
         char error[24];
 
