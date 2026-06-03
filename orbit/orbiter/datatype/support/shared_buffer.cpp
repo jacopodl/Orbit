@@ -13,7 +13,7 @@ using namespace orbiter::datatype;
 
 bool support::SharedBufferAppend(Isolate *isolate, SharedBuffer *sb, const unsigned char *data, const MSize start,
                                  const MSize length) {
-    if (sb->frozen || start >= sb->capacity)
+    if (sb->frozen)
         return false;
 
     std::unique_lock _(sb->rwlock);
@@ -23,7 +23,7 @@ bool support::SharedBufferAppend(Isolate *isolate, SharedBuffer *sb, const unsig
 
 bool support::SharedBufferAppendLocked(Isolate *isolate, SharedBuffer *sb, const unsigned char *data, const MSize start,
                                        const MSize length) noexcept {
-    if (sb->frozen || start >= sb->capacity)
+    if (sb->frozen)
         return false;
 
     if (!SharedBufferEnlargeLocked(isolate, sb, start + length))
