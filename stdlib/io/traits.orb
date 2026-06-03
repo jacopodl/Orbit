@@ -1,0 +1,185 @@
+# This source file is part of the Orbit project.
+#
+# Licensed under the Apache License v2.0
+
+/**
+ * @brief Core traits for the `io` subsystem: contracts every readable,
+ * writeable, line-oriented or closable resource must honor.
+ *
+ * The traits in this file define the minimum surface that the rest of
+ * stdlib relies on for I/O. Concrete implementations live elsewhere —
+ * `io.File` for OS file descriptors, `bufio.BufferedReader` for
+ * buffering on top of any Readable, network sockets, in-memory
+ * pipes, and so on. Anything that wants to interoperate with the IO
+ * machinery picks the traits it can honor and implements them.
+ *
+ * Conventions shared by all traits in this file:
+ *
+ *   - Length-bounded operations treat `length == 0` as a no-op that
+ *     returns immediately without touching the underlying resource.
+ *
+ *   - Read operations signal end-of-stream by returning a result
+ *     strictly shorter than the request (an empty Bytes when nothing
+ *     more is available). They do NOT panic on EOF.
+ *
+ *   - Failures from the underlying OS surface as `OSError` panics,
+ *     carrying the errno value in the error's `details` field. Argument
+ *     misuse surfaces as `TypeError` (wrong type) or `ValueError`
+ *     (out-of-range).
+ */
+
+
+/**
+ * @brief Trait for resources that hold an external handle and require
+ * explicit release.
+ *
+ * Implementations should make `close` idempotent where it makes sense:
+ * calling `close` on an already-closed resource is expected to be a
+ * no-op rather than an error, so cleanup paths can be written without
+ * try/catch ceremony.
+ *
+ * @see Readable, Writeable
+ */
+pub trait Closable {
+    /**
+     * @brief Release the underlying resource.
+     *
+     * After `close` returns, every other operation on the resource is
+     * undefined and may panic. Implementations that buffer writes
+     * should flush before tearing down the handle.
+     *
+     * @panic OSError  When the OS reports a failure during release
+     *                 (e.g. flushing pending writes).
+     */
+    func close()
+}
+
+
+/**
+ * @brief Trait for any source from which bytes can be read.
+ *
+ * Two complementary operations are required:
+ *
+ *   - `read` allocates and returns a new Bytes — convenient but pays
+ *     the allocation cost on every call.
+ *
+ *   - `readinto` writes into a caller-supplied Bytes — zero-allocation,
+ *     suitable for tight loops or for code that wants to own the
+ *     destination buffer's lifetime.
+ *
+ * Both operations may return fewer bytes than requested when the source
+ * hits end-of-stream. EOF is a return-value signal, not a panic.
+ *
+ * @see Closable, LineReadable, Writeable
+ */
+pub trait Readable {
+    /**
+     * @brief Read up to `length` bytes from the source.
+     *
+     * @param length    Maximum number of bytes to return. Must be >= 0.
+     *                  `0` returns an empty Bytes without touching the
+     *                  source.
+     *
+     * @return A new Bytes with the data read. A length strictly less
+     *         than `length` means the source reached EOF; an empty Bytes
+     *         means the source was already at EOF when called.
+     *
+     * @panic ValueError  When `length` is negative.
+     * @panic OSError     When the underlying source fails.
+     */
+    func read(length)
+
+    /**
+     * @brief Read up to `length` bytes from the source into `buffer`,
+     * starting at `offset`.
+     *
+     * @param buffer    Destination Bytes. Must be mutable and have at
+     *                  least `offset + length` bytes of length.
+     * @param offset    Byte index in `buffer` where writing begins. Must
+     *                  be >= 0.
+     * @param length    Maximum number of bytes to read. Must be >= 0.
+     *
+     * @return The number of bytes actually written into `buffer`. A
+     *         value strictly less than `length` indicates the source
+     *         reached EOF; `0` indicates the source was already at EOF.
+     *
+     * @panic ValueError  When `offset` or `length` is negative.
+     * @panic OSError     When the underlying source fails.
+     */
+    func readinto(buffer, offset, length)
+}
+
+
+/**
+ * @brief Extension of `Readable` for sources that can also be consumed
+ * one line at a time.
+ *
+ * A "line" is a sequence of bytes terminated by `\n` — the newline
+ * itself is part of the line, included in the returned Bytes. At EOF
+ * the final line may lack a trailing newline.
+ *
+ * @see Readable
+ */
+pub trait LineReadable impl Readable {
+    /**
+     * @brief Read one line from the source.
+     *
+     * Returns everything from the current position up to and including
+     * the next `\n` byte. If `length` is non-negative the result is
+     * additionally truncated to at most `length` bytes; pass `-1` for
+     * the common "one full line, no upper bound" case.
+     *
+     * @param length    Maximum bytes to return. Pass `-1` for unbounded.
+     *                  `0` returns an empty Bytes without touching the
+     *                  source.
+     *
+     * @return A new Bytes with the line. Empty if the source is at EOF.
+     *         The trailing `\n` is included when one was found; it may
+     *         be absent at end-of-stream.
+     *
+     * @panic ValueError  When `length` is < -1.
+     * @panic OSError     When the underlying source fails.
+     */
+    func readline(length)
+}
+
+
+/**
+ * @brief Trait for any sink to which bytes can be written.
+ *
+ * Implementations of `write` are expected to perform a *full* write:
+ * handle any partial-write semantics of the underlying sink internally
+ * and only return once every byte has been accepted (or panic on
+ * failure). Callers should not have to loop.
+ *
+ * `flush` exists for implementations that buffer internally; for
+ * unbuffered sinks it is a no-op.
+ *
+ * @see Closable, Readable
+ */
+pub trait Writeable {
+    /**
+     * @brief Commit any data buffered inside the implementation to the
+     * underlying sink.
+     *
+     * For sinks without internal buffering this is a no-op. Always safe
+     * to call before relying on data being durable or observable from
+     * another process.
+     *
+     * @panic OSError  When the underlying sink fails while flushing.
+     */
+    func flush()
+
+    /**
+     * @brief Write every byte of `buffer` to the sink.
+     *
+     * @param buffer    Bytes to write.
+     *
+     * @return The number of bytes written. In the absence of failure
+     *         this equals `buffer.length()`.
+     *
+     * @panic OSError  When the underlying sink fails before every byte
+     *                 could be accepted.
+     */
+    func write(buffer)
+}

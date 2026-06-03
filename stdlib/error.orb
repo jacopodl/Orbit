@@ -1,0 +1,73 @@
+# This source file is part of the Orbit project.
+#
+# Licensed under the Apache License v2.0
+
+/**
+ * @brief Standard error constructors aligned with the kinds raised by the Orbit engine.
+ *
+ * Each `pub let` here is a partial application of `Error.create(@Kind)` —
+ * call it with a reason (and optional details) to build a fully-formed
+ * Error. Catching is symmetric across user- and engine-raised errors
+ * because the kind atom is the same on both sides.
+ *
+ * @example
+ *     panic ValueError("count must be positive")
+ *     panic OSError("read failed", details=3)
+ */
+
+# ── Contract ───────────────────────────────────────────────────────────
+
+# An operation that was expected to be overridden / implemented was not.
+pub let NotImplementedError = Error.create(@NotImplementedError)
+
+
+# ── Type, value, lookup ─────────────────────────────────────────────────
+
+# A value has the wrong type for the operation.
+pub let TypeError = Error.create(@TypeError)
+
+# A value is out of the valid range or shape (e.g. negative width, malformed input).
+pub let ValueError = Error.create(@ValueError)
+
+# An index is out of bounds (List, Tuple, Bytes, ...).
+pub let IndexError = Error.create(@IndexError)
+
+# A key is missing from a Dict / Set / map-like container.
+pub let KeyError = Error.create(@KeyError)
+
+# A property or method does not exist on the target object.
+pub let AttributeError = Error.create(@AttributeError)
+
+# A name is referenced but not defined in the current scope.
+pub let NameError = Error.create(@NameError)
+
+
+# ── Text ────────────────────────────────────────────────────────────────
+
+# Invalid byte sequence for a UTF-8 / Unicode operation.
+pub let UnicodeError = Error.create(@UnicodeError)
+
+
+# ── Iteration ───────────────────────────────────────────────────────────
+
+# An iterator has no more elements.
+#
+# The long name is preserved (matches the engine's @StopIterationError
+# kind verbatim) so user code that catches engine-raised exhaustion uses
+# the same atom as user-raised "this iterator is done" signals.
+pub let StopIterationError = Error.create(@StopIterationError)
+
+
+# ── Modules ─────────────────────────────────────────────────────────────
+
+# A module could not be resolved, loaded, or compiled.
+pub let ImportError = Error.create(@ImportError)
+
+
+# ── OS / IO ─────────────────────────────────────────────────────────────
+
+# An operating-system / I/O call failed.
+#
+# When raised from the `io` primitives the `details` field carries the
+# errno value (as an Int), so user code can dispatch on it:
+pub let OSError = Error.create(@OSError)

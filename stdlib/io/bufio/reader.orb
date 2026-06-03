@@ -1,0 +1,316 @@
+# This source file is part of the Orbit project.
+#
+# Licensed under the Apache License v2.0
+
+import TypeError, ValueError from "error"
+import LineReadable, Readable from "io/traits"
+
+/**
+ * @brief Buffered reader that wraps any Readable to amortize the cost of
+ * many small reads and to expose line-oriented input.
+ *
+ * Reads from the wrapped source go through an internal byte buffer:
+ * single-byte and small-chunk reads are served from the buffer, and the
+ * underlying source is only touched once the buffer is drained.
+ *
+ * The wrapper itself implements `LineReadable`, so a BufferedReader
+ * can be passed wherever a `Readable` is expected.
+ *
+ * @example
+ *     file := io.open("/etc/hosts")
+ *     br := new BufferedReader(file)
+ *
+ *     loop {
+ *         line := br.readline(-1)
+ *         if line.length() == 0 { break }   # EOF
+ *         io.print(line)
+ *     }
+ *     file.close()
+ */
+pub class BufferedReader impl LineReadable {
+    pub let BUFFER_SIZE = 2048 # 2 KiB — default buffer size when none is given.
+
+    var buffer
+    var source
+
+    var cap
+    var idx = 0
+    var len = 0
+
+    /**
+     * @brief Build a BufferedReader on top of `source` with an internal
+     * buffer of `size` bytes.
+     *
+     * The buffer is allocated once at construction time and reused across
+     * every subsequent read. `size` therefore caps both the maximum
+     * single-read amortization and the resident memory of the reader.
+     *
+     * @param source       Any object implementing the `Readable` trait.
+     * @param size=2048    Internal buffer size, in bytes. Must be >= 0.
+     *                     A value of 0 is accepted but effectively
+     *                     bypasses buffering: every `read` goes straight
+     *                     to the underlying source, and `readline` returns
+     *                     an empty Bytes on the first call.
+     *
+     * @panic TypeError    When `source` does not implement `Readable`.
+     * @panic ValueError   When `size` is negative.
+     *
+     * @example
+     *     br := new BufferedReader(file)              # default 2 KiB
+     *     br := new BufferedReader(file, size=65536)  # 64 KiB
+     */
+    pub init(source, size=BufferedReader.BUFFER_SIZE) {
+        if !source.is(Readable) {
+            panic TypeError("source must implement Readable trait")
+        }
+
+        if size < 0 {
+            panic ValueError("size cannot be less than zero")
+        }
+
+        self.source = source
+        self.buffer = Bytes(len=size)
+        self.cap = size
+    }
+
+    # Ensure the buffer has at least one byte available, refilling from the
+    # source if it is drained. Returns the number of unread bytes currently
+    # in the buffer (0 ⇒ EOF on the underlying source).
+    func fill_buffer() {
+        if self.idx < self.len {
+            return self.len - self.idx
+        }
+
+        self.len = self.source.readinto(self.buffer, 0, self.cap)
+        self.idx = 0
+
+        return self.len
+    }
+
+    # Return `buffer` unchanged when its length matches the requested `n`,
+    # otherwise return a fresh slice [:n]. Avoids the cost of building a
+    # view in the (very common) "exactly full" case.
+    func trim(buffer, n) {
+        return n == buffer.length() ? buffer : buffer[:n]
+    }
+
+    /**
+     * @brief Read up to `length` bytes from the buffered source.
+     *
+     * The result is **at most** `length` bytes: a shorter Bytes is
+     * returned when the source hits EOF before `length` bytes have been
+     * consumed. `length == 0` returns an empty Bytes without touching
+     * the source.
+     *
+     * Small reads (`length <= buffer fill`) are served entirely from the
+     * internal buffer. Reads larger than what the buffer currently holds
+     * drain the buffer first and then bypass it, reading the remainder
+     * directly into the destination Bytes — no extra copy.
+     *
+     * @param length    Maximum number of bytes to read. Must be >= 0.
+     *
+     * @return A new Bytes containing the data read. Length is in `[0, length]`;
+     *         a result strictly shorter than `length` means EOF.
+     *
+     * @see readinto, readline
+     *
+     * @example
+     *     br.read(0)        # b""
+     *     br.read(16)       # up to 16 bytes
+     */
+    pub func read(length) {
+        if length == 0 {
+            return Bytes()
+        }
+
+        retval := Bytes(len=length)
+        nbytes := 0
+
+        to_read := self.fill_buffer()
+
+        # EOF on the very first refill — return whatever (nothing) we have.
+        if to_read == 0 {
+            return self.trim(retval, nbytes)
+        }
+
+        if length < to_read {
+            to_read = length
+        }
+
+        retval.copy(self.buffer, self.idx, nbytes, to_read)
+
+        self.idx += to_read
+        nbytes += to_read
+        length -= to_read
+
+        # Buffer fully drained: any remaining bytes go directly into `retval`,
+        # skipping the internal buffer entirely.
+        loop length > 0 {
+            to_read = self.source.readinto(retval, nbytes, length)
+
+            if to_read == 0 {
+                return self.trim(retval, nbytes)
+            }
+
+            nbytes += to_read
+            length -= to_read
+        }
+
+        return self.trim(retval, nbytes)
+    }
+
+    /**
+     * @brief Read up to `length` bytes from the source into `buffer`,
+     * starting at `offset`.
+     *
+     * Equivalent in spirit to `read`, but writes into a caller-supplied
+     * Bytes instead of allocating a new one. Useful for filling
+     * pre-allocated buffers in tight loops and for code that wants to
+     * own the buffer's lifetime explicitly.
+     *
+     * Like `read`, the call returns early on EOF: fewer than `length`
+     * bytes may be written, and the caller should check the return value.
+     *
+     * @param buffer    Destination Bytes. Must be mutable and have at
+     *                  least `offset + length` bytes of length.
+     * @param offset    Byte index in `buffer` at which to start writing.
+     * @param length    Maximum number of bytes to read.
+     *
+     * @return The number of bytes actually written to `buffer`. A value
+     *         strictly smaller than `length` indicates EOF on the source.
+     *
+     * @panic ValueError  When `offset` or `length` is negative.
+     *
+     * @see read, readline
+     *
+     * @example
+     *     dst := Bytes(len=4096)
+     *     n   := br.readinto(dst, 0, dst.length())   # fill dst
+     */
+    pub func readinto(buffer, offset, length) {
+        if offset < 0 {
+            panic ValueError("offset cannot be less than zero")
+        }
+
+        if length < 0 {
+            panic ValueError("length cannot be less than zero")
+        }
+
+        if length == 0 {
+            return 0
+        }
+
+        base := offset
+        to_read := 0
+
+        if self.idx < self.len {
+            to_read = self.len - self.idx
+        }
+
+        if length < to_read {
+            to_read = length
+        }
+
+        if to_read > 0 {
+            buffer.copy(self.buffer, self.idx, offset, to_read)
+
+            self.idx += to_read
+            offset += to_read
+            length -= to_read
+        }
+
+        # Buffer drained: stream remaining bytes directly into the caller's
+        # destination. Stop early on EOF so we never busy-loop on a closed source.
+        loop length > 0 {
+            to_read = self.source.readinto(buffer, offset, length)
+
+            if to_read == 0 {
+                break
+            }
+
+            offset += to_read
+            length -= to_read
+        }
+
+        return offset - base
+    }
+
+    /**
+     * @brief Read one line, up to and including the trailing newline.
+     *
+     * Scans the buffered input for the first `\n` byte and returns
+     * everything from the current position through (and including) that
+     * newline. If `length` is non-negative the result is additionally
+     * truncated to `length` bytes.
+     *
+     * EOF cases:
+     *   - source ends with `\n` ⇒ the final line includes its newline.
+     *   - source ends without `\n` ⇒ the final line is returned without one.
+     *   - source already at EOF ⇒ an empty Bytes is returned.
+     *
+     * Pass `length = -1` for the common "read one full line" case.
+     * Use a non-negative `length` to defend against pathological
+     * inputs (e.g. a multi-MiB line that should not be loaded whole).
+     *
+     * @param length   Maximum bytes to return. Pass -1 for unbounded.
+     *                 0 returns an empty Bytes without touching the source.
+     *
+     * @return A new Bytes containing the line (with or without trailing
+     *         newline, see above).
+     *
+     * @see read, readinto
+     *
+     * @example
+     *     br.readline(-1)     # one full line, may include \n
+     *     br.readline(80)     # at most 80 bytes
+     *     br.readline(0)      # b""
+     */
+    pub func readline(length) {
+        var retval = nil
+
+        if length >= 0 {
+            retval = Bytes(cap=length)
+        } else {
+            retval = Bytes()
+        }
+
+        if length == 0 {
+            return retval
+        }
+
+        to_read := self.fill_buffer()
+
+        loop to_read > 0 && (length < 0 || length > 0) {
+            found := self.buffer.find(b"\n", start=self.idx)
+            if found >= 0 {
+                found += 1   # include the trailing newline itself
+
+                if length > 0 && length < found {
+                    found = length
+                }
+
+                retval.extend(self.buffer[self.idx : self.idx + found])
+                self.idx += found
+
+                return retval
+            }
+
+            if length > 0 && length < to_read {
+                to_read = length
+            }
+
+            retval.extend(self.buffer[self.idx : self.idx + to_read])
+
+            self.idx += to_read
+            length -= to_read
+
+            if length == 0 {
+                return retval
+            }
+
+            to_read = self.fill_buffer()
+        }
+
+        return retval
+    }
+}
