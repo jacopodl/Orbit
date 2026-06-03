@@ -1368,6 +1368,9 @@ CATCH_FINALLY:
                     goto BEGIN;
                 }
 
+                if (fiber->IsPanicking())
+                    goto ERROR;
+
                 DISPATCH;
             }
             TARGET_OP(NTCALL) {

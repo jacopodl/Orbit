@@ -75,6 +75,15 @@ namespace orbiter {
         ~Fiber();
 
         /**
+         * @brief Checks if the current fiber is in a panic state.
+         *
+         * @return True if the fiber is panicking; false otherwise.
+         */
+        [[nodiscard]] bool IsPanicking() const noexcept {
+            return *this->panic.r_current_ != nullptr;
+        }
+
+        /**
          * @brief Saves the current fiber's execution state into its stack.
          *
          * This method pushes the fiber's context and key register states
