@@ -1,0 +1,239 @@
+# This source file is part of the Orbit project.
+#
+# Licensed under the Apache License v2.0
+
+import OSError, TypeError, ValueError from "error"
+import Closable, Writeable from "io/traits"
+
+
+/**
+ * @brief Buffered writer that wraps any Writeable to amortize the cost
+ * of many small writes.
+ *
+ * Writes accumulate inside an internal byte buffer (default 2 KiB) and
+ * are committed to the wrapped source only when the buffer fills up, or
+ * when the consumer calls `flush` / `close` explicitly.
+ * Writes strictly larger than the internal buffer are forwarded directly
+ * to the source.
+ *
+ * The wrapper itself implements both `Writeable` and `Closable`. By
+ * default `close` also closes the wrapped source — convenient for the
+ * common "open file, wrap, write, close" pattern. When the source is
+ * shared (kept open elsewhere, used for read too, etc.) pass
+ * `own_source=false` to `init` so that `close` only flushes and leaves
+ * the source untouched.
+ *
+ * IMPORTANT: forgetting to call `flush` (or `close`) before discarding
+ * a BufferedWriter silently drops any byte still sitting in the buffer.
+ * The `cleanup` hook runs `close` automatically when the writer goes
+ * out of scope, but relying on it is fragile — flush explicitly when
+ * data durability matters.
+ *
+ * @example
+ *     file := io.open("/tmp/out", flags=io.O_WRITE)
+ *     bw := new BufferedWriter(file)
+ *
+ *     for line in lines {
+ *         bw.write(line)
+ *     }
+ *
+ *     bw.close()   # flushes + closes file (default own_source=true)
+ */
+pub class BufferedWriter impl Closable + Writeable {
+    pub let BUFFER_SIZE = 2048 # 2 KiB — default buffer size when none is given.
+
+    var buffer
+    var source
+    var own_source
+
+    var failed = false
+
+    var cap
+    var idx = 0
+
+    /**
+     * @brief Build a BufferedWriter on top of `source` with an internal
+     * buffer of `size` bytes.
+     *
+     * @param source           Any object implementing the `Writeable` trait.
+     * @param size=2048        Internal buffer size, in bytes. Must be >= 0.
+     *                         A value of 0 is accepted but effectively
+     *                         bypasses buffering: every `write` is
+     *                         forwarded straight to the source.
+     * @param own_source=true  When `true`, `close` will also close the
+     *                         source (if the source implements `Closable`).
+     *                         Set to `false` when the source is shared
+     *                         and its lifecycle is managed elsewhere.
+     *
+     * @panic TypeError        When `source` does not implement `Writeable`.
+     * @panic ValueError       When `size` is negative.
+     *
+     * @example
+     *     bw := new BufferedWriter(file)                       # owns file
+     *     bw := new BufferedWriter(file, size=65536)           # 64 KiB
+     *     bw := new BufferedWriter(file, own_source=false)     # shared file
+     */
+    pub init(source, size=BufferedWriter.BUFFER_SIZE, own_source=true) {
+        if !source.is(Writeable) {
+            panic TypeError("source must implement Writeable trait")
+        }
+
+        if size < 0 {
+            panic ValueError("size cannot be less than zero")
+        }
+
+        self.source = source
+        self.own_source = own_source
+        self.buffer = Bytes(len=size)
+        self.cap = size
+    }
+
+    # Runs automatically when the writer goes out of scope. Two paths:
+    #   - healthy writer: do a regular close (flush + maybe close source).
+    #   - failed writer:  skip flush (it would panic and propagate out of
+    #                     the destructor), but still release the source
+    #                     when this writer owns it. Caller's data is
+    #                     already lost — the priority here is releasing
+    #                     the OS handle, not surfacing yet another panic.
+    cleanup {
+        if !self.failed {
+            self.close()
+
+            return
+        }
+
+        if self.own_source && self.source.is(Closable) {
+            self.source.close()
+        }
+    }
+
+    /**
+     * @brief Flush any pending writes; close the source when this writer
+     * owns it.
+     *
+     * Whether the source is closed is decided once at construction time
+     * by the `own_source` argument of `init`. When `own_source` is
+     * `false`, or when the source does not implement `Closable`, only
+     * the flush happens — the source is left intact.
+     *
+     * If the writer is already in the failed state, the inner `flush`
+     * panics immediately and the source is left untouched (regardless
+     * of `own_source`): cleanup of the source then becomes the caller's
+     * responsibility.
+     *
+     * @panic OSError  When the source fails while flushing or closing,
+     *                 or when this writer is already in the failed
+     *                 state.
+     *
+     * @see flush
+     */
+    pub func close() {
+        self.flush()
+
+        if self.own_source && self.source.is(Closable) {
+            self.source.close()
+        }
+    }
+
+    /**
+     * @brief Commit any bytes sitting in the internal buffer to the
+     * underlying source.
+     *
+     * Calling `flush` on an already-empty buffer is a cheap no-op. On
+     * success the buffer is reset to empty and the writer is ready for
+     * more data.
+     *
+     * On failure the writer enters a permanent "failed" state. The
+     * buffer's `idx` is left untouched so a partial-write retry never
+     * happens silently — instead, every subsequent `flush`, `write`
+     * or `close` call panics immediately with the same kind of
+     * `OSError`. The writer should be discarded after the original
+     * panic propagates; allocating a new wrapper around the same
+     * source is the safe way to continue.
+     *
+     * @panic OSError  When the source rejects the buffered data, or
+     *                 when this writer has already entered the failed
+     *                 state from a previous call.
+     *
+     * @see close, write
+     */
+    pub func flush() {
+        if self.failed {
+            panic OSError("writer is in failed state")
+        }
+
+        if self.idx == 0 {
+            return
+        }
+
+        try {
+            if self.idx < self.cap {
+                self.source.write(self.buffer[:self.idx])
+            } else {
+                self.source.write(self.buffer)
+            }
+        } catch e {
+            self.failed = true
+
+            panic e
+        }
+
+        self.idx = 0
+    }
+
+    /**
+     * @brief Write every byte of `buffer` through this writer.
+     *
+     * Small writes are absorbed by the internal buffer and only reach
+     * the source on flush. Writes whose length meets or exceeds the
+     * internal buffer size are forwarded directly to the source after
+     * draining any buffered data — there is no benefit in staging a
+     * payload that already dwarfs the staging area.
+     *
+     * Once the writer has entered the failed state (see `flush`) every
+     * subsequent `write` panics immediately, refusing to queue more
+     * data into a buffer that can no longer be drained.
+     *
+     * @param buffer    Bytes to write.
+     *
+     * @return The number of bytes written. In the absence of failure
+     *         this equals `buffer.length()`.
+     *
+     * @panic TypeError  When `buffer` is not a Bytes.
+     * @panic OSError    When the underlying source fails while
+     *                   draining the internal buffer or while writing
+     *                   the bypass payload, or when this writer is
+     *                   already in the failed state.
+     *
+     * @see flush
+     *
+     * @example
+     *     bw.write(b"ciao\n")          # buffered, no syscall
+     *     bw.write(big_blob)           # bypass straight to source
+     */
+    pub func write(buffer) {
+        if self.failed {
+            panic OSError("writer is in failed state")
+        }
+
+        length := buffer.length()
+
+        # Large payload: drain the buffer and write straight to the source.
+        if length >= self.cap {
+            self.flush()
+
+            return self.source.write(buffer)
+        }
+
+        # Not enough room left in the buffer for this payload: flush first.
+        if length >= self.cap - self.idx {
+            self.flush()
+        }
+
+        self.buffer.copy(buffer, 0, self.idx, length)
+
+        self.idx += length
+
+        return length
+    }
+}
