@@ -79,6 +79,67 @@ never-opened fd raises `OSError`.
     return HOObject(kOddBallNIL);
 }
 
+RUNTIME_FUNCTION(io_dup, dup,
+                 R"DOC(
+@brief Duplicate fd, returning a new descriptor that refers to the same
+open file description.
+
+Both descriptors share the underlying file offset and the open-mode
+flags — a read or seek on one is visible from the other. They differ
+only in the per-descriptor close-on-exec setting.
+
+By default the new descriptor is created with `FD_CLOEXEC` set, so it
+will be closed automatically when the process `exec()`s another
+program — the safer default for most code. Pass `cloexec=false` only
+when the descriptor must be deliberately inherited across `exec`,
+typically when setting up stdin / stdout / stderr for a child process
+in a fork+exec pair.
+
+On POSIX this is implemented via `fcntl(F_DUPFD_CLOEXEC, 0)` when
+`cloexec=true`, or plain `dup(2)` otherwise. Windows has no direct
+equivalent at the C-runtime level, so the `cloexec` argument is
+currently ignored there and the descriptor follows the platform
+default.
+
+@param fd            The file descriptor to duplicate. Must refer to
+                     an open descriptor.
+@param cloexec=true  Whether the new descriptor carries the close-on-
+                     exec flag. Ignored on Windows.
+
+@return The newly-allocated file descriptor.
+
+@panic OSError  When the underlying syscall fails.
+
+@example
+    let copy = dup(fd)                    // safer: closed on exec
+    let child_in = dup(fd, cloexec=false) // inherited across exec()
+)DOC", 1, "cloexec", false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("fd", false, InstanceType::NUMBER),
+                   PCHECK_DEF("cloexec", true, InstanceType::BOOLEAN));
+    PCHECK_CHECK(params);
+
+    IntegerUnderlying fd;
+    if (!NumberExtract(argv[0], fd))
+        return {};
+
+    const bool cloexec = O_IS_SENTINEL(argv[1]) ? true : OBOOL_TO_BOOL(argv[1]);
+
+#ifdef _ORBIT_PLATFORM_WINDOWS
+    // CLOEXEC has no direct equivalent on the Windows CRT.
+    const auto new_fd = ::_dup((int) fd);
+#else
+    const auto new_fd = cloexec
+                            ? ::fcntl((int) fd, F_DUPFD_CLOEXEC, 0)
+                            : ::dup((int) fd);
+#endif
+
+    if (new_fd < 0)
+        return ErrorFromFd(O_GET_ISOLATE(_func), fd);
+
+    return HOObject((OObject *) O_TO_SMI((MSSize) new_fd));
+}
+
 RUNTIME_FUNCTION(io_flush, flush,
                  R"DOC(
 @brief Flush pending writes for fd to the OS / disk.
@@ -460,6 +521,7 @@ retrying the remainder.
 
 const ModuleEntry io_entries[] = {
     ORBIT_MODULE_EXPORT_FUNCTION(io_close),
+    ORBIT_MODULE_EXPORT_FUNCTION(io_dup),
     ORBIT_MODULE_EXPORT_FUNCTION(io_flush),
     ORBIT_MODULE_EXPORT_FUNCTION(io_fsync),
     ORBIT_MODULE_EXPORT_FUNCTION(io_isatty),

@@ -1,0 +1,359 @@
+# This source file is part of the Orbit project.
+#
+# Licensed under the Apache License v2.0
+
+import "::orbit::io"
+
+import OSError from "error"
+import Closable, Readable, Writeable from "io/traits"
+
+pub let SEEK_CUR = io.SEEK_CUR
+pub let SEEK_END = io.SEEK_END
+pub let SEEK_SET = io.SEEK_SET
+
+/**
+ * @brief Object wrapper around an OS file descriptor.
+ *
+ * `File` is the thin OO surface over the raw syscall API exposed by the
+ * native `io` module. It implements the three core IO traits at once
+ * (`Closable`, `Readable`, `Writeable`), which makes it directly usable
+ * as the underlying source for `bufio.BufferedReader` /
+ * `bufio.BufferedWriter`, for the high-level `print` helpers, and for
+ * any future code written against the trait interfaces.
+ *
+ * The wrapper does NOT add user-space buffering: every `read`, `write`,
+ * `readinto` and `flush` lowers to exactly one syscall. When small
+ * operations dominate the workload, wrap a File in a `bufio.*` reader
+ * or writer to amortize the cost.
+ *
+ * Lifecycle:
+ *
+ *   - `close` is idempotent — calling it more than once is a silent
+ *     no-op after the first successful call.
+ *
+ *   - The `cleanup` hook runs `close` automatically when the File goes
+ *     out of scope, so a dropped File never leaks its descriptor. That
+ *     said, explicit close is recommended: errors from the kernel's
+ *     `close(2)` are only propagated when `close` is called explicitly;
+ *     a panic from the destructor would have nowhere to land.
+ *
+ *   - Every other operation panics with `OSError` when invoked on a
+ *     File whose descriptor has already been closed, instead of
+ *     forwarding the call and letting the kernel return `EBADF` with
+ *     a less actionable message.
+ *
+ * @example
+ *     # Most callers should go through the io.open helper, which
+ *     # already returns a wrapped File:
+ *     f := io.open("/etc/hosts")
+ *     loop {
+ *         chunk := f.read(4096)
+ *         if chunk.length() == 0 { break }
+ *         # ... process chunk ...
+ *     }
+ *     f.close()
+ *
+ *     # Lower-level: wrap a raw descriptor obtained elsewhere
+ *     # (a standard stream, an inherited fd, a syscall not exposed
+ *     # by stdlib, ...).
+ *     stdin := new File(fd)
+ *     line := stdin.read(1024)
+ */
+pub class File impl Closable + Readable + Writeable {
+    var closed = false
+
+    var fd
+
+    /**
+     * @brief Build a File around an existing OS file descriptor.
+     *
+     * The newly-built File assumes exclusive ownership of `fd`: the
+     * descriptor will be released when `close` is called explicitly,
+     * or implicitly when the File goes out of scope and `cleanup`
+     * runs. Passing a descriptor that is also held elsewhere is a
+     * recipe for "I/O on a closed handle" bugs — wrap each producer
+     * in its own File instead, or use `dup` to obtain an independent
+     * descriptor.
+     *
+     * Most callers do not build a File directly: the `io.open` helper
+     * opens a path and returns a wrapped File in one step. Use this
+     * constructor when the descriptor comes from somewhere else — a
+     * syscall not exposed by stdlib, a descriptor inherited from the
+     * parent process, etc.
+     *
+     * @param fd    An open file descriptor (Int).
+     *
+     * @example
+     *     # Most callers don't use this directly — they call io.open
+     *     # which already returns a File. This constructor is for
+     *     # wrapping raw descriptors that came from elsewhere:
+     *     f := new File(fd)
+     */
+    pub init(fd) {
+        self.fd = fd
+    }
+
+    # Runs automatically when the File goes out of scope. Closes the
+    # descriptor only when the user has not already done so; a second
+    # close(2) on the same fd would EBADF and panic from inside the
+    # destructor, which is exactly what we want to avoid.
+    cleanup {
+        if !self.closed {
+            io.close(self.fd)
+        }
+    }
+
+    # Common gate for every fd-using method. Panics with a clear
+    # message instead of forwarding the call and letting close(2)'s
+    # EBADF surface as a less helpful error.
+    func guard_open() {
+        if self.closed {
+            panic OSError("operation on closed file")
+        }
+    }
+
+    /**
+     * @brief Release the underlying file descriptor.
+     *
+     * Idempotent: subsequent calls are silent no-ops. The first call
+     * lowers to one `close(2)` syscall and marks this File as closed
+     * — every other operation on this File will panic afterwards.
+     *
+     * The "closed" state is set before the syscall, so even if
+     * `close(2)` fails the File is left in a coherent state and the
+     * `cleanup` hook will not attempt a second close.
+     *
+     * @panic OSError  When the underlying `close(2)` fails on the
+     *                 first call (e.g. an out-of-disk error surfaced
+     *                 by closing a previously cached write).
+     *
+     * @see flush
+     */
+    pub func close() {
+        if self.closed {
+            return
+        }
+
+        self.closed = true
+
+        io.close(self.fd)
+    }
+
+    /**
+     * @brief Return a new File that wraps a duplicate of this file's
+     * descriptor.
+     *
+     * The new File owns an independent file descriptor and an
+     * independent close lifecycle, but the two descriptors share the
+     * underlying file offset and open-mode flags: a seek through one
+     * is visible to the other, and the position they share advances
+     * with every read or write performed by either.
+     *
+     * Use `dup` to hand an independent close handle to another piece
+     * of code (e.g. a long-running consumer) without losing the
+     * ability to keep using the original File. Use `cloexec=false`
+     * only when the duplicate must be inherited across an `exec` —
+     * usually as part of setting up a child process's stdin / stdout.
+     *
+     * @param cloexec=true  Whether the new descriptor carries the
+     *                      close-on-exec flag. Ignored on Windows
+     *                      (see `io.dup` for details).
+     *
+     * @return A new File wrapping the duplicated descriptor.
+     *
+     * @panic OSError  When the underlying `dup` syscall fails, or when
+     *                 this File has already been closed.
+     *
+     * @see close, raw
+     *
+     * @example
+     *     f := io.open("/var/log/app.log")
+     *     consumer.start(f.dup())   # consumer has its own fd lifecycle
+     *     f.close()                 # original is now closed; consumer keeps reading
+     */
+    pub func dup(cloexec=true) {
+        self.guard_open()
+
+        return new File(io.dup(self.fd, cloexec))
+    }
+
+    /**
+     * @brief Force pending writes for this file all the way to
+     * physical storage.
+     *
+     * Implemented via the platform's `fsync(2)` / `_commit` call —
+     * NOT a user-space buffer flush, since File is unbuffered. The
+     * call blocks until the OS confirms that the data has reached
+     * stable storage. Reserve it for moments where durability really
+     * matters (commits, journaling); the cost is comparable to a
+     * disk write.
+     *
+     * @panic OSError  When the underlying syscall fails, or when the
+     *                 File has already been closed.
+     *
+     * @see close
+     */
+    pub func flush() {
+        self.guard_open()
+
+        io.flush(self.fd)
+    }
+
+    /**
+     * @brief Return true when the underlying descriptor refers to an
+     * interactive terminal.
+     *
+     * Typically used to decide whether to emit colour escape codes,
+     * prompts, progress bars, etc.
+     *
+     * @return A Bool: true if `fd` is a tty, false otherwise.
+     *
+     * @panic OSError  When the File has already been closed.
+     *
+     * @example
+     *     if f.isatty() {
+     *         f.write(b"\x1b[32mready\x1b[0m\n")
+     *     } else {
+     *         f.write(b"ready\n")
+     *     }
+     */
+    pub func isatty() {
+        self.guard_open()
+
+        return io.isatty(self.fd)
+    }
+
+    /**
+     * @brief Return the raw OS file descriptor backing this File.
+     *
+     * Intended as an escape hatch for operations that stdlib has not
+     * (yet) exposed as methods on File — e.g. fcntl-style controls,
+     * platform-specific ioctls, passing the fd to a foreign library.
+     * Code that only needs `read`, `write`, `seek`, etc. should call
+     * those methods directly, not go through `raw`.
+     *
+     * The returned descriptor remains owned by the File: do NOT close
+     * it yourself, and do not retain it past `File.close` — at that
+     * point the value is stale and the kernel may have reused the
+     * number for an unrelated handle.
+     *
+     * @return The Int file descriptor.
+     *
+     * @panic OSError  When the File has already been closed.
+     */
+    pub func raw() {
+        self.guard_open()
+
+        return self.fd
+    }
+
+    /**
+     * @brief Read up to `length` bytes from the file at the current
+     * offset.
+     *
+     * Lowers to a single `read(2)` syscall — a shorter result than
+     * `length` indicates that the syscall returned fewer bytes than
+     * requested (usually EOF, sometimes a signal interrupt that the
+     * native layer chose to expose).
+     *
+     * @param length    Maximum number of bytes to read. Must be >= 0.
+     *
+     * @return A new Bytes containing the data read; empty when the
+     *         file is at EOF.
+     *
+     * @panic ValueError  When `length` is negative.
+     * @panic OSError     When `read(2)` fails, or when the File has
+     *                    already been closed.
+     *
+     * @see readinto
+     */
+    pub func read(length) {
+        self.guard_open()
+
+        return io.read(self.fd, length)
+    }
+
+    /**
+     * @brief Read up to `length` bytes into `buffer`, starting at
+     * `offset`.
+     *
+     * Zero-allocation counterpart to `read`: writes directly into a
+     * caller-supplied Bytes. Lowers to a single `read(2)` syscall.
+     *
+     * @param buffer    Destination Bytes. Must be mutable and have at
+     *                  least `offset + length` bytes of length.
+     * @param offset    Byte index in `buffer` where writing begins.
+     *                  Must be >= 0.
+     * @param length    Maximum number of bytes to read. Must be >= 0.
+     *
+     * @return The number of bytes actually written into `buffer`. A
+     *         value strictly less than `length` indicates EOF.
+     *
+     * @panic ValueError  When `offset` or `length` is negative, or when
+     *                    `offset + length` exceeds `buffer.length()`.
+     * @panic OSError     When `read(2)` fails, or when the File has
+     *                    already been closed.
+     *
+     * @see read
+     */
+    pub func readinto(buffer, offset, length) {
+        self.guard_open()
+
+        return io.readinto(self.fd, buffer, offset, length)
+    }
+
+    /**
+     * @brief Move the file's read/write offset.
+     *
+     * Thin wrapper over `lseek(2)`. The interpretation of `offset`
+     * depends on `whence`:
+     *
+     *   - `SEEK_SET` — absolute, from the start of the file (default).
+     *   - `SEEK_CUR` — relative to the current position.
+     *   - `SEEK_END` — relative to the end of the file.
+     *
+     * @param offset             Byte offset relative to `whence`.
+     * @param whence=SEEK_SET    One of the SEEK_* constants exported.
+     *
+     * @return The new absolute offset, measured from the start of the
+     *         file.
+     *
+     * @panic OSError  When `lseek(2)` fails (unseekable fd, negative
+     *                 result, ...), or when the File has already been
+     *                 closed.
+     *
+     * @example
+     *     f.seek(0)                  # rewind
+     *     f.seek(-1024, SEEK_END)    # 1 KiB before EOF
+     *     pos := f.seek(0, SEEK_CUR) # query current position
+     */
+    pub func seek(offset, whence=SEEK_SET) {
+        self.guard_open()
+
+        return io.seek(self.fd, offset, whence)
+    }
+
+    /**
+     * @brief Write every byte of `buffer` to the file at the current
+     * offset.
+     *
+     * The native `io.write` layer handles short writes internally and
+     * only returns once the kernel has accepted every byte, or panics.
+     *
+     * @param buffer    Bytes to write.
+     *
+     * @return The number of bytes written. Equal to `buffer.length()`
+     *         in the absence of failure.
+     *
+     * @panic TypeError  When `buffer` is not a Bytes.
+     * @panic OSError    When `write(2)` fails, or when the File has
+     *                   already been closed.
+     *
+     * @see flush
+     */
+    pub func write(buffer) {
+        self.guard_open()
+
+        return io.write(self.fd, buffer)
+    }
+}
