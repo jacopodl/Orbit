@@ -325,7 +325,7 @@ bool CallNormalizeMethodCall(Isolate *isolate, CallCtx &ctx) {
     if (O_IS_OBJECT(args) && !O_GET_RC(args).IsInstance())
         type = O_GET_TYPE(type);
 
-    if (!IsTypeExtends(type,ctx.fn_shared->owner_type)) {
+    if (!IsTypeExtends(type, ctx.fn_shared->owner_type)) {
         ErrorSetWithObjType(isolate,
                             TypeError::Details[TypeError::Reason::ID],
                             TypeError::Details[TypeError::Reason::METHOD_RECEIVER],
@@ -2087,7 +2087,7 @@ CATCH_FINALLY:
             TARGET_OP(JF) {
                 const auto offset = instr & 0xFFFFF;
 
-                if (REG_N(FETCH_J_SRC(instr)) == kOddBallFALSE) {
+                if (!IsTrue((OObject *) REG_N(FETCH_J_SRC(instr)))) {
                     JMP_TO(offset);
 
                     continue;
@@ -2098,7 +2098,7 @@ CATCH_FINALLY:
             TARGET_OP(JT) {
                 const auto offset = instr & 0x1FFFFF;
 
-                if (REG_N(FETCH_J_SRC(instr)) == kOddBallTRUE) {
+                if (IsTrue((OObject *) REG_N(FETCH_J_SRC(instr)))) {
                     JMP_TO(offset);
 
                     continue;

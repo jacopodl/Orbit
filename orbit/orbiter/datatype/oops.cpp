@@ -443,6 +443,12 @@ bool orbiter::datatype::IsTrue(const OObject *object) {
     if (O_IS_SMI(object))
         return O_FROM_SMI(object);
 
+    if (O_IS_FALSE(object) || O_IS_NIL(object))
+        return false;
+
+    if (O_IS_TRUE(object))
+        return true;
+
     const auto &ops = O_GET_TYPE_OPS(object);
     if (ops.to_bool != nullptr)
         return ops.to_bool(object);
