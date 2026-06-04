@@ -68,6 +68,6 @@ pub let ImportError = Error.create(@ImportError)
 
 # An operating-system / I/O call failed.
 #
-# When raised from the `io` primitives the `details` field carries the
+# When raised from the `io` primitives the `details` field can carries the
 # errno value (as an Int), so user code can dispatch on it:
 pub let OSError = Error.create(@OSError)
