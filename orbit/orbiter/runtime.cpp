@@ -522,6 +522,12 @@ HOObject Orbiter::Eval(Context *context, Module *module, Code *code) noexcept {
 
     FutureAwait(future.get());
 
+    if (future->state == FutureState::REJECTED) {
+        RuntimePanic(isolate, future->result);
+
+        return {};
+    }
+
     return HOObject{future->result};
 }
 
