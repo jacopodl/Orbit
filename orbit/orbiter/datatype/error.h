@@ -103,6 +103,32 @@ namespace orbiter::datatype {
     HOType ErrorTypeInit(Isolate *isolate);
 
     /**
+     * @brief Render a single Error into a caller-supplied character buffer.
+     *
+     * Produces a one-line, human-readable description of @p err in the form
+     * `"Kind: reason"` (e.g. `"ValueError: count must be positive"`).
+     * Missing or malformed sub-fields are replaced with `"?"` so the
+     * function never aborts on a partially-constructed error — useful when
+     * formatting from inside a death path where you cannot afford another
+     * panic.
+     *
+     * Behaviour matches `snprintf`: at most @p out_size - 1 characters are
+     * written and a terminating NUL is always emitted when @p out_size > 0.
+     * The return value is the number of characters that *would* have been
+     * written had the buffer been unbounded — values `>= out_size` signal
+     * truncation.
+     *
+     * @param err       Error instance to format. `nullptr` is tolerated and
+     *                  produces an empty string.
+     * @param out       Destination buffer.
+     * @param out_size  Size of @p out in bytes, including space for the NUL.
+     *
+     * @return Characters that would have been written (excluding the NUL).
+     *         0 when @p err is null or @p out_size is 0.
+     */
+    int ErrorFormat(const Error *err, char *out, size_t out_size) noexcept;
+
+    /**
      * @brief Sets an error for the current execution context
      *
      * This function creates a new error object based on the provided kind, details, and formatted message,

@@ -209,6 +209,33 @@ HOType orbiter::datatype::ErrorTypeInit(Isolate *isolate) {
     return error;
 }
 
+int orbiter::datatype::ErrorFormat(const Error *err, char *out, const size_t out_size) noexcept {
+    if (out == nullptr || out_size == 0)
+        return 0;
+
+    if (err == nullptr) {
+        out[0] = '\0';
+
+        return 0;
+    }
+
+    // Defensive lookups — we never want this function to itself panic.
+    // A malformed Error (missing kind atom, null reason) renders as "?"
+    const auto *kind_str = "?";
+    if (err->kind != nullptr && err->kind->id != nullptr)
+        kind_str = ORSTRING_TO_CSTR(err->kind->id);
+
+    const auto *reason_str = "?";
+    int reason_len = 1;
+
+    if (err->reason != nullptr) {
+        reason_str = ORSTRING_TO_CSTR(err->reason);
+        reason_len = (int) ORSTRING_LENGTH(err->reason);
+    }
+
+    return std::snprintf(out, out_size, "%s: %.*s", kind_str, reason_len, reason_str);
+}
+
 void orbiter::datatype::ErrorSet(Isolate *isolate, const char *kind, OObject *details, const char *format, ...) {
     va_list args;
 
