@@ -1,0 +1,43 @@
+// This source file is part of the Orbit project.
+//
+// Licensed under the Apache License v2.0
+
+#ifndef ORBIT_ORBITER_VERSION_H_
+#define ORBIT_ORBITER_VERSION_H_
+
+#define OR_RELEASE_LEVEL    "@OR_RELEASE_LEVEL@"
+
+#define OR_NAME             "Orbit"
+#define OR_MAJOR            @OR_MAJOR@
+#define OR_MINOR            @OR_MINOR@
+#define OR_PATCH            @OR_PATCH@
+
+#define STRINGIFY_NX(A)     #A
+#define STRINGIFY(A)        STRINGIFY_NX(A)
+
+#define OR_VERSION \
+    STRINGIFY(OR_MAJOR) "." STRINGIFY(OR_MINOR) "." STRINGIFY(OR_PATCH) "-" OR_RELEASE_LEVEL
+
+// Compiler specific macros
+#if defined(__GNUC__)
+#define _OR_C_NAME  "GCC"
+#define _OR_C_VER   STRINGIFY(__GNUC__) "." STRINGIFY(__GNUC_MINOR__)
+#elif defined(__clang__)
+#define _OR_C_NAME  "CLang"
+#define _OR_C_VER   STRINGIFY(__clang_major__) "." STRINGIFY(__clang_minor__) "." STRINGIFY(__clang_patchlevel__)
+#elif defined(_MSC_VER)
+#define _OR_C_NAME  "MSC"
+#define _OR_C_VER   STRINGIFY(_MSC_VER)
+#elif defined(__MINGW32__)
+#define _OR_C_NAME  "MinGW"
+#define _OR_C_VER   STRINGIFY(__MINGW32_MAJOR_VERSION) "." STRINGIFY(__MINGW32_MINOR_VERSION)
+#else
+#define _OR_C_NAME  "unknown"
+#define _OR_C_VER   ""
+#endif
+
+#define OR_VERSION_EX                                                                       \
+    OR_NAME " " STRINGIFY(OR_MAJOR) "." STRINGIFY(OR_MINOR) "." STRINGIFY(OR_PATCH)         \
+    " (" OR_RELEASE_LEVEL ", " __DATE__ ", " __TIME__ ") [" _OR_C_NAME " v." _OR_C_VER "]"
+
+#endif // !ORBIT_ORBITER_VERSION_H_

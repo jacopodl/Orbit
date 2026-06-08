@@ -39,7 +39,7 @@ endif()
 
 target_sources(Orbiter PRIVATE ${VM_SRC} ${ASM_SRC})
 
-#configure_file("${CMAKE_CURRENT_SOURCE_DIR}/vm/version.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/vm/version.h")
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/orbiter/version.h.in" "${CMAKE_CURRENT_SOURCE_DIR}/orbiter/version.h")
 
 target_include_directories(Orbiter PUBLIC
         $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}>
