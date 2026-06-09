@@ -695,7 +695,10 @@ ImportStatus orbiter::import::Import(const Isolate *isolate, ORString *raw, cons
 }
 
 ImportStatus orbiter::import::Import(const Isolate *isolate, ORString *raw, const Module *base, Module * &out_module) {
-    const auto *prop = TIFindLocalProperty(O_GET_TYPE(base), "__spec__");
+    const PropertyDescriptor *prop = nullptr;
+
+    if (base != nullptr)
+        prop = TIFindLocalProperty(O_GET_TYPE(base), "__spec__");
 
     return isolate->importer_->Import(raw, (ImportSpec *) (prop != nullptr ? prop->value : nullptr), out_module);
 }

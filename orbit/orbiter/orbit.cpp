@@ -43,53 +43,11 @@ void DieWith(const Isolate *isolate, const char *context) {
 }
 
 template<typename T>
-datatype::Handle<T> OrDie(const datatype::Handle<T>& handle, Isolate *isolate, const char *context) {
+datatype::Handle<T> OrDie(const datatype::Handle<T> &handle, Isolate *isolate, const char *context) {
     if (!handle)
         DieWith(isolate, context);
 
     return std::move(handle);
-}
-
-datatype::HContext LoadDefaultContext(Isolate *isolate, const bool with_builtins) noexcept {
-    auto context = datatype::ContextNew(isolate);
-    if (!context)
-        return {};
-
-    if (with_builtins) {
-        auto *importer = isolate->importer_;
-
-        const auto *builtin = importer->Import("::orbit::builtin", nullptr);
-        if (!builtin)
-            return {};
-
-        if (!datatype::ContextImportFromModule(context.get(), builtin))
-            return {};
-    }
-
-    return context;
-}
-
-datatype::HOObject EvalFile(Isolate *isolate, datatype::Context *context, const char *name, const char *path,
-                            const liftoff::OptimizationLevel level) {
-    liftoff::Compiler compiler(isolate, level, true);
-
-    auto *file = fopen(path, "r");
-    if (file == nullptr)
-        DieWith(isolate, path);
-
-    const auto code = OrDie(compiler.Compile(name, file), isolate, "compile");
-
-    fclose(file);
-
-    const auto mod_name = OrDie(datatype::ORStringIntern(isolate, name), isolate, "intern module name");
-    const auto mod_type = OrDie(datatype::ModuleTypeNew(code.get(), mod_name.get()), isolate, "create module type");
-    const auto module = OrDie(datatype::ModuleNew(mod_type.get()), isolate, "create module instance");
-
-    const auto result = Orbiter::GetInstance()->Eval(context, module.get(), code.get());
-    if (!result)
-        DieWith(isolate, "eval");
-
-    return {};
 }
 
 bool SetupImportPath(Isolate *isolate) noexcept {
@@ -135,6 +93,58 @@ bool SetupImportPath(Isolate *isolate) noexcept {
     return true;
 }
 
+datatype::HContext LoadDefaultContext(Isolate *isolate, const bool with_builtins) noexcept {
+    auto context = datatype::ContextNew(isolate);
+    if (!context)
+        return {};
+
+    if (with_builtins) {
+        auto *importer = isolate->importer_;
+
+        const auto *builtin = importer->Import("::orbit::builtin", nullptr);
+        if (!builtin)
+            return {};
+
+        if (!datatype::ContextImportFromModule(context.get(), builtin))
+            return {};
+    }
+
+    return context;
+}
+
+void EvalCommand(Isolate *isolate, datatype::Context *context, const char *command,
+                 const liftoff::OptimizationLevel level) noexcept {
+    liftoff::Compiler compiler(isolate, level, false);
+    liftoff::scanner::Scanner scanner(isolate, command);
+
+    const auto code = OrDie(compiler.Compile("", scanner), isolate, "compile");
+
+    const auto result = Orbiter::GetInstance()->Eval(context, nullptr, code.get());
+    if (!result && isolate->panic.HasPanic())
+        DieWith(isolate, "eval");
+}
+
+void EvalFile(Isolate *isolate, datatype::Context *context, const char *name, const char *path,
+              const liftoff::OptimizationLevel level) noexcept {
+    liftoff::Compiler compiler(isolate, level, true);
+
+    auto *file = fopen(path, "r");
+    if (file == nullptr)
+        DieWith(isolate, path);
+
+    const auto code = OrDie(compiler.Compile(name, file), isolate, "compile");
+
+    fclose(file);
+
+    const auto mod_name = OrDie(datatype::ORStringIntern(isolate, name), isolate, "intern module name");
+    const auto mod_type = OrDie(datatype::ModuleTypeNew(code.get(), mod_name.get()), isolate, "create module type");
+    const auto module = OrDie(datatype::ModuleNew(mod_type.get()), isolate, "create module instance");
+
+    const auto result = Orbiter::GetInstance()->Eval(context, module.get(), code.get());
+    if (!result && isolate->panic.HasPanic())
+        DieWith(isolate, "eval");
+}
+
 int orbiter::main(const int argc, char **argv) {
     Config config{};
 
@@ -155,14 +165,14 @@ int orbiter::main(const int argc, char **argv) {
 
     const auto context = OrDie(LoadDefaultContext(isolate, true), isolate, "load default context");
 
-    if (config.file > -1) {
+    if (config.file > -1)
         EvalFile(isolate, context.get(), "__main__", argv[config.file], liftoff::kDefaultOptimization);
-    }
 
-    if (config.cmd > -1) {
-    }
+    if (config.cmd > -1)
+        EvalCommand(isolate, context.get(), argv[config.cmd], liftoff::kDefaultOptimization);
 
     if (config.interactive) {
+        // TODO: impl REPL
     }
 
     Orbiter::GetInstance()->Finalize();

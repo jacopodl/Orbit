@@ -18,14 +18,14 @@ constexpr Config DefaultConfig = {
     .argv = nullptr,
 
     .argc = 0,
-    .file = 0,
-    .cmd = 0,
+    .file = -1,
+    .cmd = -1,
 
     .ost_max = -1,
     .vc_max = -1,
     .fiber_ssize = -1,
     .fiber_pool = -1,
-    
+
     .interactive = true
 };
 
@@ -158,8 +158,12 @@ bool orbiter::ConfigInit(Config *config, int argc, char **argv) {
     status.argv = argv + 1;
     status.argc = argc - 1;
 
-    while (ret != -1 && (ret = ReadOp(&status, "hv", lopt, sizeof(lopt), '-')) != -1) {
+    while (ret != -1 && (ret = ReadOp(&status, "c!hv", lopt, sizeof(lopt), '-')) != -1) {
         switch (ret) {
+            case 'c':
+                config->cmd = status.argc_cur;
+                config->interactive = interactive;
+                break;
             case 'h':
                 Help(*argv);
                 exit(EXIT_SUCCESS);
