@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License v2.0
 
-/**
+/*!
  * @brief Standard error constructors aligned with the kinds raised by the Orbit engine.
  *
  * Each `pub let` here is a partial application of `Error.create(@Kind)` —

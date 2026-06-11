@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License v2.0
 
-/**
+/*!
  * @brief Core traits for the `io` subsystem: contracts every readable,
  * writeable, line-oriented or closable resource must honor.
  *

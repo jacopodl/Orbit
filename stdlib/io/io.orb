@@ -2,7 +2,7 @@
 #
 # Licensed under the Apache License v2.0
 
-/**
+/*!
  * @brief High-level façade over the native `::orbit::io` APIs.
  *
  * Where the native module exposes raw, descriptor-based primitives, this
