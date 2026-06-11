@@ -2063,7 +2063,7 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JEN) {
-                const auto offset = instr & 0x1FFFFF;
+                const auto offset = instr & 0xFFFFF;
 
                 if (REG_N(FETCH_J_SRC(instr)) == (PtrSize) kOddBallNIL) {
                     JMP_TO(offset);
@@ -2074,7 +2074,7 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JERR) {
-                const auto offset = instr & 0x1FFFFF;
+                const auto offset = instr & 0xFFFFF;
 
                 auto *ec = (ExceptionContext *) regs->CP.reg;
                 auto *e_key = (Atom *) REG_N(FETCH_J_SRC(instr));
@@ -2105,7 +2105,7 @@ CATCH_FINALLY:
                 DISPATCH;
             }
             TARGET_OP(JT) {
-                const auto offset = instr & 0x1FFFFF;
+                const auto offset = instr & 0xFFFFF;
 
                 if (IsTrue((OObject *) REG_N(FETCH_J_SRC(instr)))) {
                     JMP_TO(offset);
