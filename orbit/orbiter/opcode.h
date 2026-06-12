@@ -161,8 +161,9 @@ namespace orbiter {
         LDCODE, // Load Code from Code object:      OPCODE | 4 DST | 4 RESERVED  | 16 OFFSET
         LDCST, // Load constr from Code object:     OPCODE | 4 DST | 4 FLAGS(LoadConstantMode) | 16 OFFSET
         LDIMM, // Load immediate into register:     OPCODE | 4 DST | 4 SHIFT     | 16 IMM
+        MOV, // Copy register:                      OPCODE | 4 DST | 4 SRC | 16 RESERVED
 
-        SETPROP, // Set type property:               OPCODE | 4 DST (TypeInfo) | 4 SRC | 4 V_SRC | 12 OFFSET
+        SETPROP, // Set type property:              OPCODE | 4 DST (TypeInfo) | 4 SRC | 4 V_SRC | 12 OFFSET
 
         NGBLV, // Create new context variable:                      OPCODE | 4 FLAGS    | 4 SRC   | 16 KEY OFFSET
         STGBL, // Store value into global variable using key:       OPCODE | 4 RESERVED | 4 SRC   | 16 KEY OFFSET

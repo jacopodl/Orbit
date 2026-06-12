@@ -492,6 +492,18 @@ namespace liftoff::ir {
         PhiInstr() noexcept : VirtualInstruction(2) {
         }
 
+        // Marks `src` as kDoNotAllocateReg: its live interval becomes invisible
+        // to LinearScan and it inherits the Phi's register via SetRegister.
+        //
+        // INVARIANT: because the shared register is never conflict-checked over
+        // the target's range, a target must be a value that is written
+        // immediately before the join and consumed only by this Phi. Valid
+        // targets are:
+        //   - an edge copy created with Builder::CreateMove (control-flow joins);
+        //   - the previous link of a contiguous accumulation chain
+        //     (Builder::LoadImmediate), where every link writes the same register
+        //     back-to-back.
+        // NEVER PASS AN ARBITRARY VALUE (variable load, call result, ...).
         PhiInstr *AddTarget(Instruction *src) noexcept {
             assert(this->index<2);
 

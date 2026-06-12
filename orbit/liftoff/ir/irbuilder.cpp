@@ -129,13 +129,17 @@ Instruction *IRBuilder::BinaryAndOr(const parser::Binary *binary) {
 
     auto *left = this->visit(binary->left);
 
+    auto *mov_left = this->builder_.CreateMove(left);
+
     this->builder_.CreateBranch(opcode, left, nullptr, end);
 
     auto *right = this->visit(binary->right);
 
+    auto *mov_right = this->builder_.CreateMove(right);
+
     this->builder_.AppendBasicBlock(end);
 
-    return this->builder_.CreatePhi()->AddTarget(left)->AddTarget(right);
+    return this->builder_.CreatePhi()->AddTarget(mov_left)->AddTarget(mov_right);
 }
 
 Instruction *IRBuilder::BinaryOP(const parser::Binary *binary) {
@@ -373,15 +377,19 @@ Instruction *IRBuilder::CreateJumpForElvisOrNil(const parser::Binary *binary, co
 
     auto *end = this->builder_.CreateBasicBlock();
 
+    auto *mov_left = this->builder_.CreateMove(left);
+
     this->builder_.CreateBranch(opcode, left, nullptr, end);
 
     auto *right = this->visit(binary->right);
+
+    auto *mov_right = this->builder_.CreateMove(right);
 
     this->builder_.AppendBasicBlock(end);
 
     const auto phi = this->builder_.CreatePhi();
 
-    return phi->AddTarget(left)->AddTarget(right);
+    return phi->AddTarget(mov_left)->AddTarget(mov_right);
 }
 
 Instruction *IRBuilder::ExpandStoreTuple(const parser::ListExpression *tuple, Instruction *src, const bool decl) {
@@ -1346,16 +1354,20 @@ Instruction *IRBuilder::visitNilSafety(const parser::Unary *node) {
 
     auto *value = this->visit(node->value);
 
+    auto *mov_value = this->builder_.CreateMove(value);
+
     this->builder_.CreateJump(end);
 
     this->builder_.AppendBasicBlock(nil_block);
 
     auto *nil_val = this->builder_.LoadNilValue();
 
+    auto *mov_nil = this->builder_.CreateMove(nil_val);
+
     this->builder_.AppendBasicBlock(end);
 
     auto *phy = this->builder_.CreatePhi();
-    return phy->AddTarget(value)->AddTarget(nil_val);
+    return phy->AddTarget(mov_value)->AddTarget(mov_nil);
 }
 
 Instruction *IRBuilder::visitParameter(parser::Parameter *node) {
@@ -1557,13 +1569,17 @@ Instruction *IRBuilder::visitTernary(const parser::Ternary *node) {
 
     left = this->visit(node->middle);
 
+    auto *mov_left = this->builder_.CreateMove(left);
+
     this->builder_.CreateBranch(orbiter::OPCode::JMP, nullptr, orelse, end);
 
     right = this->visit(node->right);
 
+    auto *mov_right = this->builder_.CreateMove(right);
+
     this->builder_.AppendBasicBlock(end);
 
-    return this->builder_.CreatePhi()->AddTarget(left)->AddTarget(right);
+    return this->builder_.CreatePhi()->AddTarget(mov_left)->AddTarget(mov_right);
 }
 
 Instruction *IRBuilder::visitTrap(const parser::Unary *node) {

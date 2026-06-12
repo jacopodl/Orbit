@@ -159,7 +159,17 @@ std::vector<LiveInterval> &IRContext::ComputeLiveIntervals() {
                 }
 
                 this->live_intervals_.emplace_back(instr, instr->instr_offset, end);
+
+                continue;
             }
+
+            // A Phi with no uses still needs a register: its targets are marked
+            // kDoNotAllocateReg and inherit the Phi's register, so it must be
+            // allocated even when the joined value is discarded (e.g. a ternary
+            // or `a || b` used as an expression statement). A point interval is
+            // enough — it expires immediately after the join.
+            if (instr->type() == ObjectType::VIRT_INSTRUCTION)
+                this->live_intervals_.emplace_back(instr, instr->instr_offset, instr->instr_offset);
         }
     }
 

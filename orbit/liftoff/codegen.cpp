@@ -182,6 +182,7 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
                                                              ((Instruction*)instr->operands[1].value)->assigned_reg,
                                                              ((ir::BinaryOpInstr*) instr)->flags);
                 break;
+            case orbiter::OPCode::MOV:
             case orbiter::OPCode::MVN:
             case orbiter::OPCode::NEG:
             case orbiter::OPCode::NOT:
@@ -403,7 +404,7 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
             case orbiter::OPCode::JT: {
                 const auto *jmp = (const BasicBlock *) (const Instruction *) instr->operands[1].value;
 
-                assert(jmp->offset <= 0x1FFFFF);
+                assert(jmp->offset <= 0xFFFFF);
 
                 *(orbiter::MachineWord *) m_code = EMIT_C_JMP(instr->opcode,
                                                               ((Instruction*)instr->operands[0].value)->assigned_reg,

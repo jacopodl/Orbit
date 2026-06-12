@@ -186,6 +186,19 @@ namespace liftoff::ir {
 
         Instruction *CreateManipType(orbiter::OPCode opcode, Instruction *target, Instruction *src, U16 offset);
 
+        /**
+         * @brief Creates a register-to-register copy of `src`.
+         *
+         * Used at the end of each branch flowing into a Phi: the copy is a fresh,
+         * single-use value consumed only by the Phi, so the register shared by the
+         * Phi and its targets is only ever written right before the join point.
+         *
+         * @param src Instruction whose value must be copied.
+         *
+         * @return Pointer to the created MOV instruction.
+         */
+        Instruction *CreateMove(Instruction *src);
+
         Instruction *CreatePendingBCAction(BasicBlock *target, const orbiter::PendingAction action) {
             assert(action == orbiter::PendingAction::BREAK || action == orbiter::PendingAction::CONTINUE);
 

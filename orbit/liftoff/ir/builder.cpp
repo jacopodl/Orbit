@@ -211,6 +211,10 @@ Instruction *Builder::CreateManipType(const OPCode opcode, Instruction *target, 
     return this->CreateInstruction<ManipTypeInstruction>(opcode, target, src, offset);
 }
 
+Instruction *Builder::CreateMove(Instruction *src) {
+    return this->CreateInstruction<UnaryOpInstr>(OPCode::MOV, src);
+}
+
 Instruction *Builder::CreateStoreVariable(const OPCode opcode, I16 offset, U8 flags, Instruction *value) {
     auto *instr = this->CreateInstruction<OffsetInstruction>(opcode, 0, offset, value);
 
@@ -448,13 +452,17 @@ Instruction *Builder::LoadImmediate(const MSSize value) {
 
     Instruction *acc = nullptr;
 
-    MSize uval = (MSize) value;
+    auto uval = (MSize) value;
     for (int shift = 0; uval != 0; uval >>= 16, shift++) {
         auto *imm = this->CreateInstruction<UnaryImmInstr>(OPCode::LDIMM, shift, uval & 0xFFFF);
 
         if (acc == nullptr)
             acc = imm;
         else
+            // Phi used as a same-register constraint, NOT as a control-flow
+            // join: the LDIMM chunks are emitted back-to-back and each ORs its
+            // 16-bit slice into the shared register, so no edge copy is needed
+            // (nothing can be allocated between the links of the chain).
             acc = this->CreatePhi()->AddTarget(acc)->AddTarget(imm);
     }
 

@@ -842,7 +842,7 @@ void ExecuteCleanupForPC(const Fiber *fiber) {
             continue;
 
         const auto *value = *((OObject **) (fiber->vm.stack.stack + (
-                                          fiber->vm.regs.BP.reg + (entry->slot * sizeof(void *)))));
+                                                fiber->vm.regs.BP.reg + (entry->slot * sizeof(void *)))));
 
         switch (entry->type) {
             case OPCode::SYNC_EXIT:
@@ -1543,6 +1543,11 @@ CATCH_FINALLY:
                 dst = FETCH_R_DST(instr);
 
                 REG_N(dst) = shift == 0 ? O_TO_SMI(imm) : O_TO_SMI(O_FROM_SMI(REG_N(dst)) | (imm << (16 * shift)));
+
+                DISPATCH;
+            }
+            TARGET_OP(MOV) {
+                ACCESS_REG_DST(instr) = ACCESS_REG_SRC(instr);
 
                 DISPATCH;
             }
