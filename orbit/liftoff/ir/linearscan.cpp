@@ -197,11 +197,15 @@ void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
     auto ld_opcode = orbiter::OPCode::SKLDR;
     auto ld_offset = (I16) 0;
 
-    for (auto use = instruction->use_list; use != nullptr; use = use->next) {
+    auto use = instruction->use_list;
+    while (use != nullptr) {
         auto *target = (PhysInstruction *) use->user;
 
-        if (target->type() != ObjectType::INSTRUCTION)
+        if (target->type() != ObjectType::INSTRUCTION) {
+            use = use->next;
+
             continue;
+        }
 
         // Store-to-load forwarding: if the immediately following instruction is a
         // STGOFF, the value will already be persisted in a global slot — reuse it
@@ -229,8 +233,11 @@ void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
         //     original adjacency. This works because newly inserted instructions
         //     always carry instr_offset = 0 and never shift the offsets of the
         //     surrounding original instructions.
-        if (target->prev == instruction || target->instr_offset - 1 == instruction->instr_offset)
+        if (target->prev == instruction || target->instr_offset - 1 == instruction->instr_offset) {
+            use = use->next;
+
             continue;
+        }
 
         Instruction *load = nullptr;
         if (ld_opcode == orbiter::OPCode::SKLDR) {
@@ -249,16 +256,14 @@ void LinearScan::SpillToStackAndReloadUses(Instruction *instruction) {
         IRContext::InsertInstructionBefore(target, load);
 
         // Replace the operand reference so the target now consumes the reloaded value.
-        // ReplaceOperand calls DeleteUse, which sets use->next = nullptr — iterating
-        // further via use->next would stop the loop prematurely. Restarting from the
-        // head of the (now shorter) use_list is the only safe approach.
+        // ReplaceOperand calls DeleteUse, which unlinks `use` from the list — the
+        // only safe way to keep iterating is to restart from the head of the (now
+        // shorter) use_list.
         target->ReplaceOperand(instruction, load);
-        use = instruction->use_list;
 
         inserted++;
 
-        if (use == nullptr)
-            break;
+        use = instruction->use_list;
     }
 
     // No SKSTR needed if:
