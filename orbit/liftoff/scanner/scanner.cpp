@@ -218,26 +218,26 @@ bool Scanner::ParseHexEscape() {
     return true;
 }
 
-bool Scanner::ParseOctEscape(int value) {
-    unsigned char sequence[] = {0, 0, 0};
-    unsigned char byte = 0;
+bool Scanner::ParseOctEscape(const int value) {
+    unsigned int byte = 0;
 
     if (!IsOctDigit(value))
         return false;
 
-    sequence[2] = HexDigitToNumber(value);
+    byte = HexDigitToNumber(value);
 
-    for (int i = 1; i >= 0 && IsOctDigit(this->Peek()); i--)
-        sequence[i] = HexDigitToNumber(this->Next());
+    for (int i = 0; i < 2 && IsOctDigit(this->Peek()); i++)
+        byte = (byte << 3) | HexDigitToNumber(this->Next());
 
-    for (int i = 0, mul = 0; i < 3; i++) {
-        byte |= sequence[i] << (unsigned char) (mul * 3);
-        if (sequence[i] != 0)
-            mul++;
+    if (byte > 0xFF) {
+        this->status = ScannerStatus::INVALID_OCT_BYTE;
+
+        return false;
     }
 
     if (!this->sbuf_.PutChar(byte)) {
         this->status = ScannerStatus::NOMEM;
+
         return false;
     }
 
@@ -376,7 +376,7 @@ bool Scanner::TokenizeComment(Token *out_token, bool inline_comment) {
 
     // Skip newline/whitespace at comment start
     for (int skip = this->Peek();
-         isspace(skip) || (!inline_comment && skip == '\n');
+         isblank(skip) || (!inline_comment && skip == '\n');
          this->Next(), skip = this->Peek());
 
     int peek = this->Peek();
@@ -544,8 +544,8 @@ bool Scanner::TokenizeOctal(Token *out_token) {
     return true;
 }
 
-bool Scanner::TokenizeString(Token *out_token, bool check_prefix, bool byte_string) {
-    TokenType type = TokenType::STRING;
+bool Scanner::TokenizeString(Token *out_token, const bool check_prefix, const bool byte_string) {
+    auto type = TokenType::STRING;
     int value;
     int hashes = 0;
 
@@ -553,7 +553,8 @@ bool Scanner::TokenizeString(Token *out_token, bool check_prefix, bool byte_stri
         type = TokenType::BYTE_STRING;
 
     // Count beginning hashes
-    for (; this->Peek() == '#'; this->Next(), hashes++);
+    if (check_prefix)
+        for (; this->Peek() == '#'; this->Next(), hashes++);
 
     if (check_prefix && this->Next() != '"') {
         this->status = ScannerStatus::INVALID_RS_PROLOGUE;
@@ -622,6 +623,7 @@ bool Scanner::TokenizeString(Token *out_token, bool check_prefix, bool byte_stri
     out_token->type = type;
     out_token->loc.end = this->loc;
     out_token->length = this->sbuf_.GetBuffer(&out_token->buffer);
+
     return true;
 }
 
@@ -954,6 +956,7 @@ const char *Scanner::GetStatusMessage() const {
         "invalid hexadecimal literal",
         "expected new-line after line continuation character",
         "invalid digit in octal literal",
+        "octal escape value out of range, must be between \\000 and \\377",
         "unterminated string",
         "invalid raw string prologue",
         "expected '",
