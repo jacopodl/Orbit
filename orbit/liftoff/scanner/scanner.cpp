@@ -394,7 +394,9 @@ bool Scanner::TokenizeComment(Token *out_token, bool inline_comment) {
         peek = this->Peek();
     }
 
-    if (peek <= 0)
+    // EOF terminates an inline comment normally; for a block comment it means
+    // the closing '*/' was never found (unterminated).
+    if (peek <= 0 && !inline_comment)
         return false;
 
     out_token->type = type;
@@ -793,6 +795,19 @@ bool Scanner::NextToken(Token *out_token) noexcept {
 
                     if (this->Peek() == '*') {
                         this->Next();
+
+                        // "/**/" is an empty block comment, not a doc comment:
+                        // the second '*' was actually the start of the closing
+                        // '*/'. Emit a plain (empty) comment.
+                        if (this->Peek() == '/') {
+                            this->Next();
+
+                            out_token->loc.end = this->loc;
+                            out_token->type = TokenType::COMMENT;
+                            out_token->length = this->sbuf_.GetBuffer(&out_token->buffer);
+
+                            return true;
+                        }
 
                         if (this->TokenizeComment(out_token, false)) {
                             out_token->type = TokenType::COMMENT_DOC;
