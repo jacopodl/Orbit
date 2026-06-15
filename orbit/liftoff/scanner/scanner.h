@@ -63,6 +63,8 @@ namespace liftoff::scanner {
 
         Position loc{1, 1, 0};
 
+        bool NextTokenInternal(Token *out_token) noexcept;
+
         bool ParseEscape(int stop, bool ignore_unicode);
 
         bool ParseHexEscape();

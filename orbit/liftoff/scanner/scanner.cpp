@@ -123,7 +123,7 @@ int DefaultPrompt(const char *prompt, FILE *fd, InputBuffer *ibuf) {
         }
 
         cur += (int) strlen((char *) buf + cur);
-    } while (*((buf + cur) - 1) != '\n');
+    } while (cur == 0 || *((buf + cur) - 1) != '\n');
 
     if (!ibuf->AppendInput(buf, cur))
         cur = -1;
@@ -631,8 +631,12 @@ bool Scanner::TokenizeString(Token *out_token, const bool check_prefix, const bo
             return false;
         }
 
-        // If check_prefix is false, then it's not a raw string, so escape sequences must be processed
-        if (!check_prefix && value == '\\') {
+        // Escapes are processed unless the string is "raw". A string is raw
+        // when it carries the `r` prefix (check_prefix && !byte_string) OR when
+        // it is hash-delimited (hashes > 0) — the latter makes even byte
+        // strings raw, e.g. b##"..."##. So: normal "..." and plain byte b"..."
+        // interpret '\\'; r"...", r#"..."#, and b#"..."# keep it verbatim.
+        if ((!check_prefix || (byte_string && hashes == 0)) && value == '\\') {
             if (this->Peek() != '\\') {
                 if (!this->ParseEscape('"', byte_string))
                     return false;
@@ -706,7 +710,7 @@ bool Scanner::TokenizeWord(Token *out_token) {
     return true;
 }
 
-bool Scanner::NextToken(Token *out_token) noexcept {
+bool Scanner::NextTokenInternal(Token *out_token) noexcept {
     int value;
 
     // Reset error status
@@ -715,19 +719,22 @@ bool Scanner::NextToken(Token *out_token) noexcept {
     // Reset store buffer
     this->sbuf_.Clear();
 
-    out_token->isolate = this->isolate_;
-
-    // Cleanup token
+    // Free the previous buffer (if any) with the isolate it was allocated with.
+    // Note: the token's isolate cannot differ from this scanner's isolate, but
+    // for correctness we use the one stored in the token.
     if (out_token->buffer != nullptr) {
-        orbiter::memory::IsolateAllocator allocator(this->isolate_);
+        const orbiter::memory::IsolateAllocator allocator(out_token->isolate);
         allocator.free(out_token->buffer);
 
         out_token->buffer = nullptr;
         out_token->length = 0;
     }
 
+    out_token->isolate = this->isolate_;
+
     if (this->peeked.type != TokenType::TK_NULL) {
         *out_token = std::move(this->peeked);
+
         this->peeked.type = TokenType::TK_NULL;
 
         return true;
@@ -764,16 +771,42 @@ bool Scanner::NextToken(Token *out_token) noexcept {
         this->Next();
 
         switch (value) {
+            case '\r':
+                // Only \r\n is a valid line ending; a lone '\r' is not.
+                if (this->Peek() != '\n') {
+                    this->status = ScannerStatus::INVALID_TK;
+
+                    return false;
+                }
+
+                this->Next();
+
+                [[fallthrough]];
             case '\n':
-                while (this->Peek() == '\n')
-                    this->Next();
+                // Collapse a run of consecutive newlines (\n or \r\n) into one EOL.
+                for (;;) {
+                    const int nl = this->Peek();
+
+                    if (nl == '\n')
+                        this->Next();
+                    else if (nl == '\r') {
+                        this->Next();
+
+                        if (this->Peek() != '\n') {
+                            this->status = ScannerStatus::INVALID_TK;
+
+                            return false;
+                        }
+
+                        this->Next();
+                    } else
+                        break;
+                }
+
                 out_token->loc.end = this->loc;
                 out_token->type = TokenType::END_OF_LINE;
+
                 return true;
-            case '\r': // \r\n
-                CHECK_AGAIN('\n', TokenType::END_OF_LINE)
-                this->status = ScannerStatus::INVALID_TK;
-                return false;
             case '!':
                 if (this->Peek() == '=') {
                     this->Next();
@@ -899,12 +932,20 @@ bool Scanner::NextToken(Token *out_token) noexcept {
                 return this->TokenizeAtom(out_token);
             case '[':
                 RETURN_TK(TokenType::LEFT_SQUARE);
-            case '\\':
-                if (this->Next() != '\n') {
+            case '\\': {
+                // Line continuation: accept '\'+'\n' and '\'+'\r\n'.
+                auto c = this->Next();
+                if (c == '\r')
+                    c = this->Next();
+
+                if (c != '\n') {
                     this->status = ScannerStatus::INVALID_LC;
+
                     return false;
                 }
+
                 continue;
+            }
             case ']':
                 RETURN_TK(TokenType::RIGHT_SQUARE);
             case '^':
@@ -937,6 +978,18 @@ bool Scanner::NextToken(Token *out_token) noexcept {
     return true;
 }
 
+bool Scanner::NextToken(Token *out_token) noexcept {
+    // On a successful tokenization the status must read GOOD: a lookahead Peek
+    // past the last character sets END_OF_FILE as a side effect even when a
+    // valid token (including the END_OF_FILE token itself) is produced.
+    if (!this->NextTokenInternal(out_token))
+        return false;
+
+    this->status = ScannerStatus::GOOD;
+
+    return true;
+}
+
 int Scanner::HexToByte() {
     int byte = 0;
 
@@ -952,7 +1005,7 @@ int Scanner::HexToByte() {
     return byte;
 }
 
-int Scanner::Peek(bool advance) {
+int Scanner::Peek(const bool advance) {
     int chr;
     int err;
 
