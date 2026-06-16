@@ -14,6 +14,7 @@
 #endif
 
 #include <orbit/orbiter/datatype/bytes.h>
+#include <orbit/orbiter/datatype/byteview.h>
 #include <orbit/orbiter/datatype/error.h>
 #include <orbit/orbiter/datatype/errors.h>
 #include <orbit/orbiter/datatype/function.h>
@@ -488,25 +489,16 @@ retrying the remainder.
     if (!NumberExtract(argv[0], fd))
         return {};
 
-    unsigned char *buf;
-    MSize n;
-
-    if (O_IS_TYPE(argv[1], InstanceType::BYTES)) {
-        const auto *data = (Bytes *) argv[1];
-
-        buf = data->shared->buffer + data->start;
-        n = data->length;
-    } else {
-        const auto *data = (ORString *) argv[1];
-
-        buf = (unsigned char *) ORSTRING_TO_CSTR(data);
-        n = ORSTRING_LENGTH(data);
-    }
+    // Holds the Bytes read lock for the duration of the syscall, so a
+    // concurrent enlarge cannot reallocate the buffer mid-write.
+    const ByteView data(isolate, argv[1]);
+    if (!data)
+        return {};
 
 #ifdef _ORBIT_PLATFORM_WINDOWS
-    const auto written = ::_write((int) fd, buf, (unsigned int) n);
+    const auto written = ::_write((int) fd, data.Data(), (unsigned int) data.Size());
 #else
-    const auto written = ::write((int) fd, buf, n);
+    const auto written = ::write((int) fd, data.Data(), data.Size());
 #endif
 
     if (written < 0)
