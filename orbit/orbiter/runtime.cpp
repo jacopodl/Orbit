@@ -493,6 +493,28 @@ Fiber *Orbiter::EvalDetached(Context *context, Module *module, Code *code) noexc
 HOObject Orbiter::Eval(Context *context, Module *module, Code *code) noexcept {
     auto *isolate = O_GET_ISOLATE(code);
 
+    const auto future = EvalAsync(context, module, code);
+    if (!future)
+        return {};
+
+    auto *r_future = future.get();
+
+    // Note: One might consider releasing fibers from this queue at this point.
+    // However, this is unnecessary due to the work-stealing mechanism already in place.
+    FutureAwait(r_future);
+
+    if (r_future->state == FutureState::REJECTED) {
+        RuntimePanic(isolate, r_future->result);
+
+        return {};
+    }
+
+    return HOObject{r_future->result};
+}
+
+HFuture Orbiter::EvalAsync(Context *context, Module *module, Code *code) noexcept {
+    auto *isolate = O_GET_ISOLATE(code);
+
     const auto future = FutureNew(isolate);
     if (!future)
         return {};
@@ -517,18 +539,7 @@ HOObject Orbiter::Eval(Context *context, Module *module, Code *code) noexcept {
 
     this->OSTWakeRun();
 
-    // Note: One might consider releasing fibers from this queue at this point.
-    // However, this is unnecessary due to the work-stealing mechanism already in place.
-
-    FutureAwait(future.get());
-
-    if (future->state == FutureState::REJECTED) {
-        RuntimePanic(isolate, future->result);
-
-        return {};
-    }
-
-    return HOObject{future->result};
+    return future;
 }
 
 HFuture Orbiter::EvalAsync(Function *func, const unsigned char *stack_begin, const U16 size) noexcept {

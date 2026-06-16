@@ -251,6 +251,8 @@ namespace orbiter {
 
         datatype::HOObject Eval(datatype::Context *context, datatype::Module *module, datatype::Code *code) noexcept;
 
+        datatype::HFuture EvalAsync(datatype::Context *context, datatype::Module *module, datatype::Code *code) noexcept;
+
         datatype::HFuture EvalAsync(datatype::Function *func, const unsigned char *stack_begin, U16 size) noexcept;
 
         static Orbiter *GetInstance() noexcept;
