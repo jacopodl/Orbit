@@ -4,6 +4,8 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/fiber.h>
+
 #include <orbit/orbiter/datatype/rawptr.h>
 
 #include <orbit/orbiter/native/loader.h>
@@ -54,6 +56,9 @@ DLHandle Loader::LoadLibrary(ORString *name, bool &closable) {
     auto lib = OpenLibrary(this->isolate_, library);
     if (lib == DLHandleError) {
 #ifdef _ORBIT_PLATFORM_DARWIN
+        // Delete last error
+        Fiber::Current()->DiscardPanic();
+
         // macOS doesn't automatically append .dylib, so if nothing is found, attempt to add it explicitly.
         if (name == nullptr)
             return nullptr;
@@ -85,10 +90,11 @@ DLHandle Loader::LoadLibrary(ORString *name, bool &closable) {
     if (!ret)
         return nullptr;
 
-    if (name != nullptr)
+    if (name != nullptr) {
         DictInsert(this->lib_cache_.get(), (OObject *) name, (OObject *) ret.get());
 
-    closable = true;
+        closable = true;
+    }
 
     return (DLHandle) ret->ptr.load(std::memory_order_relaxed);
 }

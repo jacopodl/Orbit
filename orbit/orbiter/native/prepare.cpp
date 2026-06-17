@@ -155,7 +155,7 @@ HOObject orbiter::native::ConvertToOrbitObject(Isolate *isolate, void **result, 
         case NativeType::UNIT:
             return HOObject(kOddBallNIL);
         case NativeType::PTR:
-            return HOObject(RawPtrNew(isolate, result));
+            return HOObject(RawPtrNew(isolate, *result));
         case NativeType::F32:
             return HOObject(DecimalNew(isolate, *(float *) result));
         case NativeType::F64:
