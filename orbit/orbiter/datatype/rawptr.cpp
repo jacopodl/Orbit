@@ -4,6 +4,7 @@
 
 #include <cassert>
 
+#include <orbit/orbiter/datatype/bytes.h>
 #include <orbit/orbiter/datatype/decimal.h>
 #include <orbit/orbiter/datatype/error.h>
 #include <orbit/orbiter/datatype/errors.h>
@@ -41,6 +42,26 @@ static bool RawPtrToBool(const OObject *self) {
     return ((const RawPtr *) self)->ptr.load(std::memory_order_relaxed) != 0;
 }
 
+static bool RawPtrToNative(const RawPtr *self, void *out, const NativeType type) {
+    switch (type) {
+        // A raw pointer is an address: marshal it either as a pointer or as a
+        // pointer-width integer (the `uintptr_t` / `intptr_t` / `size_t` shape),
+        // so it can be passed to a native func that types the address as
+        // `ptr`, `uSize` or `iSize`. Narrower integer types are intentionally
+        // rejected — silently truncating an address is a footgun, so the FFI
+        // layer raises UNSUPPORTED_TYPE instead.
+        case NativeType::PTR:
+        case NativeType::USIZE:
+        case NativeType::ISIZE:
+            *((PtrSize *) out) = self->ptr.load(std::memory_order_relaxed);
+
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 static OObject *RawPtrToString(orbiter::Isolate *isolate, const OObject *self) {
     const auto *rawptr = (const RawPtr *) self;
     const auto s = ORStringFormat(isolate, "Rawptr(%p)", rawptr->ptr.load(std::memory_order_relaxed));
@@ -57,6 +78,27 @@ static MSize RawPtrHash(const OObject *self) {
     const auto h = ((const RawPtr *) self)->ptr.load(std::memory_order_relaxed);
 
     return h != 0 ? (MSize) h : 1;
+}
+
+// *********************************************************************************************************************
+// INTERNAL
+// *********************************************************************************************************************
+
+/// @brief Guard for the dereferencing methods.
+///
+/// Returns true when @p addr is safe to read/write. When @p addr is null it
+/// raises a `RuntimeError` and returns false, so the call site can bail with a
+/// single `if (!RawPtrCheckNonNull(...)) return {};`.
+static bool RawPtrCheckNonNull(orbiter::Isolate *isolate, const PtrSize addr) {
+    if (addr != 0)
+        return true;
+
+    ErrorSet(isolate,
+             RuntimeError::Details[RuntimeError::Reason::ID],
+             nullptr,
+             "null pointer dereference");
+
+    return false;
 }
 
 // *********************************************************************************************************************
@@ -185,13 +227,18 @@ RUNTIME_METHOD(rawptr_read_bytes, read_bytes,
                R"DOC(
 @brief Read `size` bytes from the pointed-to address and return them as a Bytes object.
 
-@param size  Number of bytes to read.
+Exactly `size` bytes are copied verbatim into a new, mutable Bytes; the pointer
+is not retained. Unlike `read_string`, `size` is mandatory — a raw memory region
+has no terminator to infer its length from.
 
-@return A Bytes object containing the copied data.
+@param size  Number of bytes to read. Must be non-negative.
+
+@return A new Bytes object containing the copied data.
 
 @panic RuntimeError  When the pointer is null.
+@panic ValueError    When `size` is negative.
 
-@see read_i8, read_i64
+@see read_string, read_i8, read_i64
 )DOC", 2, nullptr, false, false) {
     PCHECK_ENTRIES(params,
                    PCHECK_DEF("self", false, InstanceType::RAWPTR),
@@ -199,8 +246,31 @@ RUNTIME_METHOD(rawptr_read_bytes, read_bytes,
     );
     PCHECK_CHECK(params);
 
-    // TODO: implement once Bytes type is available
-    assert(false);
+    const auto *self = (const RawPtr *) argv[0];
+    auto *isolate = O_GET_ISOLATE(self);
+
+    const auto addr = self->ptr.load(std::memory_order_relaxed);
+
+    if (!RawPtrCheckNonNull(isolate, addr))
+        return {};
+
+    IntegerUnderlying size;
+    NumberExtract(argv[1], size);
+
+    if (size < 0) {
+        ErrorSet(isolate,
+                 ValueError::Details[ValueError::Reason::ID],
+                 nullptr,
+                 "size cannot be negative");
+
+        return {};
+    }
+
+    auto bytes = BytesNew(isolate, (const unsigned char *) addr, size, false);
+    if (!bytes)
+        return {};
+
+    return HOObject(std::move(bytes));
 }
 
 RUNTIME_METHOD(rawptr_read_f64, read_f64,
@@ -221,14 +291,8 @@ RUNTIME_METHOD(rawptr_read_f64, read_f64,
 
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(isolate,
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(isolate, addr))
         return {};
-    }
 
     DecimalUnderlying val;
 
@@ -257,14 +321,8 @@ RUNTIME_METHOD(rawptr_read_i8, read_i8,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     int8_t val;
 
@@ -289,14 +347,8 @@ RUNTIME_METHOD(rawptr_read_i16, read_i16,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     I16 val;
 
@@ -323,14 +375,8 @@ RUNTIME_METHOD(rawptr_read_i32, read_i32,
 
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(isolate,
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(isolate, addr))
         return {};
-    }
 
     I32 val;
 
@@ -361,14 +407,8 @@ RUNTIME_METHOD(rawptr_read_i64, read_i64,
 
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(isolate,
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(isolate, addr))
         return {};
-    }
 
     I64 val;
 
@@ -399,14 +439,8 @@ RUNTIME_METHOD(rawptr_read_ptr, read_ptr,
 
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(isolate,
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(isolate, addr))
         return {};
-    }
 
     void *val;
 
@@ -417,6 +451,64 @@ RUNTIME_METHOD(rawptr_read_ptr, read_ptr,
         return {};
 
     return HOObject(std::move(p));
+}
+
+RUNTIME_METHOD(rawptr_read_string, read_string,
+               R"DOC(
+@brief Read a NUL-terminated or fixed-length string from the pointed-to address.
+
+When `length` is omitted the bytes are read up to (but not including) the first
+NUL terminator, like C `strlen`. When `length` is given, exactly that many bytes
+are copied verbatim — embedded NUL bytes included.
+
+The bytes are copied into a new String; the pointer is not retained.
+
+@param length?  Number of bytes to read. Omit to read up to the first NUL.
+
+@return A new String containing the copied bytes.
+
+@panic RuntimeError  When the pointer is null.
+@panic ValueError    When `length` is negative.
+
+@see read_bytes, read_ptr
+)DOC", 1, "length", false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::RAWPTR),
+                   PCHECK_DEF("length", true, InstanceType::NUMBER)
+    );
+    PCHECK_CHECK(params);
+
+    const auto *self = (const RawPtr *) argv[0];
+    auto *isolate = O_GET_ISOLATE(self);
+
+    const auto addr = self->ptr.load(std::memory_order_relaxed);
+
+    if (!RawPtrCheckNonNull(isolate, addr))
+        return {};
+
+    HORString str;
+
+    if (!O_IS_SENTINEL(argv[1])) {
+        IntegerUnderlying length;
+        NumberExtract(argv[1], length);
+
+        if (length < 0) {
+            ErrorSet(isolate,
+                     ValueError::Details[ValueError::Reason::ID],
+                     nullptr,
+                     "length cannot be negative");
+
+            return {};
+        }
+
+        str = ORStringNew(isolate, (const char *) addr, length);
+    } else
+        str = ORStringNew(isolate, (const char *) addr);
+
+    if (!str)
+        return {};
+
+    return HOObject(std::move(str));
 }
 
 RUNTIME_METHOD(rawptr_read_u8, read_u8,
@@ -435,14 +527,8 @@ RUNTIME_METHOD(rawptr_read_u8, read_u8,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     uint8_t val;
 
@@ -467,14 +553,8 @@ RUNTIME_METHOD(rawptr_read_u16, read_u16,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     uint16_t val;
 
@@ -501,14 +581,8 @@ RUNTIME_METHOD(rawptr_read_u32, read_u32,
 
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(isolate,
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(isolate, addr))
         return {};
-    }
 
     uint32_t val;
 
@@ -539,14 +613,8 @@ RUNTIME_METHOD(rawptr_read_u64, read_u64,
 
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(isolate,
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(isolate, addr))
         return {};
-    }
 
     uint64_t val;
 
@@ -605,14 +673,8 @@ RUNTIME_METHOD(rawptr_write_f64, write_f64,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     const auto val = (DecimalUnderlying) ((const Decimal *) argv[1])->value;
     memcpy((void *) addr, &val, sizeof(val));
@@ -641,14 +703,8 @@ Only the lower 8 bits of `value` are written.
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -680,14 +736,8 @@ Only the lower 16 bits of `value` are written.
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -719,14 +769,8 @@ Only the lower 32 bits of `value` are written.
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -756,14 +800,8 @@ RUNTIME_METHOD(rawptr_write_i64, write_i64,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -795,14 +833,8 @@ Only the lower 8 bits of `value` are written.
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -834,14 +866,8 @@ Only the lower 16 bits of `value` are written.
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -873,14 +899,8 @@ Only the lower 32 bits of `value` are written.
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -910,14 +930,8 @@ RUNTIME_METHOD(rawptr_write_u64, write_u64,
     const auto *self = (const RawPtr *) argv[0];
     const auto addr = self->ptr.load(std::memory_order_relaxed);
 
-    if (addr == 0) {
-        ErrorSet(O_GET_ISOLATE(self),
-                 RuntimeError::Details[RuntimeError::Reason::ID],
-                 nullptr,
-                 "null pointer dereference");
-
+    if (!RawPtrCheckNonNull(O_GET_ISOLATE(self), addr))
         return {};
-    }
 
     IntegerUnderlying value;
     NumberExtract(argv[1], value);
@@ -941,6 +955,7 @@ constexpr FunctionDef rawptr_methods[] = {
     rawptr_read_i32,
     rawptr_read_i64,
     rawptr_read_ptr,
+    rawptr_read_string,
     rawptr_read_u8,
     rawptr_read_u16,
     rawptr_read_u32,
@@ -968,6 +983,7 @@ bool orbiter::datatype::RawPtrTypeSetup(TypeInfo *self) {
 
     ops.equal = RawPtrEqual;
     ops.to_bool = RawPtrToBool;
+    ops.to_native = (ToNativeType) RawPtrToNative;
     ops.to_string = RawPtrToString;
     ops.hash = RawPtrHash;
 
@@ -975,7 +991,7 @@ bool orbiter::datatype::RawPtrTypeSetup(TypeInfo *self) {
 }
 
 HOType orbiter::datatype::RawPtrTypeInit(Isolate *isolate) {
-    auto rawptr = MakeType(isolate, "Rawptr", InstanceType::RAWPTR, sizeof(RawPtr) - sizeof(OObject), 26, 0);
+    auto rawptr = MakeType(isolate, "Rawptr", InstanceType::RAWPTR, sizeof(RawPtr) - sizeof(OObject), 27, 0);
     return rawptr;
 }
 
