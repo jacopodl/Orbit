@@ -521,6 +521,77 @@ namespace liftoff::ir {
                 ((Instruction *) this->operands[i].value)->SetRegister(reg);
         }
     };
+
+    /// @brief True iff codegen emits this opcode's OWN `assigned_reg` into the
+    /// destination register field.
+    ///
+    /// Such an instruction MUST be assigned a register by the allocator even
+    /// when its result has no users (e.g. a discarded `await` or `<- ch`):
+    /// `kUninitializedReg` (-1) packed into the 4-bit DST nibble reads as 0xF,
+    /// silently corrupting it.
+    /// `ComputeLiveIntervals` gives every such use-less definition a point
+    /// interval so it still gets a register.
+    ///
+    /// NOT the complement of `Optimizer::HasSideEffects` — the two answer
+    /// orthogonal questions ("does it affect state?" vs "does it write its own
+    /// DST register?") and many opcodes are BOTH (`AWAIT`, `CHRCV`, `GITR`,
+    /// `MKCLZ`, `POP`) or NEITHER. Do not derive one from the other.
+    inline bool OpcodeDefinesRegister(const orbiter::OPCode op) noexcept {
+        switch (op) {
+            case orbiter::OPCode::ADD:
+            case orbiter::OPCode::SUB:
+            case orbiter::OPCode::MUL:
+            case orbiter::OPCode::DIV:
+            case orbiter::OPCode::MOD:
+            case orbiter::OPCode::AND:
+            case orbiter::OPCode::OR:
+            case orbiter::OPCode::XOR:
+            case orbiter::OPCode::SHLR:
+            case orbiter::OPCode::SHRR:
+            case orbiter::OPCode::SHLI:
+            case orbiter::OPCode::SHRI:
+            case orbiter::OPCode::MEMB:
+            case orbiter::OPCode::CMP:
+            case orbiter::OPCode::EQ:
+            case orbiter::OPCode::MOV:
+            case orbiter::OPCode::MVN:
+            case orbiter::OPCode::NEG:
+            case orbiter::OPCode::NOT:
+            case orbiter::OPCode::LDCODE:
+            case orbiter::OPCode::LDCST:
+            case orbiter::OPCode::LDIMM:
+            case orbiter::OPCode::LDNAT:
+            case orbiter::OPCode::MKCLZ:
+            case orbiter::OPCode::MKTRT:
+            case orbiter::OPCode::LDCLO:
+            case orbiter::OPCode::CLOLDR:
+            case orbiter::OPCode::LDGBL:
+            case orbiter::OPCode::LDGOFF:
+            case orbiter::OPCode::SKLDR:
+            case orbiter::OPCode::POP:
+            case orbiter::OPCode::NERROR:
+            case orbiter::OPCode::CLONEW:
+            case orbiter::OPCode::NDICT:
+            case orbiter::OPCode::NLIST:
+            case orbiter::OPCode::NSET:
+            case orbiter::OPCode::NTUPLE:
+            case orbiter::OPCode::LDIDX:
+            case orbiter::OPCode::LDSBSCR:
+            case orbiter::OPCode::AWAIT:
+            case orbiter::OPCode::STRES:
+            case orbiter::OPCode::LDMOD:
+            case orbiter::OPCode::NOBJ:
+            case orbiter::OPCode::CHRCV:
+            case orbiter::OPCode::GITR:
+            case orbiter::OPCode::LDOBJP:
+            case orbiter::OPCode::LDFUNC:
+            case orbiter::OPCode::LDEXC:
+                return true;
+
+            default:
+                return false;
+        }
+    }
 }
 
 #endif // !ORBIT_LIFTOFF_IR_INSTRUCTION_H_

@@ -163,12 +163,23 @@ std::vector<LiveInterval> &IRContext::ComputeLiveIntervals() {
                 continue;
             }
 
-            // A Phi with no uses still needs a register: its targets are marked
-            // kDoNotAllocateReg and inherit the Phi's register, so it must be
-            // allocated even when the joined value is discarded (e.g. a ternary
-            // or `a || b` used as an expression statement). A point interval is
-            // enough — it expires immediately after the join.
-            if (instr->type() == ObjectType::VIRT_INSTRUCTION)
+            // No users. DCE has already dropped the pure value-producers, so
+            // whatever is left here has side effects. If it still DEFINES a
+            // register it must be allocated one anyway — a discarded `await` /
+            // `<- ch`, or a Phi join whose value is unused (e.g. `a || b` as a
+            // statement). Otherwise codegen emits kUninitializedReg (-1) into
+            // the 4-bit DST field, corrupting it.
+            // A point interval suffices: it expires immediately after the def.
+            //
+            // A Phi (VIRT_INSTRUCTION) always defines a register: it inherits
+            // one and propagates it to its kDoNotAllocateReg targets.
+            const bool defines = instr->type() == ObjectType::VIRT_INSTRUCTION
+                                 || (
+                                     instr->type() == ObjectType::INSTRUCTION
+                                     && OpcodeDefinesRegister(((PhysInstruction *) instr)->opcode)
+                                 );
+
+            if (defines)
                 this->live_intervals_.emplace_back(instr, instr->instr_offset, instr->instr_offset);
         }
     }

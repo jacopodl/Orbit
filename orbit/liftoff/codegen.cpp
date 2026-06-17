@@ -125,6 +125,8 @@ unsigned char *Codegen::EmitOpcodes(const BasicBlock *block, unsigned char *m_co
 
         const auto *instr = (PhysInstruction *) cursor;
 
+        assert(instr->assigned_reg >= 0 || !ir::OpcodeDefinesRegister(instr->opcode));
+
         switch (instr->opcode) {
             case orbiter::OPCode::ADD:
             case orbiter::OPCode::SUB:
