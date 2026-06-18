@@ -92,16 +92,20 @@ HNativeFunc orbiter::datatype::NativeFuncNew(Isolate *isolate, const native::Nat
     func->ret_type = binding->ret_type;
     func->arity = binding->params.count;
 
-    func->params = allocator.alloc<native::NativeParam>(func->arity * sizeof(native::NativeParam));
-    if (func->params == nullptr) {
-        isolate->gc->RawFree((OObject *) func, false);
+    func->params = nullptr;
 
-        return {};
-    }
+    if (func->arity > 0) {
+        func->params = allocator.alloc<native::NativeParam>(func->arity * sizeof(native::NativeParam));
+        if (func->params == nullptr) {
+            isolate->gc->RawFree((OObject *) func, false);
 
-    for (auto i = 0; i < func->arity; ++i) {
-        func->params[i].name = binding->params.params[i].name;
-        func->params[i].type = binding->params.params[i].type;
+            return {};
+        }
+
+        for (auto i = 0; i < func->arity; ++i) {
+            func->params[i].name = binding->params.params[i].name;
+            func->params[i].type = binding->params.params[i].type;
+        }
     }
 
     O_GC_TRACK_RETURN(isolate, func, true);
