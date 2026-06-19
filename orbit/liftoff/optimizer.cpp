@@ -36,6 +36,7 @@ bool Optimizer::HasSideEffects(const orbiter::OPCode opcode) {
         case orbiter::OPCode::STOBJP:
         case orbiter::OPCode::STIDX:
         case orbiter::OPCode::STSBSCR:
+        case orbiter::OPCode::LDCLO:
         case orbiter::OPCode::CLOSTR:
         case orbiter::OPCode::SKSTR:
         case orbiter::OPCode::SETPROP:
