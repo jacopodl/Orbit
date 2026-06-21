@@ -156,7 +156,7 @@ int orbiter::main(const int argc, char **argv) {
     if (!Orbiter::Initialize(&config))
         return EXIT_FAILURE;
 
-    auto *isolate = Isolate::New();
+    auto *isolate = Isolate::New(&config);
     if (isolate == nullptr)
         return EXIT_FAILURE;
 

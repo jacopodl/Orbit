@@ -10,6 +10,7 @@
 namespace orbiter::module {
     extern const datatype::ModuleInit *module_builtin_;
     extern const datatype::ModuleInit *module_io_;
+    extern const datatype::ModuleInit *module_runtime_;
 }
 
 #endif // !ORBIT_ORBITER_MODULE_MODULES_H_

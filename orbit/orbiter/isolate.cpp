@@ -53,7 +53,7 @@ Isolate::~Isolate() {
     delete this->allocator_;
 }
 
-Isolate *Isolate::New() {
+Isolate *Isolate::New(Config *config) {
 #define INIT_TYPE(num, fn)                                                      \
     do {                                                                        \
         if((isolate->primitive[(int) num] = fn(isolate).get_inc()) == nullptr)  \
@@ -168,6 +168,8 @@ Isolate *Isolate::New() {
     isolate->importer_ = new import::Importer(isolate);
     if (!isolate->importer_->Initialize())
         goto ERROR;
+
+    isolate->config = config;
 
     return isolate;
 

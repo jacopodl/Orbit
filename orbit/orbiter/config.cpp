@@ -122,7 +122,7 @@ static constexpr char usage[] =
 static constexpr char usage_env[] =
         "\nEnvironment variables:\n"
         "ORBIT_MAXVC     : value that controls the number of OS threads that can execute Orbit code simultaneously.\n"
-        "                  The default value of ORBMAXVC is the number of CPUs visible at startup.\n"
+        "                  The default value of ORBIT_MAXVC is the number of CPUs visible at startup.\n"
         "ORBIT_PATH      : augment the default search path for modules. One or more directories separated by "
         #ifdef _ORBIT_PLATFORM_WINDOWS
         "';' "

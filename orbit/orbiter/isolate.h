@@ -25,6 +25,7 @@ namespace orbiter {
     namespace import {
         class Importer;
     }
+
     namespace native {
         class Loader;
     }
@@ -38,6 +39,8 @@ namespace orbiter {
         PanicContainer panic;
 
         Panic *panic_cache;
+
+        struct Config *config;
 
         datatype::OObject *oom_error_;
 
@@ -56,7 +59,7 @@ namespace orbiter {
 
         ~Isolate();
 
-        static Isolate *New();
+        static Isolate *New(Config *config);
     };
 
     class MutatorScope {
