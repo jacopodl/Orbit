@@ -1954,6 +1954,9 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                     stmt = this->ParseFunction(start, true, access);
                 else
                     stmt = this->ParseFunction(start, false, access);
+
+                stmt->is_expr = ((Function *) stmt.get())->anon;
+
                 break;
             }
             case TokenType::KW_IF:
@@ -2007,6 +2010,10 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
                 return this->ParseWhenStatement();
             default:
                 stmt = this->ParseExpression();
+                if (stmt->node_type != NodeType::VAR_DECLARATION && stmt->node_type != NodeType::VAR_DECLARATIONS)
+                    stmt->is_expr = true;
+
+                break;
         }
 
         this->IgnoreNewLineIF(TokenType::COLON);

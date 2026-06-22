@@ -13,6 +13,25 @@
 using namespace liftoff;
 using namespace liftoff::ir;
 
+// Node types that must NOT be echoed as the value of a module in interactive
+// mode, even though they are parsed as expression-statements (`is_expr`)
+static bool IsNeverEcho(const parser::NodeType tp) {
+    switch (tp) {
+        // Bindings / mutations.
+        case parser::NodeType::VAR_DECLARATION:
+        case parser::NodeType::VAR_DECLARATIONS:
+        case parser::NodeType::ASSIGNMENT:
+        case parser::NodeType::ASSIGNMENTS:
+        case parser::NodeType::SPAWN:
+        case parser::NodeType::PANIC:
+        case parser::NodeType::CHAN_SEND:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 // Maps a compound-assignment token (`+=`, `-=`, ...) to the corresponding
 // plain binary-operator token (`+`, `-`, ...). The result is then fed into
 // InfixOp2OpCode to obtain the actual VM opcode.
@@ -1972,14 +1991,20 @@ IRCHandle IRBuilder::Generate(const parser::ASTHandle<parser::Module *> &module)
         if (stack_space > 0)
             this->builder_.AllocStackSlots(stack_space, orbiter::AllocaFlags::ZERO_INIT);
 
+        Instruction *last_value = nullptr;
         for (auto &statement: module->statements)
-            this->visit(statement.get());
+            last_value = this->visit(statement.get());
 
         assert(this->builder_.context == context);
 
-        // Insert return value
-        if (!this->builder_.CheckIfLastInstructionIs(orbiter::OPCode::RET))
-            this->builder_.CreateReturn(0);
+        if (!this->builder_.CheckIfLastInstructionIs(orbiter::OPCode::RET)) {
+            const auto *last = module->statements.back().get();
+
+            if (last_value != nullptr && last != nullptr && last->is_expr && !IsNeverEcho(last->node_type))
+                this->builder_.CreateReturn(last_value, 0);
+            else
+                this->builder_.CreateReturn(0);
+        }
 
         // This call ensures any checks performed by LeaveContext are honored
         this->builder_.LeaveContext();

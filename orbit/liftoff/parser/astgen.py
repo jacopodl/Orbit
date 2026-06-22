@@ -27,8 +27,9 @@ NODES = {
     "ASTNode": {
         "fields": {
             "isolate": "orbiter::Isolate*",
+            "loc": "scanner::Loc",
             "node_type": "NodeType",
-            "loc": "scanner::Loc"
+            "is_expr": "bool"
         }
     },
     "Assignment": {
@@ -375,6 +376,7 @@ inline ASTHandle<{node_name}*> Make{node_name}(orbiter::Isolate *isolate, const 
 
         node->isolate = isolate;
         node->node_type = node_type;
+        node->is_expr = false;
         node->loc = loc;
         
     {vector_init_code}
@@ -393,6 +395,7 @@ inline ASTHandle<{node_name}*> Make{node_name}(orbiter::Isolate *isolate, const 
     
     node->isolate = isolate;
     node->node_type = NodeType::{node_name.upper()};
+    node->is_expr = false;
     node->loc = loc;
         
     {vector_init_code}
