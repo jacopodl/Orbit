@@ -1973,7 +1973,7 @@ ASTHandle<ASTNode *> Parser::ParseStatement() {
             case TokenType::KW_SWITCH:
                 return this->ParseSwitchStatement();
             case TokenType::KW_YIELD:
-                if (!this->context_->Check(ContextType::FUNC))
+                if (!this->context_->CheckEnclosingScope(ContextType::FUNC))
                     throw ParserException(31);
 
                 this->sym_t_->scope->flags |= ScopeFlags::GENERATOR;

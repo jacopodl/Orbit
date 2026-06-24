@@ -48,7 +48,35 @@ namespace liftoff::parser {
             return false;
         }
 
-        explicit Context(Parser *parser, ContextType type) : back_(parser->context_), parser_(parser), type_(type) {
+        /// Walk outward looking for a context of @p type, passing transparently
+        /// through control-flow blocks (`loop`/`switch`) but stopping at the
+        /// first real scope boundary. Returns true only if @p type is reached
+        /// before any non-control scope.
+        [[nodiscard]] bool CheckEnclosingScope(const ContextType type) const noexcept {
+            auto cursor = this;
+
+            while (cursor != nullptr) {
+                if (cursor->type_ == type)
+                    return true;
+
+                // Any non-control context is a hard scope boundary.
+                if (!IsControl(cursor->type_))
+                    return false;
+
+                cursor = cursor->back_;
+            }
+
+            return false;
+        }
+
+        /// Control-flow contexts are transparent to enclosing-scope lookups: a
+        /// `loop`/`switch` does not open a new declaration scope, so a search for
+        /// the enclosing function/class/module must look straight through them.
+        [[nodiscard]] static constexpr bool IsControl(const ContextType type) noexcept {
+            return type == ContextType::LOOP || type == ContextType::SWITCH;
+        }
+
+        explicit Context(Parser *parser, const ContextType type) : back_(parser->context_), parser_(parser), type_(type) {
             parser->context_ = this;
         }
 
