@@ -803,6 +803,9 @@ Instruction *IRBuilder::visitBlock(const parser::Block *node) {
 Instruction *IRBuilder::visitBranch(const parser::Branch *node) {
     const BranchInstruction *last = nullptr;
 
+    if (node->node_type == parser::NodeType::WHEN)
+        return this->visitWhen(node);
+
     auto *end = this->builder_.CreateBasicBlock();
     auto *orelse = end;
 
@@ -820,12 +823,15 @@ Instruction *IRBuilder::visitBranch(const parser::Branch *node) {
     if (node->orelse != nullptr) {
         last = (BranchInstruction *) this->builder_.CreateBranch(orbiter::OPCode::JMP, nullptr, orelse, nullptr);
 
-        if (!this->sym_t_->EnterNestedScope(node->orelse->loc.start.offset))
-            throw SymbolTableException();
+        if (node->orelse->node_type != parser::NodeType::IF) {
+            if (!this->sym_t_->EnterNestedScope(node->orelse->loc.start.offset))
+                throw SymbolTableException();
 
-        this->visit(node->orelse);
+            this->visit(node->orelse);
 
-        this->sym_t_->LeaveNestedScope();
+            this->sym_t_->LeaveNestedScope();
+        } else
+            this->visit(node->orelse);
     }
 
     if (last != nullptr) {
@@ -1832,6 +1838,38 @@ Instruction *IRBuilder::visitYield(const parser::Unary *unary) {
                       : this->builder_.LoadNilValue();
 
     return this->builder_.CreateYield(value);
+}
+
+Instruction *IRBuilder::visitWhen(const parser::Branch *node) {
+    const BranchInstruction *last = nullptr;
+
+    auto *end = this->builder_.CreateBasicBlock();
+    auto *orelse = end;
+
+    auto *value = this->visit(node->test);
+
+    this->builder_.CreateBranch(orbiter::OPCode::JF, value, nullptr, orelse);
+
+    this->visit(node->body);
+
+    if (node->orelse != nullptr) {
+        last = (BranchInstruction *) this->builder_.CreateBranch(orbiter::OPCode::JMP, nullptr, orelse, nullptr);
+
+        if (node->orelse->node_type == parser::NodeType::WHEN)
+            this->visitWhen((parser::Branch *) node->orelse);
+        else
+            this->visit(node->orelse);
+    }
+
+    if (last != nullptr) {
+        if (this->builder_.context->current_->IsInstructionListEmpty())
+            last->SetBasicBlock(this->builder_.context->current_);
+        else
+            last->SetBasicBlock(this->builder_.CreateAppendBasicBlock());
+    } else
+        this->builder_.AppendBasicBlock(end);
+
+    return nullptr;
 }
 
 unsigned int IRBuilder::ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,

@@ -123,6 +123,8 @@ namespace liftoff::ir {
 
         Instruction *visitYield(const parser::Unary *unary);
 
+        Instruction *visitWhen(const parser::Branch *node);
+
         unsigned int ProcessFunctionParams(const parser::Function *node, Instruction *&def_args,
                                            orbiter::LoadFuncFlags &f_flags);
 

@@ -958,7 +958,9 @@ ASTHandle<ASTNode *> Parser::ParseWhenStatement() {
     auto end = branch->body->loc.end;
 
     if (this->MatchEat(TokenType::KW_ELSE, false)) {
-        if (this->MatchEat(TokenType::KW_WHEN, false)) {
+        this->EatNL();
+
+        if (this->Match(TokenType::KW_WHEN)) {
             branch->orelse = this->ParseWhenStatement().release();
             end = branch->orelse->loc.end;
         } else {
