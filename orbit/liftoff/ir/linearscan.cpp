@@ -340,6 +340,22 @@ void LinearScan::Allocate(std::vector<LiveInterval> &intervals) {
         this->active_.insert(&interval);
     }
 
+    // Drain call sites that fall after the last processed interval's start.
+    // The loop above advances `call_it` only while processing intervals, so a
+    // call with no interval starting at/after it is never seen — e.g. a trailing
+    // `return new X()`, where the constructor call's result is unused and the
+    // RET defines no value, leaving nothing after the call to advance call_it.
+    // Without this, values live across that call (the new object, used by RET)
+    // are never spilled and the call clobbers their register.
+    while (call_it != call_positions.end()) {
+        for (const auto *active: this->active_) {
+            if (active->end > *call_it)
+                this->SpillToStackAndReloadUses(active->instr);
+        }
+
+        ++call_it;
+    }
+
     // Update the stack slot of the IR context to the current stack size
     if (this->stack_offset_ > this->ir_->stack_slots_max)
         this->builder_.AllocStackSlots(this->stack_offset_ - this->ir_->stack_slots, orbiter::AllocaFlags::DEFAULT);
