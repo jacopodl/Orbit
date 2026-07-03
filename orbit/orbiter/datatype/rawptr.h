@@ -13,7 +13,11 @@ namespace orbiter::datatype {
     struct RawPtr {
         OROBJ_HEAD;
 
+        std::atomic<PtrSize> original;
+
         std::atomic<PtrSize> ptr;
+
+        std::atomic_bool free;
     };
 
     using HRawPtr = Handle<RawPtr>;

@@ -17,6 +17,19 @@
 using namespace orbiter::datatype;
 
 // *********************************************************************************************************************
+// INTERNAL
+// *********************************************************************************************************************
+
+bool RawPtrDtor(const RawPtr *self) {
+    void *ptr = (void *) self->original.load(std::memory_order_relaxed);
+
+    if (ptr != nullptr && self->free.load(std::memory_order_relaxed))
+        ::free(ptr);
+
+    return true;
+}
+
+// *********************************************************************************************************************
 // TYPE OPS — COMPARISON
 // *********************************************************************************************************************
 
@@ -113,9 +126,10 @@ address in a RawPtr. This is the entry point for handing a writable buffer to a
 native function — e.g. an out-parameter `int *`: allocate a cell, pass the
 RawPtr to the callee, read the value back, then release it.
 
-The buffer is owned by the caller and must be released with `free` when no
-longer needed. For a garbage-collected alternative that never leaks, pass a
-`Bytes` value to the native call instead.
+Ownership: call `free` for deterministic release; if you don't, the buffer is
+released automatically when the RawPtr is collected, so `alloc`-created
+buffers never leak. The automatic release applies only to pointers created by
+`alloc` — RawPtrs wrapping foreign memory are never freed automatically.
 
 @param size    Number of bytes to allocate. Must be positive.
 @param fill=0  Byte value written to every byte of the buffer (low 8 bits used).
@@ -178,6 +192,8 @@ longer needed. For a garbage-collected alternative that never leaks, pass a
         return {};
     }
 
+    p->free.store(true, std::memory_order_relaxed);
+
     return HOObject(std::move(p));
 }
 
@@ -239,22 +255,29 @@ raw bytes.
 
 RUNTIME_METHOD(rawptr_free, free,
                R"DOC(
-@brief Release the memory at this pointer's address by calling free().
+@brief Release the pointed-to memory by calling free() on its original address.
 
-The pointer is zeroed after the call to prevent use-after-free.
-Has no effect if the pointer is already null.
+The release always targets the address this RawPtr was created with, so a
+pointer previously moved with `add`/`sub` is still freed correctly. Both the
+original and the current address are zeroed afterwards to prevent
+use-after-free, and any pending automatic release (for `alloc`-created
+pointers) is cancelled. Has no effect if already freed or null.
 
-@see address, is_null
+@see alloc, address, is_null
 )DOC", 1, nullptr, false, false) {
     PCHECK_ENTRIES(params, PCHECK_DEF("self", false, InstanceType::RAWPTR));
     PCHECK_CHECK(params);
 
     auto *self = (RawPtr *) argv[0];
 
-    const auto addr = self->ptr.exchange(0, std::memory_order_relaxed);
+    auto *ptr = (void *) self->original.exchange(0, std::memory_order_seq_cst);
 
-    if (addr != 0)
-        ::free((void *) addr);
+    // Poison the current view as well, so dereferences after free() fail with
+    // a null-pointer error instead of reading freed memory.
+    self->ptr.store(0, std::memory_order_seq_cst);
+
+    if (ptr != nullptr)
+        ::free(ptr);
 
     return HOObject(kOddBallNIL);
 }
@@ -283,6 +306,13 @@ Supports negative offsets to move backwards. When `word` is true the count
 is measured in pointer-size units (each `sizeof(void *)` bytes) instead of
 raw bytes — convenient for walking a `T **` such as an `argv`-style array
 without hardcoding the platform word size.
+
+The result is an independent *view* into the same memory: its origin is the
+shifted address itself. Do NOT call `free` on it — that would free a
+mid-buffer address; release memory through the pointer that owns it (to move
+the owner safely, use `add`/`sub`, whose `free` still targets the true
+origin). The view is also not kept alive by the parent: if an `alloc`-created
+owner is collected, its views dangle.
 
 @param bytes  Signed count to add to the address (bytes, or pointer-size
               units when `word` is true).
@@ -1084,6 +1114,8 @@ constexpr FunctionDef rawptr_methods[] = {
 // *********************************************************************************************************************
 
 bool orbiter::datatype::RawPtrTypeSetup(TypeInfo *self) {
+    self->dtor = (DtorFn) RawPtrDtor;
+
     auto &ops = ((TypeInfoOps *) self)->ops;
 
     ops.equal = RawPtrEqual;
@@ -1102,8 +1134,11 @@ HOType orbiter::datatype::RawPtrTypeInit(Isolate *isolate) {
 
 HRawPtr orbiter::datatype::RawPtrNew(Isolate *isolate, void *ptr) {
     auto *rawptr = MakeObject<RawPtr>(isolate, InstanceType::RAWPTR);
-    if (rawptr != nullptr)
+    if (rawptr != nullptr) {
         rawptr->ptr.store((PtrSize) ptr, std::memory_order_relaxed);
+        rawptr->original.store((PtrSize) ptr, std::memory_order_relaxed);
+        rawptr->free.store(false, std::memory_order_relaxed);
+    }
 
     O_GC_TRACK_RETURN(isolate, rawptr, false);
 }
