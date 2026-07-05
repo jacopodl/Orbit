@@ -716,6 +716,80 @@ rejected rather than producing invalid UTF-8.
     return HOObject(std::move(s));
 }
 
+RUNTIME_METHOD(string_next_codepoint, next_codepoint,
+               R"DOC(
+@brief Return the byte offset of the codepoint boundary after `offset`.
+
+Given a byte offset into the UTF-8 buffer, advance to the start of the next
+codepoint: `offset` plus the byte length of the codepoint that begins there.
+If `offset` falls *inside* a multi-byte codepoint, it advances to the next
+lead byte (never splitting further). This is the primitive for stepping a byte
+offset forward without landing mid-codepoint — e.g. advancing past a
+zero-width regex match on a UTF-8 subject.
+
+@param offset  A byte offset, 0 <= offset <= byte_length().
+
+@return The byte offset of the next codepoint boundary. Equals byte_length()
+        once the end is reached (advancing at the end stays at the end).
+
+@panic TypeError   When `offset` is not a Number.
+@panic ValueError  When `offset` is outside 0 <= offset <= byte_length().
+
+@see byte_length, byte_substring, at
+
+@example
+    "héllo".next_codepoint(0)    // 1  (h is 1 byte)
+    "héllo".next_codepoint(1)    // 3  (é spans bytes 1..2)
+    "héllo".next_codepoint(2)    // 3  (offset was mid-é; snap to next boundary)
+)DOC", 2, nullptr, false, false) {
+    PCHECK_ENTRIES(params,
+                   PCHECK_DEF("self", false, InstanceType::STRING),
+                   PCHECK_DEF("offset", false, InstanceType::NUMBER));
+    PCHECK_CHECK(params);
+
+    const auto *self = (ORString *) argv[0];
+    auto *isolate = O_GET_ISOLATE(_func);
+
+    IntegerUnderlying offset;
+    if (!NumberExtract(argv[1], offset))
+        return {};
+
+    if (offset < 0 || (MSize) offset > STR_LEN(self)) {
+        ErrorSet(isolate,
+                 ValueError::Details[ValueError::Reason::ID],
+                 nullptr,
+                 "next_codepoint offset out of range");
+
+        return {};
+    }
+
+    auto pos = (MSize) offset;
+
+    if (pos < STR_LEN(self)) {
+        // If we're mid-codepoint (a 10xxxxxx continuation byte), the lead-byte
+        // count is 0; step over continuation bytes to the next boundary.
+        // Otherwise advance by the codepoint's byte length (clamped to the end).
+        const auto width = StrUtf8LeadByteCount(STR_BUF(self)[pos]);
+
+        if (width == 0) {
+            do
+                pos++;
+            while (pos < STR_LEN(self) && (STR_BUF(self)[pos] & 0xC0) == 0x80);
+        } else {
+            pos += width;
+
+            if (pos > STR_LEN(self))
+                pos = STR_LEN(self);
+        }
+    }
+
+    auto result = IntNew(isolate, (IntegerUnderlying) pos);
+    if (!result)
+        return {};
+
+    return HOObject(std::move(result));
+}
+
 RUNTIME_METHOD(string_contains, contains,
                R"DOC(
 @brief Return true if the string contains the given substring.
@@ -1569,6 +1643,7 @@ constexpr FunctionDef string_methods[] = {
     string_length,
     string_lower,
     string_lstrip,
+    string_next_codepoint,
     string_replace,
     string_rfind,
     string_rstrip,
@@ -1873,7 +1948,7 @@ HOType orbiter::datatype::ORStringTypeInit(Isolate *isolate) {
         return {};
     }
 
-    auto string = MakeType(isolate, "String", InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 21, 0);
+    auto string = MakeType(isolate, "String", InstanceType::STRING, sizeof(ORString) - sizeof(OObject), 22, 0);
     if (!string) {
         allocator.FreeObject(gst);
 
