@@ -3,7 +3,7 @@
     Licensed under the Apache License v2.0
 
     syntax: ISO-14977 EBNF
-    version: 3.1
+    version: 4.0
 *)
 
 (* Basic elements *)
@@ -149,7 +149,7 @@ import_item = identifier, ["as", identifier];
 
 
 (* Native Declarations *)
-native_declaration = native_function_declaration | native_variable_declaration;
+native_declaration = native_function_declaration | native_variable_declaration | native_block;
 
 (* Native Function Declaration *)
 native_function_declaration = [doc_comment], "native", "func", identifier, "(", [native_parameter_list], ")", ":", native_type, [native_alias], [native_from];
@@ -160,6 +160,12 @@ native_from = "from", string_literal;
 
 (* Native Variable Declaration *)
 native_variable_declaration = "native", ("var" | "let"), identifier, ":", native_type, [native_alias], [native_from];
+
+(* Native Block — groups declarations that share the same module; the
+   per-declaration `from` clause is not allowed inside the block *)
+native_block = "native", "from", string_literal, "{", {native_block_member}, "}";
+native_block_member = ("func", identifier, "(", [native_parameter_list], ")", ":", native_type, [native_alias])
+                    | (("var" | "let"), identifier, ":", native_type, [native_alias]);
 
 native_type = "bool" | "byte" | "i8" | "i16" | "i32" | "i64" | "iSize" | "u8" | "u16" | "u32" | "u64" | "uSize" | "unit" | "opaque" | "ptr" |"f32" | "f64";
 

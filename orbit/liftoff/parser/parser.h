@@ -72,7 +72,7 @@ namespace liftoff::parser {
         "Invalid native return type: expected a valid native type (e.g., 'i32', 'f64', 'bool', etc.)",
         "Invalid native function alias: expected identifier after 'as' keyword (e.g., 'as print')",
         "Invalid native function import: expected string literal after 'from' keyword (e.g., 'from \"libc\"')",
-        "Invalid native declaration: 'native' must be followed by 'func', 'var', or 'let' (e.g., 'native var' or 'native let')",
+        "Invalid native declaration: 'native' must be followed by 'func', 'var', 'let', or 'from' (e.g., 'native var' or 'native from \"libc\" { ... }')",
         "Invalid native variable declaration: expected variable name identifier after 'var' or 'let' (e.g., 'native var count')",
         "Invalid native variable syntax: expected colon ':' after variable name to specify type",
         "Invalid native variable type: expected a valid native type (e.g., 'i32', 'f64', 'bool', etc.)",
@@ -102,7 +102,12 @@ namespace liftoff::parser {
         "Invalid call to a native variable",
         "Invalid function declaration: anonymous functions are not allowed in this context",
         "Invalid ternary operator syntax: expected ':' after true expression",
-        "Invalid 'when' usage: 'when' blocks can only be used at module level"
+        "Invalid 'when' usage: 'when' blocks can only be used at module level",
+        "Invalid native block: expected '{' after module name to open 'native from' block",
+        "Invalid native block: expected 'func', 'var', or 'let' declaration inside 'native from' block",
+        "Invalid native block: expected end of line, ';' or '}' after declaration in 'native from' block",
+        "Unclosed native block: expected '}' at the end of 'native from' block",
+        "Invalid 'from' clause: declarations inside a 'native from' block cannot specify their own module"
     };
 
     constexpr auto kInitMethodName = "init";
@@ -255,9 +260,13 @@ namespace liftoff::parser {
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseLoopStatement();
 
+        [[nodiscard]] ASTHandle<ASTNode *> ParseNativeBlock();
+
         [[nodiscard]] ASTHandle<ASTNode *> ParseNativeStatement();
 
-        [[nodiscard]] ASTHandle<ASTNode *> ParseNativeFuncStatement(const scanner::Position &start);
+        [[nodiscard]] ASTHandle<ASTNode *> ParseNativeFuncStatement(const scanner::Position &start, bool ignore_from);
+
+        [[nodiscard]] ASTHandle<ASTNode *> ParseNativeVarStatement(const scanner::Position &start, bool ignore_from);
 
         [[nodiscard]] ASTHandle<ASTNode *> ParseSwitchCase(bool as_if);
 
