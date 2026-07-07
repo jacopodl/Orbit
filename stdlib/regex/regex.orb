@@ -12,8 +12,9 @@
  * - `Match` — result of an attempt.
  * - `CompileContext` / `GLOBAL_COMPILE_CONTEXT` — compilation settings shared
  *   by every `Pattern`.
- * - `find` / `findall` / `match` — one-shot helpers that compile and run in a
- *   single call, for when the pattern is not worth keeping around.
+ * - `find` / `findall` / `match` / `replace` / `split` — one-shot helpers that
+ *   compile and run in a single call, for when the pattern is not worth
+ *   keeping around.
  *
  * Compile/match option constants live in `regex/flags`, error kinds in
  * `regex/error`.
@@ -112,4 +113,60 @@ One-shot helper over the lower-level `Pattern.match`: always returns a
 */
 pub func match(pattern, subject) {
     return new Pattern(pattern).match(subject)
+}
+
+/**
+@brief Compile `pattern` and replace every match in `subject`.
+
+One-shot helper: the pattern is compiled (with default options) and discarded
+after the call. When matching repeatedly, compile a `Pattern` once and reuse
+it instead. The replacement is inserted literally and a new String/Bytes is
+returned; the subject is never modified in place.
+
+@param pattern      The expression source (String or Bytes).
+@param subject      The String or Bytes to search.
+@param replacement  The literal replacement; must have the same type as the
+                    subject.
+
+@return A new String/Bytes (same type as the subject) with the replacements
+        applied; equal to the subject when nothing matches.
+
+@panic TypeError     When `pattern` is neither String nor Bytes, or
+                     `replacement` type does not match the subject type.
+@panic PatternError  When PCRE2 rejects the expression.
+@panic PCREError     When PCRE2 reports a matching error.
+
+@see find, findall, Pattern
+
+@example
+    regex.replace("[0-9]+", "a1 b22", "N")  # "aN bN"
+*/
+pub func replace(pattern, subject, replacement) {
+    return new Pattern(pattern).replace(subject, replacement)
+}
+
+/**
+@brief Compile `pattern` and split `subject` at every match.
+
+One-shot helper: the pattern is compiled (with default options) and discarded
+after the call. When matching repeatedly, compile a `Pattern` once and reuse
+it instead. The remainder after the last match is always included, so the
+result never has fewer than one element.
+
+@param pattern  The expression source (String or Bytes).
+@param subject  The String or Bytes to split.
+
+@return A List of String/Bytes pieces (same type as the subject).
+
+@panic TypeError     When `pattern` is neither String nor Bytes.
+@panic PatternError  When PCRE2 rejects the expression.
+
+@see findall, replace, Pattern
+
+@example
+    regex.split(",\\s*", "a, b,c")   # ["a", "b", "c"]
+    regex.split(",", "no commas")    # ["no commas"]
+*/
+pub func split(pattern, subject) {
+    return new Pattern(pattern).split(subject)
 }

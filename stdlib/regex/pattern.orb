@@ -8,8 +8,9 @@
  * `Pattern` compiles a regular expression once (against the shared
  * `GLOBAL_COMPILE_CONTEXT`) and exposes the matching primitives built on top
  * of it: `match`/`find` for a single attempt, `findall` for iterating every
- * match (zero-width matches included), and `split` for cutting a subject at
- * each match boundary.
+ * match (zero-width matches included), `replace` for building a copy with
+ * matches substituted, and `split` for cutting a subject at each match
+ * boundary.
  *
  * Subjects can be String or Bytes; every offset exchanged with this class is
  * a **byte** offset. For UTF-8 subjects compile the pattern with
@@ -268,6 +269,65 @@ pub class Pattern {
         }
 
         return new match.Match(subject, self, md, rc, self.capture_count)
+    }
+
+    /**
+    @brief Return a copy of the subject with every match replaced.
+
+    Classic find-and-rebuild: the matches are located first (`findall`, so
+    zero-width matches and UTF-8 stepping are already handled), then a new
+    String/Bytes is assembled from the unmatched pieces with `replacement`
+    spliced in between. The subject is never modified in place.
+
+    The replacement is inserted literally: no `$1`-style group references.
+
+    @param subject               The String or Bytes to search.
+    @param replacement           The literal replacement; must have the same
+                                 type as the subject.
+    @param max_replacements=-1   Replace at most this many matches (-1 means
+                                 no limit).
+
+    @return A new String/Bytes (same type as the subject) with the
+            replacements applied; equal to the subject when nothing matches.
+
+    @panic TypeError   When `replacement` type does not match the subject type.
+    @panic PCREError   When PCRE2 reports a matching error.
+
+    @see findall, split
+
+    @example
+        p := new Pattern("[0-9]+")
+        p.replace("a1 b22", "N")                       # "aN bN"
+        p.replace("a1 b22", "N", max_replacements=1)   # "aN b22"
+        p.replace("no digits", "N")                    # "no digits"
+    */
+    pub func replace(subject, replacement, max_replacements=-1) {
+        is_string := subject.is(String)
+
+        if is_string && !replacement.is(String) {
+            panic fmt_typerror(replacement, String)
+        } elif !is_string && !replacement.is(Bytes) {
+            panic fmt_typerror(replacement, Bytes)
+        }
+
+        total := is_string ? subject.byte_length() : subject.length()
+
+        result := is_string ? "" : b""
+        offset := 0
+
+        for var m in self.findall(subject, max_matches=max_replacements) {
+            start := m.start()
+
+            result += is_string ? subject.byte_substring(offset, start) : subject[offset:start]
+            result += replacement
+
+            offset = m.end()
+        }
+
+        # Remainder after the last match.
+        result += is_string ? subject.byte_substring(offset, total) : subject[offset:]
+
+        return result
     }
 
     /**
