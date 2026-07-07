@@ -1,0 +1,39 @@
+# This source file is part of the Orbit project.
+#
+# Licensed under the Apache License v2.0
+
+/*!
+ * @brief Native interop (FFI) platform metadata.
+ *
+ * Re-exports the constants of the native `::orbit::ffi` module: the size in
+ * bytes of every native type usable in `native` declarations (`SIZEOF_*`)
+ * and the platform byte order (`ENDIAN`, "little" or "big").
+ *
+ * Use these to compute buffer layouts for native calls instead of hardcoding
+ * platform-dependent sizes.
+ *
+ * @example
+ *     import "ffi"
+ *
+ *     buf := Rawptr.alloc(ffi.SIZEOF_PTR * 2)      # two pointers
+ *     out := Rawptr.alloc(ffi.SIZEOF_U32, fill=0)  # a single uint32_t
+ */
+
+pub import
+    ENDIAN,
+    SIZEOF_BOOL,
+    SIZEOF_BYTE,
+    SIZEOF_I8,
+    SIZEOF_I16,
+    SIZEOF_I32,
+    SIZEOF_I64,
+    SIZEOF_ISIZE,
+    SIZEOF_U8,
+    SIZEOF_U16,
+    SIZEOF_U32,
+    SIZEOF_U64,
+    SIZEOF_USIZE,
+    SIZEOF_PTR,
+    SIZEOF_F32,
+    SIZEOF_F64
+    from "::orbit::ffi"
