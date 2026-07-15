@@ -7,7 +7,7 @@
 
 #include <orbit/orbiter/memory/iallocator.h>
 
-#include <orbit/liftoff/ir/ircontext.h>
+#include <orbit/liftoff/ir/irchandle.h>
 
 namespace liftoff::ir {
     /**
