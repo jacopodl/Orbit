@@ -8,8 +8,8 @@
 using namespace liftoff::ir;
 
 LinearScan::LinearScan(IRContext *ir, const U16 total_regs) noexcept : builder_(ir),
-                                                                 ir_(ir),
-                                                                 total_regs_(total_regs) {
+                                                                       ir_(ir),
+                                                                       total_regs_(total_regs) {
     assert(total_regs >= 2);
 
     for (auto i = total_regs - 1; i >= 0; --i)
@@ -115,6 +115,13 @@ void LinearScan::ExpireOldIntervals(const U32 position) {
     while (it != this->active_.end()) {
         const LiveInterval *interval = *it;
 
+        // Strict `<`: an interval is expired only once `position` has passed its
+        // end. NOTE the deliberate inconsistency with AllocateSpecificRegister,
+        // which treats `found->end == interval.start` as non-overlapping and
+        // hands the register over. Relaxing this to `<=` (freeing a register at
+        // end == start) was tried and empirically miscompiles under register
+        // pressure — the read-before-write argument does not hold in every path,
+        // so the conservative bound stays here. See the boundary discussion.
         if (interval->end < position) {
             this->free_registers_.insert(interval->instr->assigned_reg);
 
@@ -144,36 +151,26 @@ void LinearScan::ExpireOldIntervals(const U32 position) {
 }
 
 // Called when all registers are occupied and a new interval still needs one.
-// Evicts the interval with the longest remaining lifetime (it is cheapest to
-// keep short-lived values in registers), steals its register for the incoming
-// interval, and emits SKSTR/SKLDR pairs to preserve the evicted value.
 void LinearScan::SpillAndAssignRegister(LiveInterval *interval) {
     const auto longest = *this->active_.rbegin();
 
-    const auto spilled_instr = longest->instr;
+    // The incoming interval always takes the longest-lived interval's register.
+    interval->instr->SetRegister(longest->instr->assigned_reg);
 
-    bool is_spilled = false;
+    if (longest->end > interval->end) {
+        // longest outlives interval: spill longest, interval stays stable.
+        this->SpillToStackAndReloadUses(longest->instr);
 
-    // Assign the register of the spilled instruction to the new interval
-    interval->instr->SetRegister(spilled_instr->assigned_reg);
+        this->active_.erase(longest);
+        this->active_stack_.insert(longest);
 
-    // Emit instructions to store the spilled value to the stack and update references
-    this->SpillToStackAndReloadUses(spilled_instr);
-
-    // If the incoming interval outlives the evicted one, the incoming interval will
-    // itself need to be on the stack for part of its range — spill it too.
-    if (interval->end > longest->end) {
+        this->active_.insert(interval);
+    } else {
+        // interval is the longest-lived: spill interval, longest stays stable.
         this->SpillToStackAndReloadUses(interval->instr);
 
-        is_spilled = true;
+        this->active_stack_.insert(interval);
     }
-
-    this->active_stack_.insert(longest);
-
-    this->active_.erase(longest);
-
-    if (is_spilled)
-        this->active_.insert(interval);
 }
 
 // Spills `instruction` to a backing location and replaces all non-adjacent uses
