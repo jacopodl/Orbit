@@ -7,17 +7,30 @@
 
 #include <orbit/orbiter/datatype/oobject.h>
 #include <orbit/orbiter/datatype/code.h>
+#include <orbit/orbiter/datatype/function.h>
 
 namespace orbiter::datatype {
     struct Class {
         OROBJ_HEAD;
     };
+
     using HClass = Handle<Class>;
 
     struct Trait {
         OROBJ_HEAD;
     };
+
     using HTrait = Handle<Trait>;
+
+    struct ClassBlueprint {
+        Function *equal;
+        Function *compare;
+        Function *hash;
+        Function *repr;
+        Function *str;
+
+        void *blueprint[];
+    };
 
     /**
      * @brief Set up additional features and properties for the specified type
