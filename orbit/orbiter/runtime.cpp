@@ -452,7 +452,7 @@ Orbiter::~Orbiter() {
 bool Orbiter::EvalSync(Function *func, OObject **argv, const U16 argc, OObject **out) {
     auto *fiber = Fiber::Current();
 
-    const auto SP = fiber->vm.regs.SP.reg;
+    const auto saved_regs = fiber->vm.regs;
 
     auto stack_size_required = kStackPrologueOffset +
                                (func->shared->code->stack_size * sizeof(void *))
@@ -490,7 +490,8 @@ bool Orbiter::EvalSync(Function *func, OObject **argv, const U16 argc, OObject *
 
     auto *res = eval(fiber, fiber->vm.regs.BP.reg);
 
-    fiber->vm.regs.SP.reg = SP; // Cleanup stack
+    // Full registers restore
+    fiber->vm.regs = saved_regs;
 
     if (!fiber->IsPanicking()) {
         *out = res;
