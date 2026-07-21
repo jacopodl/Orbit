@@ -27,6 +27,10 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 ORBIT="$ROOT/bin/Orbit"
 export ORBIT_PATH="$ROOT/stdlib"
 
+# A reproducer for a hang must not hang the suite: cap every run. Override with
+# POC_TIMEOUT=<seconds> for a slow machine. `timeout` exits 124 on expiry.
+POC_TIMEOUT="${POC_TIMEOUT:-30}"
+
 filter="${1:-}"
 pass=0; fail=0
 
@@ -39,7 +43,11 @@ run_orb() {
     line="$(sed -n 's/.*EXPECT:[[:space:]]*//p' "$f" | head -1 | tr -d '\r')"
     if [ -z "$line" ]; then bad_line "$rel" "no '# EXPECT:' directive"; return; fi
 
-    out="$("$ORBIT" "$f" 2>&1)"; rc=$?
+    out="$(timeout "$POC_TIMEOUT" "$ORBIT" "$f" 2>&1)"; rc=$?
+
+    if [ $rc -eq 124 ]; then
+        bad_line "$rel" "timed out after ${POC_TIMEOUT}s (hang)"; return
+    fi
 
     case "$line" in
         ok)

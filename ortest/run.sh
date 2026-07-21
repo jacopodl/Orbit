@@ -30,6 +30,10 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ORBIT="$ROOT/bin/Orbit"
 export ORBIT_PATH="$ROOT/stdlib"
 
+# A suite that hangs must not hang the gate: cap every run. Override with
+# ORTEST_TIMEOUT=<seconds> on a slow machine. `timeout` exits 124 on expiry.
+ORTEST_TIMEOUT="${ORTEST_TIMEOUT:-30}"
+
 filter="${1:-}"
 pass=0; fail=0
 
@@ -42,7 +46,11 @@ run_orb() {
     line="$(sed -n 's/.*EXPECT:[[:space:]]*//p' "$f" | head -1 | tr -d '\r')"
     if [ -z "$line" ]; then bad_line "$rel" "no '# EXPECT:' directive"; return; fi
 
-    out="$("$ORBIT" "$f" 2>&1)"; rc=$?
+    out="$(timeout "$ORTEST_TIMEOUT" "$ORBIT" "$f" 2>&1)"; rc=$?
+
+    if [ $rc -eq 124 ]; then
+        bad_line "$rel" "timed out after ${ORTEST_TIMEOUT}s (hang)"; return
+    fi
 
     case "$line" in
         ok)

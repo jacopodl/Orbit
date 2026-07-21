@@ -1,0 +1,53 @@
+# PoC ctb-001-type-object-receiver — class hook dispatchers reached with a TYPE
+# OBJECT as receiver used to segfault, and to name the value after its SUPERCLASS
+# (CTB-001).
+#
+# `ops.to_string` / `to_repr` / `compare` are installed on every class, and a type
+# object resolves its ops through its superclass, so `tostr(D)` lands in
+# ClassToString with the type object as receiver. There, `O_GET_TYPE(self)` is the
+# superclass and the ClassBlueprint cache does not exist until the class is first
+# instantiated -> null dereference.
+#
+# FIXED 2026-07-17: see issues/ctbuilder.md.
+# EXPECT: contains: ALL CHECKS PASSED
+
+import "io"
+
+var fails = 0
+
+func check(name, got, expected) {
+    if got == expected {
+        io.print("OK   ", name)
+    } else {
+        fails += 1
+        io.print("FAIL ", name, " got=", got, " expected=", expected)
+    }
+}
+
+func has_prefix(s, prefix) { return s.starts_with(prefix) }
+
+class Base { pub init() { } }
+
+# Never instantiated: its blueprint is never built. This alone used to segfault.
+class NeverBuilt : Base { pub init() { super.init() } }
+
+class WithHooks : Base {
+    pub init() { super.init() }
+    pub func str() { return "instance-str" }
+    pub func hash() { return 22 }
+}
+
+check("no crash, type names itself", has_prefix(tostr(NeverBuilt), "<NeverBuilt at "), true)
+check("repr form too", has_prefix(torepr(NeverBuilt), "<NeverBuilt at "), true)
+check("hooks do not run for a type object", has_prefix(tostr(WithHooks), "<WithHooks at "), true)
+check("instance hook still runs", tostr(new WithHooks()), "instance-str")
+
+d := {}
+d[NeverBuilt] = "nb"
+check("type object still hashable", d[NeverBuilt], "nb")
+
+if fails == 0 {
+    io.print("ALL CHECKS PASSED")
+} else {
+    io.print(fails, "CHECK(S) FAILED")
+}

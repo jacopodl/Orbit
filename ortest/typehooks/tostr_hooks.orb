@@ -179,65 +179,65 @@ class NoEq {
 
 func t_basic() {
     b := new Basic()
-    check("hook result", b.tostr(), "basic-str")
+    check("hook result", tostr(b), "basic-str")
     return 0
 }
 
 func t_wrong_type() {
     w := new WrongType()
-    r := trap w.tostr()
+    r := trap tostr(w)
     check("non-string return traps", r.unwrap_or("TYPE-ERR"), "TYPE-ERR")
     return 0
 }
 
 func t_panic_propagates() {
     p := new Panicker()
-    r := trap p.tostr()
+    r := trap tostr(p)
     check("hook panic propagates", r.unwrap_or("CAUGHT"), "CAUGHT")
     return 0
 }
 
 func t_trap_inside_hook() {
     s := new SelfHealing()
-    check("trap inside hook", s.tostr(), "recovered")
+    check("trap inside hook", tostr(s), "recovered")
     return 0
 }
 
 func t_await_banned() {
     a := new Awaiter(napper())
-    r := trap a.tostr()
+    r := trap tostr(a)
     check("await banned in hook", r.unwrap_or("BANNED"), "BANNED")
     return 0
 }
 
 func t_chan_recv_banned() {
     c := new ChanReader(Chan())
-    r := trap c.tostr()
+    r := trap tostr(c)
     check("chan recv banned in hook", r.unwrap_or("BANNED"), "BANNED")
     return 0
 }
 
 func t_chan_send_banned() {
     c := new ChanWriter(Chan())
-    r := trap c.tostr()
+    r := trap tostr(c)
     check("chan send banned in hook", r.unwrap_or("BANNED"), "BANNED")
     return 0
 }
 
 func t_nested_call() {
     n := new Nested()
-    check("nested call in hook", n.tostr(), "nested-ok")
+    check("nested call in hook", tostr(n), "nested-ok")
     return 0
 }
 
 # The receiver must reach the hook through EvalSync's argv, not by luck of
-# the caller's stack layout: `x.tostr()` happens to leave self right below
+# the caller's stack layout: `tostr(x)` happens to leave self right below
 # the sync frame, while stringifying a container element does not — both
 # paths must see the right `self`.
 func t_self_receiver() {
     p := new Named("pippo")
-    check("self via direct call", p.tostr(), "pippo")
-    check("self via list element", [p].tostr(), "[pippo]")
+    check("self via direct call", tostr(p), "pippo")
+    check("self via list element", tostr([p]), "[pippo]")
     return 0
 }
 

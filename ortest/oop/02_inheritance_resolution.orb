@@ -1,0 +1,75 @@
+# OOP suite 02 -- member resolution across an inheritance chain.
+#
+# A class's `type_` field is an inheritance link (it points at the SUPERCLASS),
+# unlike a builtin type object where it points at the metatype. Resolving a class
+# through it first makes the super shadow the class's own members: the derived
+# constructor is never invoked, and every member read off the class resolves to
+# the super's version.
+#
+# Covers: derived constructors actually running (field defaults, explicit
+# assignments, statements after `super.init(...)`) and override resolution on
+# both instances and type objects.
+#
+# NOTE: chains three levels deep are NOT exercised here — instantiating one hangs
+# (see issues/ir.md, IR-005). Extend this suite once that is fixed.
+#
+# EXPECT: contains: ALL TESTS PASSED
+
+import "io"
+
+var fails = 0
+
+func check(name, got, expected) {
+    if got == expected {
+        io.print("OK   ", name)
+    } else {
+        io.print("FAIL ", name, "-- got:", got, "expected:", expected)
+        fails += 1
+    }
+}
+
+var ctor_marker = 0
+
+class Base {
+    pub var a = 1
+    pub init() { }
+    pub func who() { return "base" }
+    pub func only_base() { return "only-base" }
+}
+
+class Derived : Base {
+    pub var b = 2
+    pub var c
+
+    pub init() {
+        super.init()
+        self.c = 3
+        ctor_marker = 42
+    }
+
+    pub func who() { return "derived" }
+}
+
+d := new Derived()
+
+# --- the derived constructor must actually run ---
+check("super ctor ran (inherited field)", d.a, 1)
+check("derived field default", d.b, 2)
+check("assignment in derived ctor", d.c, 3)
+check("statement after super.init ran", ctor_marker, 42)
+
+# --- override resolution on instances ---
+check("override on instance", d.who(), "derived")
+check("inherited method on instance", d.only_base(), "only-base")
+check("base instance unaffected", new Base().who(), "base")
+
+# --- override resolution on the type object ---
+# Reading a member off the class itself must give the class's own, not the super's.
+check("type object: override not shadowed", Derived.who == Base.who, false)
+check("type object: inherited member shared", Derived.only_base == Base.only_base, true)
+
+if fails == 0 {
+    io.print("ALL TESTS PASSED")
+} else {
+    io.print(fails, "TEST(S) FAILED")
+}

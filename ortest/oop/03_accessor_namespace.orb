@@ -1,0 +1,65 @@
+# OOP suite 03 -- accessor free functions vs same-named user methods.
+#
+# The value-protocol accessors (tostr, torepr, hash, type, tp_name, idof, ...)
+# are free functions in the builtin module, not methods on a metatype. So a class
+# may declare a METHOD whose name matches an accessor with no collision at all:
+# the method is reached with `x.name()`, the accessor with `name(x)`, and the two
+# are fully independent. This non-collision is exactly what the Type-metatype ->
+# builtin migration bought — before it, a class member could shadow an accessor
+# (or be shadowed by it) because they shared a call site.
+#
+# EXPECT: contains: ALL TESTS PASSED
+
+import "io"
+
+var fails = 0
+
+func check(name, got, expected) {
+    if got == expected {
+        io.print("OK   ", name)
+    } else {
+        io.print("FAIL ", name, "-- got:", got, "expected:", expected)
+        fails += 1
+    }
+}
+
+# `tp_name` and `type` are NOT hooks — just plain method names that happen to
+# match accessors. The class value and the accessor must not interfere.
+class Named {
+    pub init() { }
+    pub func tp_name() { return "my-name" }
+    pub func type() { return "my-type" }
+}
+
+o := new Named()
+
+# --- the user method and the accessor coexist, independently ---
+check("user method tp_name()", o.tp_name(), "my-name")
+check("accessor tp_name(o)", tp_name(o), "Named")
+check("user method type()", o.type(), "my-type")
+check("accessor type(o)", type(o) == Named, true)
+
+# --- the accessors still work on any value ---
+check("tp_name on primitive", tp_name(42), "Number")
+check("tostr on primitive", tostr(42), "42")
+check("idof is stable per object", idof(o) == idof(o), true)
+
+# --- for a name that IS a hook (str/hash), the method and the accessor agree,
+#     because the accessor dispatches to that very hook ---
+class Hooked {
+    pub var v
+    pub init(v) { self.v = v }
+    pub func str() { return "hooked-str" }
+    pub func hash() { return self.v }
+}
+
+h := new Hooked(7)
+check("str hook reachable as method", h.str(), "hooked-str")
+check("str method matches tostr accessor", h.str() == tostr(h), true)
+check("hash method matches hash accessor", h.hash() == hash(h), true)
+
+if fails == 0 {
+    io.print("ALL TESTS PASSED")
+} else {
+    io.print(fails, "TEST(S) FAILED")
+}

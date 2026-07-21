@@ -37,8 +37,9 @@ ortest/
 ```
 
 Current topics: `regalloc/` (register allocator, tiers `01_variables` …
-`05_pressure`, rising in difficulty), `typehooks/` (str/eq user hooks). Add a
-new subsystem as a new subfolder — the runner picks it up automatically.
+`05_pressure`, rising in difficulty), `oop/` (class hooks, inheritance, instance
+layout), `typehooks/` (str/eq user hooks). Add a new subsystem as a new
+subfolder — the runner picks it up automatically.
 
 ## Writing a suite
 

@@ -1,0 +1,77 @@
+# OOP suite 04 -- hook dispatchers reached with a TYPE OBJECT as receiver.
+#
+# `ops.compare` / `to_string` / `to_repr` are installed on every class, and a type
+# object resolves its ops through its SUPERCLASS. So `tostr(SomeClass)` lands in
+# the class hook dispatchers with the type object — not an instance — as receiver.
+# Two things differ there:
+#
+#   - `O_GET_TYPE(self)` is the superclass, so it must not be used to name the
+#     value (it printed `<Base at ...>` for a derived class);
+#   - the ClassBlueprint cache is built on FIRST INSTANTIATION, so a class that
+#     was never constructed has none (dereferencing it segfaulted).
+#
+# Instance hooks must not run against a type object, so the expected behaviour is
+# the plain `<TypeName at 0xADDR>` form with the *correct* name, and no crash.
+#
+# EXPECT: contains: ALL TESTS PASSED
+
+import "io"
+
+var fails = 0
+
+func check(name, got, expected) {
+    if got == expected {
+        io.print("OK   ", name)
+    } else {
+        io.print("FAIL ", name, "-- got:", got, "expected:", expected)
+        fails += 1
+    }
+}
+
+func has_prefix(s, prefix) {
+    return s.starts_with(prefix)
+}
+
+class Base {
+    pub init() { }
+}
+
+# Never instantiated anywhere in this suite: its blueprint stays unbuilt.
+class NeverBuilt : Base {
+    pub init() { super.init() }
+}
+
+# Defines the hooks, but they must not run for a type-object receiver.
+class WithHooks : Base {
+    pub init() { super.init() }
+    pub func str() { return "instance-str" }
+    pub func repr() { return "instance-repr" }
+    pub func hash() { return 22 }
+}
+
+# --- no crash, and the type's OWN name (not the superclass's) ---
+check("type object names itself", has_prefix(tostr(NeverBuilt), "<NeverBuilt at "), true)
+check("type object repr names itself", has_prefix(torepr(NeverBuilt), "<NeverBuilt at "), true)
+check("base type object", has_prefix(tostr(Base), "<Base at "), true)
+
+# --- a class WITH hooks: they belong to instances, not to the type object ---
+check("type object ignores str hook", has_prefix(tostr(WithHooks), "<WithHooks at "), true)
+check("type object ignores repr hook", has_prefix(torepr(WithHooks), "<WithHooks at "), true)
+
+# --- the hooks still work where they should ---
+check("instance uses str hook", tostr(new WithHooks()), "instance-str")
+check("instance uses repr hook", torepr(new WithHooks()), "instance-repr")
+check("instance uses hash hook", hash(new WithHooks()), 22)
+
+# --- type objects stay usable as dict keys (identity hash) ---
+d := {}
+d[NeverBuilt] = "nb"
+d[WithHooks] = "wh"
+check("never-built type as dict key", d[NeverBuilt], "nb")
+check("hook-defining type as dict key", d[WithHooks], "wh")
+
+if fails == 0 {
+    io.print("ALL TESTS PASSED")
+} else {
+    io.print(fails, "TEST(S) FAILED")
+}

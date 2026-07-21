@@ -249,6 +249,122 @@ Verified: full battery green plus a targeted stress (pinned RR result held live
 across 16 temporaries exhausting the pool, and two call results with 14 live
 temporaries in between).
 
+---
+
+## IR-004 — A derived class resolves its own members through its superclass (wrong `init`, shadowed properties)
+**Severity:** High (silent wrong behaviour) · **Status:** FIXED (2026-07-17) · **Location:** `orbit/orbiter/vm.cpp` (`LoadFromObjectProp`)
+
+**Fix verified (`poc/ir/ir-004-derived-ctor-body.orb` GREEN — full tracker suite
+21/21, `ortest/run.sh` 7/7).** Root cause found by the project author: the
+`type_` field is **overloaded**. For a builtin type object it points at the
+*metatype* (`O_GET_TYPE(String)` → `Type`), but for a user class it points at the
+*superclass* (`O_GET_TYPE(Derived)` → `Base`). `LoadFromObjectProp` resolved a
+type object through `O_GET_TYPE(obj)` first:
+
+```cpp
+const bool obj_is_type = O_IS_OBJECT(obj) && !O_GET_RC(obj).IsInstance();
+const auto *type = obj_is_type ? O_GET_TYPE(obj) : GetTypeInfoFromObject(...);
+```
+
+so `new Derived()` looked up `init` starting at `Base` and got **Base's**
+constructor. The derived constructor never ran at all — which is why its field
+defaults, its explicit assignments and every statement after `super.init(...)`
+appeared to be dead code.
+
+The metatype-first order exists for a reason and was kept: for a builtin like
+`String` it prevents an *instance* method being picked up and applied to the
+non-instance type object. The fix only special-cases classes, where `type_` is an
+inheritance link rather than a metatype link: for a `CLASS` type object (outside a
+`SUPER` lookup) the class's **own** chain is searched first. `TIFindProperty`
+already walks up to the super and on to the metatype, so inherited members still
+resolve normally.
+
+Not limited to constructors: before the fix, *any* member read off a derived
+class type object returned the super's version — `D.who == B.who` evaluated to
+`true` (same Function object) with `who` overridden in `D`; it is `false` now.
+
+<details><summary>Original report (2026-07-17, OPEN)</summary>
+
+The parser *requires* `super.init(...)` to be the first statement of a derived
+class constructor (`parser.h:95`). Everything after it is then silently dead: the
+constructor body simply does not run past that point. No error, no diagnostic.
+
+Consequences, all silent:
+
+- a derived class's own field defaults (`pub var b = 20`) stay `nil`;
+- explicit assignments in the constructor (`self.c = 30`) are lost;
+- any other constructor logic (side effects, validation) is skipped.
+
+```orb
+class Base    { pub var a = 10   pub init() { } }
+class Derived : Base {
+    pub var b = 20
+    pub init() { super.init()   self.b = 99 }   # neither the default nor the assignment lands
+}
+new Derived().b   # -> nil (expected 99)
+```
+
+Storage and slot resolution are **not** at fault: the identical write from an
+ordinary method works (`p.setd()` → `p.d == 7` in the PoC), and the inherited
+field set by the super's constructor is correct.
+
+`EXECSUB` (`vm.cpp:1540`) looks like a proper call: it `PushState()`s, switches
+the context to the super's `Code`, and `goto BEGIN`; the super's `RET` →
+`PopState()` restores the whole `FiberContext` (code object included) plus IP/BP,
+so control *should* resume right after the `EXECSUB`. That points at the IR
+builder not emitting the trailing statements of a derived constructor at all,
+rather than at the VM — worth confirming with an IR/bytecode dump of the derived
+`init` before fixing.
+
+**PoC:** [`poc/ir/ir-004-derived-ctor-body.orb`](poc/ir/ir-004-derived-ctor-body.orb)
+`(confirmed live)` — 3 checks RED, 2 control checks green.
+
+**Fix.** Determine whether the derived-constructor lowering emits the statements
+following the `super.init(...)` call; if it does not, emit them after the
+`EXECSUB` and keep the constructor's own `RET` as the terminator. If it does emit
+them, the return path from `EXECSUB` is not resuming the caller's code object as
+`PopState` suggests, and the VM side needs the fix instead.
+*(2026-07-17: both hypotheses were wrong — the lowering and `EXECSUB`/`PopState`
+are fine. The derived constructor was never invoked in the first place: the
+`init` lookup resolved to the superclass. See the update above.)*
+
+</details>
+
+---
+
+## IR-005 — Instantiating a class three levels deep in an inheritance chain hangs
+**Severity:** High (interpreter hang) · **Status:** OPEN · **Location:** unconfirmed; candidates are the constructor chain (`EXECSUB`, `orbit/orbiter/vm.cpp:1540`), `InitObjectBlueprint` recursion (`ctbuilder.cpp`), and `TIFindProperty`'s superclass walk (`oobject.cpp:262`)
+
+`A <- B` constructs fine; `A <- B <- C` makes `new C()` spin forever. The hang is
+at **runtime** — compilation completes and statements before the construction run
+and print normally.
+
+```orb
+class A  { pub init() { } }
+class B : A { pub init() { super.init() } }
+class C : B { pub init() { super.init() } }
+
+new B()   # ok
+new C()   # hangs
+```
+
+**Pre-existing**, and independent of IR-004: reproduces identically with the
+`LoadFromObjectProp` fix reverted (verified by stashing it and rebuilding).
+
+**Hypothesis (unverified).** `TIFindProperty` (`oobject.cpp:262`) walks the chain
+with `type = O_GET_TYPE(type)` and has **no cycle guard**. If the metatype root is
+self-referential (`Type`'s type being `Type`, the usual arrangement), then any
+lookup that misses all the way up loops forever. A two-level chain may always find
+its target before reaching the root, while a three-level one does not. Worth
+checking that root link first — a cycle guard there would be a cheap fix if so.
+
+**PoC:** [`poc/ir/ir-005-three-level-chain-hang.orb`](poc/ir/ir-005-three-level-chain-hang.orb)
+`(confirmed live)` — does not terminate; run it under a timeout.
+
+**Note for the test suite:** `ortest/oop/02_inheritance_resolution.orb` is
+deliberately capped at two levels so the release gate does not hang; extend it to
+three once this is fixed.
+
 <details><summary>Original report (2026-07-15, OPEN)</summary>
 
 Every `CALL` result is pinned to the return register R13 and *keeps* R13 as its
