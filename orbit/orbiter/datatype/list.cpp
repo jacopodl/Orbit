@@ -73,6 +73,23 @@ void ListTrace(const List *self, GCTraceCallback callback, const MSize epoch) {
 // TYPE OPS — COMPARISON
 // *********************************************************************************************************************
 
+/// Membership test: `"ab" in ["a", "ab", "c"].
+static bool ListContains(List *container, const OObject *value, bool &result) {
+    std::shared_lock _(container->lock);
+
+    result = false;
+
+    for (MSize i = 0; i < container->length; i++) {
+        if (!Equal(container->objects[i], value, result))
+            return false;
+
+        if (result)
+            break;
+    }
+
+    return true;
+}
+
 /// Structural equality: same length and element-wise Equal.
 static bool ListEqual(const OObject *left, const OObject *right, bool &out) {
     if (left == right) {
@@ -875,6 +892,7 @@ bool orbiter::datatype::ListTypeSetup(TypeInfo *self) {
 
     auto &ops = ((TypeInfoOps *) self)->ops;
 
+    ops.contains = (ContainsFn) ListContains;
     ops.equal = ListEqual;
     ops.add = ListAdd;
     ops.load_index = ListLoadIndex;

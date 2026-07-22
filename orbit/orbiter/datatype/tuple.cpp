@@ -43,6 +43,17 @@ void TupleTrace(const Tuple *self, const GCTraceCallback callback, const MSize e
 // TYPE OPS — COMPARISON
 // *********************************************************************************************************************
 
+/// Membership test: `"ab" in ("a", "ab", "c").
+static bool TupleContains(const OObject *container, const OObject *value, bool &result) {
+    const auto i = TupleContains((const Tuple *) container, value);
+    if (i == kTupleContainsError)
+        return false;
+
+    result = i > -1;
+
+    return true;
+}
+
 /// Structural equality: same length and element-wise Equal.
 static bool TupleEqual(const OObject *left, const OObject *right, bool &out) {
     if (left == right) {
@@ -498,6 +509,7 @@ bool orbiter::datatype::TupleTypeSetup(TypeInfo *self) {
 
     auto &ops = ((TypeInfoOps *) self)->ops;
 
+    ops.contains = ::TupleContains;
     ops.equal = TupleEqual;
     ops.add = TupleAdd;
     ops.load_index = TupleLoadIndex;
