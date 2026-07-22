@@ -222,10 +222,13 @@ static bool StrContains(const OObject *container, const OObject *value, bool &re
 
 /// String concatenation: "a" + "b" → "ab".
 static bool StrAdd(const OObject *left, const OObject *right, OObject *&result) {
-    auto *isolate = O_GET_ISOLATE(left);
+    if (!O_IS_OBJECT(left) || !O_IS_TYPE(left, InstanceType::STRING))
+        return false;
 
     if (!O_IS_OBJECT(right) || !O_IS_TYPE(right, InstanceType::STRING))
         return false;
+
+    auto *isolate = O_GET_ISOLATE(left);
 
     const auto *l = (const ORString *) left;
     const auto *r = (const ORString *) right;
@@ -251,7 +254,14 @@ static bool StrAdd(const OObject *left, const OObject *right, OObject *&result) 
 
 /// String repetition: "ab" * 3 → "ababab".
 static bool StrMul(const OObject *left, const OObject *right, OObject *&result) {
-    auto *isolate = O_GET_ISOLATE(left);
+    auto *self = (const ORString *) left;
+
+    if (!O_IS_OBJECT(self) || !O_IS_TYPE(self, InstanceType::STRING)) {
+        self = (const ORString *) right;
+        right = left;
+    }
+
+    auto *isolate = O_GET_ISOLATE(self);
 
     IntegerUnderlying n;
     if (!NumberExtract(right, n))
@@ -263,9 +273,7 @@ static bool StrMul(const OObject *left, const OObject *right, OObject *&result) 
         return true;
     }
 
-    auto *self = (const ORString *) left;
     const auto length = STR_LEN(self);
-
     if (length > 0 && (UIntegerUnderlying) n > ((MSize) -1 / length)) {
         ErrorSet(isolate,
                  RuntimeError::Details[RuntimeError::Reason::ID],
