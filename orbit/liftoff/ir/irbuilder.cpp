@@ -377,15 +377,15 @@ Instruction *IRBuilder::CreateCall(const parser::Call *node, Instruction *f_src)
     }
 
     const auto call = (CallInstr *) this->builder_.CreateCallDetached(opcode, f_src, node->args.size(), mode);
-
+    
     if (nargs != nullptr)
-        call->SetNargs(nargs);
+        call->SetNargs(this->builder_.CreateMove(nargs));
 
     if (rest != nullptr)
-        call->SetRest(rest);
+        call->SetRest(this->builder_.CreateMove(rest));
 
     if (kwargs != nullptr)
-        call->SetKwargs(kwargs);
+        call->SetKwargs(this->builder_.CreateMove(kwargs));
 
     if (opcode == orbiter::OPCode::DEFER)
         this->builder_.context->deferred_stack_count += node->args.size();
